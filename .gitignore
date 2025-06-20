@@ -278,7 +278,6 @@ static/collected/
 *.h5
 *.hdf5
 *.model
-models/
 
 # Data files (uncomment if you don't want to track data)
 # data/
