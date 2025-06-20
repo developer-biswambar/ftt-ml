@@ -8,7 +8,7 @@ import pandas as pd
 import uuid
 import os
 from typing import Dict, Any
-from storage import uploaded_files, extractions
+from app.storage import uploaded_files, extractions
 
 # Load .env file
 try:
@@ -51,35 +51,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# API Endpoints
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.0.0",
-        "openai_configured": bool(OPENAI_API_KEY and OPENAI_API_KEY != "sk-placeholder"),
-        "multi_column_support": True,
-        "batch_processing_enabled": True,
-        "current_batch_size": BATCH_SIZE,
-        "uploaded_files_count": len(uploaded_files),
-        "extractions_count": len(extractions)
-    }
-
-@app.get("/config")
-async def get_config():
-    return {
-        "success": True,
-        "data": {
-            "openai_configured": bool(OPENAI_API_KEY and OPENAI_API_KEY != "sk-placeholder"),
-            "openai_model": OPENAI_MODEL,
-            "batch_size": BATCH_SIZE,
-            "multi_column_support": True,
-            "api_key_set": bool(OPENAI_API_KEY and OPENAI_API_KEY != "sk-placeholder"),
-            "api_key_preview": f"sk-...{OPENAI_API_KEY[-4:]}" if OPENAI_API_KEY else "Not set"
-        }
-    }
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -280,8 +251,10 @@ sys.modules['app_storage'].extractions = extractions
 
 # Import and include extraction routes
 try:
-    from extraction_routes import router as extraction_router
+    from app.extraction_routes import router as extraction_router
+    from app.health_routes import router as health_routes 
     app.include_router(extraction_router)
+    app.include_router(health_routes)
     print("✅ Extraction routes loaded successfully")
 except ImportError as e:
     print(f"❌ Failed to load extraction routes: {e}")

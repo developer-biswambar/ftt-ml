@@ -24,7 +24,17 @@ class ExtractionService:
     
     async def start_extraction(self, request: ExtractionRequest) -> str:
         """
-        Start the extraction process asynchronously
+        Starts the extraction process asynchronously.
+
+        Args:
+            request (ExtractionRequest): The extraction request containing file ID, source column, 
+                                         extraction prompt, and optional batch size.
+
+        Returns:
+            str: The unique extraction ID for tracking the extraction process.
+
+        Raises:
+            Exception: If the extraction request validation or initialization fails.
         """
         try:
             # Validate request
@@ -68,7 +78,18 @@ class ExtractionService:
     
     async def _process_extraction(self, request: ExtractionRequest, extraction_id: str):
         """
-        Process the extraction request
+        Processes the extraction request asynchronously.
+
+        Args:
+            request (ExtractionRequest): The extraction request containing file ID, source column, 
+                                         extraction prompt, and optional batch size.
+            extraction_id (str): The unique ID of the extraction process.
+
+        Updates:
+            Updates the extraction status, processes data in batches, and calculates final statistics.
+
+        Raises:
+            Exception: If any error occurs during the extraction process.
         """
         start_time = time.time()
         
@@ -175,7 +196,13 @@ class ExtractionService:
     
     async def _enhance_extractions(self, extraction_rows: List[ExtractionRow]) -> List[ExtractionRow]:
         """
-        Enhance LLM extractions with regex patterns and validation
+        Enhances LLM extractions with regex patterns and validation.
+
+        Args:
+            extraction_rows (List[ExtractionRow]): List of rows extracted by the LLM.
+
+        Returns:
+            List[ExtractionRow]: Enhanced rows with validated and corrected fields.
         """
         enhanced_rows = []
         
@@ -234,7 +261,15 @@ class ExtractionService:
         return enhanced_rows
     
     def get_extraction_status(self, extraction_id: str) -> Optional[ExtractionResult]:
-        """Get the status of an extraction"""
+        """
+        Retrieves the status of an extraction.
+
+        Args:
+            extraction_id (str): The unique ID of the extraction.
+
+        Returns:
+            Optional[ExtractionResult]: The extraction result if found, otherwise None.
+        """
         return self.active_extractions.get(extraction_id)
     
     def get_all_extractions(self) -> List[ExtractionResult]:
@@ -242,7 +277,16 @@ class ExtractionService:
         return list(self.active_extractions.values())
     
     async def export_results(self, extraction_id: str, format: str = "csv") -> Optional[bytes]:
-        """Export extraction results in specified format"""
+        """
+        Exports extraction results in the specified format.
+
+        Args:
+            extraction_id (str): The unique ID of the extraction.
+            format (str): The format for export (csv, excel, or json).
+
+        Returns:
+            Optional[bytes]: The exported data in the specified format, or None if extraction is incomplete.
+        """
         extraction_result = self.get_extraction_status(extraction_id)
         
         if not extraction_result or extraction_result.status != ExtractionStatus.COMPLETED:

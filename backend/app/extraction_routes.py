@@ -12,7 +12,7 @@ import math
 import os
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
-from storage import uploaded_files, extractions
+from app.storage import uploaded_files, extractions
 
 
 # Get configuration from environment
