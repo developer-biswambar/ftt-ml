@@ -5,8 +5,8 @@ import time
 import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from app.models.schemas import (
-    ExtractionRequest, ExtractionResult, ExtractionStatus, 
+from backend.app.models.schemas import (
+    ExtractionRequest, ExtractionResult, ExtractionStatus,
     ExtractionRow, ExtractedField
 )
 from app.services.openai_service import openai_service
