@@ -1,18 +1,19 @@
 # main.py - Main FastAPI Application
 
+import logging
+import os
+import uuid
+from datetime import datetime
+
+import pandas as pd
+from app.storage import uploaded_files, extractions
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import logging
-from datetime import datetime
-import pandas as pd
-import uuid
-import os
-from typing import Dict, Any
-from app.storage import uploaded_files, extractions
 
 # Load .env file
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
     print("✅ .env file loaded successfully")
 except ImportError:
@@ -36,7 +37,6 @@ print(f"📊 Batch Size: {BATCH_SIZE}")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 # Create FastAPI app
 app = FastAPI(
     title="Financial Data Extraction API - Multi-Column",
@@ -52,21 +52,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
         if not file.filename.lower().endswith(('.csv', '.xlsx', '.xls')):
             raise HTTPException(400, "Only CSV and Excel files are supported")
-        
+
         file_id = str(uuid.uuid4())
         content = await file.read()
-        
+
         if file.filename.lower().endswith('.csv'):
             import io
             df = pd.read_csv(io.BytesIO(content))
         else:
             df = pd.read_excel(io.BytesIO(content))
-        
+
         file_info = {
             "file_id": file_id,
             "filename": file.filename,
@@ -74,23 +75,24 @@ async def upload_file(file: UploadFile = File(...)):
             "columns": list(df.columns),
             "upload_time": datetime.utcnow().isoformat()
         }
-        
+
         uploaded_files[file_id] = {
             "info": file_info,
             "data": df
         }
-        
+
         logger.info(f"File uploaded: {file.filename} with {len(df)} rows")
-        
+
         return {
             "success": True,
             "message": "File uploaded successfully",
             "data": file_info
         }
-        
+
     except Exception as e:
         logger.error(f"Upload error: {e}")
         raise HTTPException(400, f"Upload failed: {str(e)}")
+
 
 @app.get("/files")
 async def list_files():
@@ -99,7 +101,7 @@ async def list_files():
         for file_id, file_data in uploaded_files.items():
             file_info = file_data["info"].copy()
             files.append(file_info)
-        
+
         return {
             "success": True,
             "message": f"Retrieved {len(files)} files",
@@ -116,6 +118,7 @@ async def list_files():
             "data": {"files": [], "total_count": 0}
         }
 
+
 @app.get("/templates/multi-column")
 async def get_multi_column_templates():
     """Get multi-column extraction templates"""
@@ -130,7 +133,7 @@ async def get_multi_column_templates():
                     "priority": 1
                 },
                 {
-                    "column_name": "Comments", 
+                    "column_name": "Comments",
                     "extraction_prompt": "Extract counterparty, settlement date, and trade reference",
                     "priority": 2
                 },
@@ -179,12 +182,13 @@ async def get_multi_column_templates():
             ]
         }
     ]
-    
+
     return {
         "success": True,
         "message": "Multi-column templates retrieved",
         "data": templates
     }
+
 
 @app.get("/templates")
 async def get_templates():
@@ -211,12 +215,13 @@ async def get_templates():
             "example": "Comprehensive extraction of multiple financial fields"
         }
     ]
-    
+
     return {
         "success": True,
         "message": "Single-column templates retrieved",
         "data": templates
     }
+
 
 @app.get("/debug/status")
 async def debug_status():
@@ -243,8 +248,10 @@ async def debug_status():
         }
     }
 
+
 # Make storage available for other modules
 import sys
+
 sys.modules['app_storage'] = type(sys)('app_storage')
 sys.modules['app_storage'].uploaded_files = uploaded_files
 sys.modules['app_storage'].extractions = extractions
@@ -252,7 +259,8 @@ sys.modules['app_storage'].extractions = extractions
 # Import and include extraction routes
 try:
     from app.extraction_routes import router as extraction_router
-    from app.health_routes import router as health_routes 
+    from app.health_routes import router as health_routes
+
     app.include_router(extraction_router)
     app.include_router(health_routes)
     print("✅ Extraction routes loaded successfully")
@@ -260,16 +268,20 @@ except ImportError as e:
     print(f"❌ Failed to load extraction routes: {e}")
     print("⚠️ Running without extraction functionality")
 
+
 @app.on_event("startup")
 async def startup_event():
     print("🚀 Financial Data Extraction API Started - Multi-Column Support")
     print(f"📊 Storage initialized: {len(uploaded_files)} files, {len(extractions)} extractions")
-    print(f"🤖 OpenAI: {'✅ Configured' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌ Not configured'}")
+    print(
+        f"🤖 OpenAI: {'✅ Configured' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌ Not configured'}")
     print("🔄 Multi-Column Processing: ✅ Enabled")
     print("📋 API Docs: http://localhost:8000/docs")
 
+
 if __name__ == "__main__":
     import uvicorn
+
     print("🚀 Starting Financial Data Extraction API - Multi-Column")
     print(f"📊 Batch size: {BATCH_SIZE}")
     print(f"🤖 OpenAI Model: {OPENAI_MODEL}")

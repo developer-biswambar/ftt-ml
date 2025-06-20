@@ -1,11 +1,10 @@
-from fastapi import APIRouter
 import datetime
-from openai import AsyncOpenAI
 import logging
 import os
+
 from app.storage import uploaded_files, extractions
-
-
+from fastapi import APIRouter
+from openai import AsyncOpenAI
 
 # Get configuration from environment
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -26,10 +25,7 @@ if OPENAI_API_KEY and OPENAI_API_KEY != "sk-placeholder":
 else:
     print("⚠️ OpenAI client not initialized - check API key")
 
-
-
-
-router =  APIRouter()
+router = APIRouter()
 
 
 # API Endpoints
@@ -46,6 +42,7 @@ async def health_check():
         "uploaded_files_count": len(uploaded_files),
         "extractions_count": len(extractions)
     }
+
 
 @router.get("/config")
 async def get_config():
