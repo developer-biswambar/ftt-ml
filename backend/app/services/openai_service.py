@@ -5,9 +5,10 @@ import logging
 import time
 from typing import List
 
+from openai import AsyncOpenAI
+
 from app.config.settings import settings
 from app.models.schemas import ExtractedField, ExtractionRow
-from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 

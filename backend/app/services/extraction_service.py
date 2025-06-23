@@ -7,14 +7,13 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 from app.config.settings import settings
-from app.services.file_service import file_service
-from app.services.openai_service import openai_service
-from app.utils.financial_validators import FinancialValidators
-
 from app.models.schemas import (
     ExtractionRequest, ExtractionResult, ExtractionStatus,
     ExtractionRow
 )
+from app.services.file_service import file_service
+from app.services.openai_service import openai_service
+from app.utils.financial_validators import FinancialValidators
 
 logger = logging.getLogger(__name__)
 

@@ -1,10 +1,11 @@
-from datetime import datetime
 import logging
 import os
+from datetime import datetime
 
-from app.storage import uploaded_files, extractions
 from fastapi import APIRouter
 from openai import AsyncOpenAI
+
+from app.storage import uploaded_files, extractions
 
 # Get configuration from environment
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

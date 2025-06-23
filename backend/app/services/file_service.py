@@ -7,9 +7,10 @@ from typing import Dict, List, Optional, Tuple
 
 import aiofiles
 import pandas as pd
+from fastapi import UploadFile, HTTPException
+
 from app.config.settings import settings
 from app.models.schemas import FileInfo, FileType
-from fastapi import UploadFile, HTTPException
 
 logger = logging.getLogger(__name__)
 
