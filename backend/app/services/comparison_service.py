@@ -1,24 +1,22 @@
-import asyncio
+import json
 import json
 import logging
 import os
 import re
-import uuid
 from collections import defaultdict
 from datetime import datetime
-from typing import List, Dict, Optional, Any, Tuple
-from pydantic import BaseModel, Field
+from typing import List, Dict, Optional, Any
 
 import numpy as np
 import pandas as pd
 from openai import AsyncOpenAI
 from pydantic import BaseModel
+from pydantic import Field
 
 from app.storage import uploaded_files, comparisons
 
 # Setup logging
 logger = logging.getLogger(__name__)
-
 
 # Get configuration from environment
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -32,6 +30,8 @@ if OPENAI_API_KEY and OPENAI_API_KEY != "sk-placeholder":
         logger.info("✅ OpenAI client initialized for comparisons")
     except Exception as e:
         logger.error(f"❌ Failed to initialize OpenAI client: {e}")
+
+
 class ComparisonConfig:
     # Sampling
     MIN_SAMPLE_SIZE = 20
@@ -49,6 +49,7 @@ class ComparisonConfig:
     # Validation
     VALIDATE_ON_FULL_DATASET = True
     CONFIDENCE_CALCULATION = True
+
 
 class UnstructuredDataProcessor:
     """Handle completely unstructured or poorly structured data"""
@@ -159,6 +160,7 @@ class UnstructuredDataProcessor:
 
         return sum(scores) / len(scores)
 
+
 # Pydantic models for file comparison
 class ColumnMapping(BaseModel):
     file_a_column: str
@@ -187,8 +189,6 @@ class AnalysisResult(BaseModel):
     data_characteristics: Dict[str, Any]
     created_at: str
     processing_time: float
-
-
 
 
 # Enhanced utility functions
@@ -332,7 +332,6 @@ async def detect_all_patterns(df: pd.DataFrame) -> Dict[str, Dict]:
         all_patterns[column] = await analyze_data_patterns(df, column)
 
     return all_patterns
-
 
 
 async def multi_pass_analysis(df_a: pd.DataFrame, df_b: pd.DataFrame,
@@ -598,7 +597,7 @@ Analysis Request: {prompt}
 
 === DATA STRUCTURE ANALYSIS ===
 File A Structure:
-{json.dumps(comprehensive_context['structure']['file_a'], indent=2,default=convert_numpy)}
+{json.dumps(comprehensive_context['structure']['file_a'], indent=2, default=convert_numpy)}
 
 File B Structure:
 {json.dumps(comprehensive_context['structure']['file_b'], indent=2)}
@@ -607,10 +606,10 @@ File B Structure:
 Note: These patterns were detected across the ENTIRE dataset, not just samples.
 
 File A Patterns:
-{json.dumps(comprehensive_context['patterns']['file_a'], indent=2,default=convert_numpy)}
+{json.dumps(comprehensive_context['patterns']['file_a'], indent=2, default=convert_numpy)}
 
 File B Patterns:
-{json.dumps(comprehensive_context['patterns']['file_b'], indent=2,default=convert_numpy)}
+{json.dumps(comprehensive_context['patterns']['file_b'], indent=2, default=convert_numpy)}
 
 === DETECTED COLUMN RELATIONSHIPS ===
 Top relationships found:

@@ -10,10 +10,11 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 import pandas as pd
-from app.storage import uploaded_files, extractions
 from fastapi import APIRouter, Form, HTTPException
 from openai import AsyncOpenAI
 from pydantic import BaseModel
+
+from app.storage import uploaded_files, extractions
 
 # Get configuration from environment
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

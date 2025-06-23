@@ -6,9 +6,9 @@ import uuid
 from datetime import datetime
 
 import pandas as pd
-from app.storage import uploaded_files, extractions
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.storage import uploaded_files, extractions, comparisons  # Added 'comparisons' to imports
 
 # Load .env file
@@ -306,8 +306,10 @@ except ImportError as e:
 @app.on_event("startup")
 async def startup_event():
     print("🚀 Financial Data Extraction & Analysis API Started")
-    print(f"📊 Storage initialized: {len(uploaded_files)} files, {len(extractions)} extractions, {len(comparisons)} comparisons")
-    print(f"🤖 OpenAI: {'✅ Configured' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌ Not configured'}")
+    print(
+        f"📊 Storage initialized: {len(uploaded_files)} files, {len(extractions)} extractions, {len(comparisons)} comparisons")
+    print(
+        f"🤖 OpenAI: {'✅ Configured' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌ Not configured'}")
     print("🔄 Multi-Column Processing: ✅ Enabled")
     print("🔍 File Comparison: ✅ Enabled")  # NEW
     print("📋 API Docs: http://localhost:8000/docs")

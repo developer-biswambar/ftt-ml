@@ -1,26 +1,19 @@
 import asyncio
-import json
 import logging
 import os
-import re
 import uuid
-from collections import defaultdict
 from datetime import datetime
-from typing import List, Dict, Optional, Any, Tuple
 
-import numpy as np
 import pandas as pd
+from fastapi import APIRouter, HTTPException
+from openai import AsyncOpenAI
 
 from app.services.comparison_service import ComparisonConfig, process_comparison_enhanced, ComparisonRequest
 from app.storage import uploaded_files, comparisons
-from fastapi import APIRouter, HTTPException
-from openai import AsyncOpenAI
-from pydantic import BaseModel, Field
 
 # Get configuration from environment
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4-turbo")
-
 
 # Enhanced configuration
 
@@ -37,12 +30,8 @@ if OPENAI_API_KEY and OPENAI_API_KEY != "sk-placeholder":
     except Exception as e:
         logger.error(f"❌ Failed to initialize OpenAI client: {e}")
 
-
-
 # Create router
 router = APIRouter(prefix="/api/v1/compare", tags=["comparison"])
-
-
 
 
 # API Routes
