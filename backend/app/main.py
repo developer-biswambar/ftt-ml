@@ -9,6 +9,7 @@ import pandas as pd
 from app.storage import uploaded_files, extractions
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from app.storage import uploaded_files, extractions, comparisons  # Added 'comparisons' to imports
 
 # Load .env file
 try:
@@ -117,6 +118,38 @@ async def list_files():
             "message": f"Failed to list files: {str(e)}",
             "data": {"files": [], "total_count": 0}
         }
+
+
+@app.get("/files/{file_id}")
+async def get_file_info(file_id: str):
+    """Get detailed information about a specific file"""
+    if file_id not in uploaded_files:
+        raise HTTPException(404, "File not found")
+
+    file_data = uploaded_files[file_id]
+    df = file_data["data"]
+
+    # Get sample data and statistics
+    sample_data = df.head(10).to_dict(orient='records')
+
+    column_stats = {}
+    for col in df.columns:
+        column_stats[col] = {
+            "dtype": str(df[col].dtype),
+            "null_count": int(df[col].isna().sum()),
+            "unique_count": int(df[col].nunique()),
+            "sample_values": df[col].dropna().head(5).tolist()
+        }
+
+    return {
+        "success": True,
+        "message": "File details retrieved",
+        "data": {
+            "info": file_data["info"],
+            "sample_data": sample_data,
+            "column_statistics": column_stats
+        }
+    }
 
 
 @app.get("/templates/multi-column")
@@ -256,26 +289,27 @@ sys.modules['app_storage'] = type(sys)('app_storage')
 sys.modules['app_storage'].uploaded_files = uploaded_files
 sys.modules['app_storage'].extractions = extractions
 
-# Import and include extraction routes
+# Import and include routers
 try:
     from app.extraction_routes import router as extraction_router
     from app.health_routes import router as health_routes
+    from app.comparison_routes import router as comparison_router  # NEW
 
     app.include_router(extraction_router)
     app.include_router(health_routes)
-    print("✅ Extraction routes loaded successfully")
+    app.include_router(comparison_router)  # NEW
+    print("✅ All routes loaded successfully")
 except ImportError as e:
-    print(f"❌ Failed to load extraction routes: {e}")
-    print("⚠️ Running without extraction functionality")
+    print(f"❌ Failed to load routes: {e}")
 
 
 @app.on_event("startup")
 async def startup_event():
-    print("🚀 Financial Data Extraction API Started - Multi-Column Support")
-    print(f"📊 Storage initialized: {len(uploaded_files)} files, {len(extractions)} extractions")
-    print(
-        f"🤖 OpenAI: {'✅ Configured' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌ Not configured'}")
+    print("🚀 Financial Data Extraction & Analysis API Started")
+    print(f"📊 Storage initialized: {len(uploaded_files)} files, {len(extractions)} extractions, {len(comparisons)} comparisons")
+    print(f"🤖 OpenAI: {'✅ Configured' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌ Not configured'}")
     print("🔄 Multi-Column Processing: ✅ Enabled")
+    print("🔍 File Comparison: ✅ Enabled")  # NEW
     print("📋 API Docs: http://localhost:8000/docs")
 
 
