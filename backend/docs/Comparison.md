@@ -29,7 +29,14 @@ class ComparisonRequest(BaseModel):
     analysis_prompt: str                        # Natural language instructions
     column_mappings: Optional[List[ColumnMapping]] = None  # For manual mode
     join_columns: Optional[Dict[str, str]] = None         # For joining data
-    comparison_mode: str = "ai_guided"          # ai_guided|manual_mapping|auto_detect
+    comparison_mode: str = "ai_guided"
+    advanced_options: Optional[Dict[str, str]]= {
+        "MIN_SAMPLE_SIZE": 50,
+        "MAX_SAMPLE_SIZE": 200,
+        "VALIDATE_ON_FULL_DATASET": true,
+        "PATTERN_CONFIDENCE_THRESHOLD": 0.8
+    }
+    #ai_guided|manual_mapping|auto_detect
 ```
 
 #### Technical Flow
