@@ -285,8 +285,7 @@ async def debug_status():
                 {
                     "id": rec_id[-8:],
                     "status": rec_data.get("status"),
-                    "match_rate": rec_data.get("result", {}).get("match_rate", 0) if rec_data.get(
-                        "status") == "completed" else None,
+                    "match_rate": rec_data.get("result", {}).get("match_rate", 0) if rec_data.get("status") == "completed" else None,
                     "created": rec_data.get("created_at", "")[:19]
                 }
                 for rec_id, rec_data in list(reconciliations.items())[-5:]
@@ -320,10 +319,8 @@ except ImportError as e:
 @app.on_event("startup")
 async def startup_event():
     print("🚀 Financial Data Extraction, Analysis & Reconciliation API Started")
-    print(
-        f"📊 Storage initialized: {len(uploaded_files)} files, {len(extractions)} extractions, {len(comparisons)} comparisons, {len(reconciliations)} reconciliations")
-    print(
-        f"🤖 OpenAI: {'✅ Configured' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌ Not configured'}")
+    print(f"📊 Storage initialized: {len(uploaded_files)} files, {len(extractions)} extractions, {len(comparisons)} comparisons, {len(reconciliations)} reconciliations")
+    print(f"🤖 OpenAI: {'✅ Configured' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌ Not configured'}")
     print("🔄 Multi-Column Processing: ✅ Enabled")
     print("🔍 File Comparison: ✅ Enabled")
     print("🔗 LLM-based Reconciliation: ✅ Enabled")  # NEW
