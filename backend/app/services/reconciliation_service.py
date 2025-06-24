@@ -11,7 +11,7 @@ from fastapi import APIRouter
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
-from app.storage import uploaded_files, reconciliations
+from app.services.storage_service import uploaded_files, reconciliations
 
 # Get configuration from environment
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
