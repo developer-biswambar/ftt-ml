@@ -154,7 +154,10 @@ async def list_reconciliations(skip: int = 0, limit: int = 20):
         })
 
     # Sort by creation date
-    reconciliation_list.sort(key=lambda x: x["created_at"], reverse=True)
+    reconciliation_list.sort(
+        key=lambda x: x["created_at"] or "",
+        reverse=True
+    )
 
     # Apply pagination
     total = len(reconciliation_list)
