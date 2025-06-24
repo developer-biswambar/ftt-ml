@@ -52,24 +52,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-#
-# @app.middleware("http")
-# async def log_requests(request: Request, call_next):
-#     logger.info(f"Incoming request: {request.method} {request.url.path}")
-#     response = await call_next(request)
-#     body_bytes = await request.body()
-#     body_str = body_bytes.decode("utf-8")
-#     try:
-#         json_body = json.loads(body_str)
-#     except json.JSONDecodeError:
-#         json_body = body_str or "No JSON Body"
-#     logger.info(
-#         f"{request.method} {request.url.path} - "
-#         f"Query: {request.query_params} - "
-#         f"IP: {request.client.host} - "
-#         f"Body: {json_body}"
-#     )
-#     return response
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"Incoming request: {request.method} {request.url.path}")
+    response = await call_next(request)
+    body_bytes = await request.body()
+    body_str = body_bytes.decode("utf-8")
+    try:
+        json_body = json.loads(body_str)
+    except json.JSONDecodeError:
+        json_body = body_str or "No JSON Body"
+    logger.info(
+        f"{request.method} {request.url.path} - "
+        f"Query: {request.query_params} - "
+        f"IP: {request.client.host} - "
+        f"Body: {json_body}"
+    )
+    return response
 
 
 @app.post("/upload")
