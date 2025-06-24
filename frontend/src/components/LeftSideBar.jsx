@@ -1,5 +1,5 @@
 import React, {useRef} from 'react';
-import {CheckCircle, FileText, RefreshCw, Upload} from 'lucide-react';
+import {CheckCircle, FileText, RefreshCw, Upload, Eye} from 'lucide-react';
 
 const LeftSidebar = ({
                          files,
@@ -101,14 +101,14 @@ const LeftSidebar = ({
                 />
             </div>
 
-            {/* File Selection - Compact */}
+            {/* Available Files List */}
             <div className="p-4 border-b border-slate-200 bg-white/30">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
-                        <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
-                            <span className="text-blue-600 text-xs font-bold">🔗</span>
+                        <div className="w-5 h-5 bg-indigo-100 rounded-full flex items-center justify-center">
+                            <span className="text-indigo-600 text-xs font-bold">📂</span>
                         </div>
-                        <h3 className="text-sm font-semibold text-slate-700">Select Files</h3>
+                        <h3 className="text-sm font-semibold text-slate-700">Available Files</h3>
                     </div>
                     <button
                         onClick={onRefreshFiles}
@@ -120,73 +120,139 @@ const LeftSidebar = ({
                     </button>
                 </div>
 
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {files.length === 0 ? (
+                        <div className="text-center py-4">
+                            <FileText size={24} className="mx-auto text-slate-300 mb-2"/>
+                            <p className="text-xs text-slate-500">No files uploaded yet</p>
+                        </div>
+                    ) : (
+                        files.map((file) => (
+                            <div
+                                key={file.file_id}
+                                className="group p-2 bg-white/70 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-white hover:shadow-sm transition-all duration-200"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-slate-800 truncate" title={file.filename}>
+                                            {file.filename}
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                            {file.total_rows?.toLocaleString()} rows • {file.columns?.length} cols
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => openFileViewer(file.file_id)}
+                                        className="opacity-0 group-hover:opacity-100 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-all duration-200"
+                                        title="View/Edit File"
+                                    >
+                                        <Eye size={14}/>
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {/* File Selection */}
+            <div className="p-4 border-b border-slate-200 bg-white/30">
+                <div className="flex items-center space-x-2 mb-3">
+                    <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 text-xs font-bold">🔗</span>
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-700">Select Files for Reconciliation</h3>
+                </div>
+
                 <div className="space-y-2">
-                    {/* File A Selector - Compact */}
+                    {/* File A Selector */}
                     <div className="group">
                         <label className="flex items-center space-x-2 text-xs font-medium text-slate-600 mb-1">
                             <div className="w-3 h-3 bg-emerald-100 rounded-full flex items-center justify-center">
                                 <span className="text-emerald-600 text-xs font-bold">A</span>
                             </div>
-                            <span>Primary:</span>
+                            <span>Primary File:</span>
                         </label>
-                        <div className="relative">
-                            <select
-                                value={selectedFiles.fileA?.file_id || ''}
-                                onChange={(e) => {
-                                    const file = files.find(f => f.file_id === e.target.value);
-                                    setSelectedFiles(prev => ({...prev, fileA: file}));
-                                }}
-                                className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-slate-300 hover:shadow-sm"
-                            >
-                                <option value="">Choose Primary File</option>
-                                {files.map(file => (
-                                    <option key={file.file_id} value={file.file_id}>
-                                        {file.filename} ({file.total_rows})
-                                    </option>
-                                ))}
-                            </select>
+                        <div className="flex space-x-1">
+                            <div className="relative flex-1">
+                                <select
+                                    value={selectedFiles.fileA?.file_id || ''}
+                                    onChange={(e) => {
+                                        const file = files.find(f => f.file_id === e.target.value);
+                                        setSelectedFiles(prev => ({...prev, fileA: file}));
+                                    }}
+                                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-slate-300 hover:shadow-sm"
+                                >
+                                    <option value="">Choose Primary File</option>
+                                    {files.map(file => (
+                                        <option key={file.file_id} value={file.file_id}>
+                                            {file.filename} ({file.total_rows})
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedFiles.fileA && (
+                                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                                        <CheckCircle size={12} className="text-emerald-500"/>
+                                    </div>
+                                )}
+                            </div>
                             {selectedFiles.fileA && (
-                                <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                                    <CheckCircle size={12} className="text-emerald-500"/>
-                                </div>
+                                <button
+                                    onClick={() => openFileViewer(selectedFiles.fileA.file_id)}
+                                    className="p-2 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded transition-all duration-200"
+                                    title="View Primary File"
+                                >
+                                    <Eye size={12}/>
+                                </button>
                             )}
                         </div>
                     </div>
 
-                    {/* File B Selector - Compact */}
+                    {/* File B Selector */}
                     <div className="group">
                         <label className="flex items-center space-x-2 text-xs font-medium text-slate-600 mb-1">
                             <div className="w-3 h-3 bg-purple-100 rounded-full flex items-center justify-center">
                                 <span className="text-purple-600 text-xs font-bold">B</span>
                             </div>
-                            <span>Compare:</span>
+                            <span>Compare File:</span>
                         </label>
-                        <div className="relative">
-                            <select
-                                value={selectedFiles.fileB?.file_id || ''}
-                                onChange={(e) => {
-                                    const file = files.find(f => f.file_id === e.target.value);
-                                    setSelectedFiles(prev => ({...prev, fileB: file}));
-                                }}
-                                className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-slate-300 hover:shadow-sm"
-                            >
-                                <option value="">Choose Comparison File</option>
-                                {files.map(file => (
-                                    <option key={file.file_id} value={file.file_id}>
-                                        {file.filename} ({file.total_rows})
-                                    </option>
-                                ))}
-                            </select>
+                        <div className="flex space-x-1">
+                            <div className="relative flex-1">
+                                <select
+                                    value={selectedFiles.fileB?.file_id || ''}
+                                    onChange={(e) => {
+                                        const file = files.find(f => f.file_id === e.target.value);
+                                        setSelectedFiles(prev => ({...prev, fileB: file}));
+                                    }}
+                                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-slate-300 hover:shadow-sm"
+                                >
+                                    <option value="">Choose Comparison File</option>
+                                    {files.map(file => (
+                                        <option key={file.file_id} value={file.file_id}>
+                                            {file.filename} ({file.total_rows})
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedFiles.fileB && (
+                                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                                        <CheckCircle size={12} className="text-purple-500"/>
+                                    </div>
+                                )}
+                            </div>
                             {selectedFiles.fileB && (
-                                <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                                    <CheckCircle size={12} className="text-purple-500"/>
-                                </div>
+                                <button
+                                    onClick={() => openFileViewer(selectedFiles.fileB.file_id)}
+                                    className="p-2 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded transition-all duration-200"
+                                    title="View Comparison File"
+                                >
+                                    <Eye size={12}/>
+                                </button>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Connection Visual - Compact */}
+                {/* Connection Visual */}
                 {selectedFiles.fileA && selectedFiles.fileB && (
                     <div
                         className="mt-3 p-2 bg-gradient-to-r from-emerald-50 to-purple-50 rounded-lg border border-emerald-200">
