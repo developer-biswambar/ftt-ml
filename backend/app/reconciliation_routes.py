@@ -33,9 +33,6 @@ if OPENAI_API_KEY and OPENAI_API_KEY != "sk-placeholder":
 # Create router
 router = APIRouter(prefix="/api/v1/reconcile", tags=["reconciliation"])
 
-# Global storage for reconciliations (add to storage.py)
-reconciliations = {}
-
 
 # API Routes
 
