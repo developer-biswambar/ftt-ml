@@ -1,4 +1,4 @@
-// src/services/api.js
+// src/services/api.js - Enhanced with viewer endpoints
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000';
@@ -32,6 +32,24 @@ export const apiService = {
     getFileInfo: async (fileId) => {
         const response = await api.get(`/files/${fileId}`);
         return response.data;
+    },
+
+    // NEW: Viewer operations
+    getFileData: async (fileId, page = 1, pageSize = 1000) => {
+        const response = await api.get(`/files/${fileId}/data?page=${page}&page_size=${pageSize}`);
+        return response.data;
+    },
+
+    updateFileData: async (fileId, data) => {
+        const response = await api.put(`/files/${fileId}/data`, { data });
+        return response.data;
+    },
+
+    downloadModifiedFile: async (fileId, format = 'csv') => {
+        const response = await api.get(`/files/${fileId}/download?format=${format}`, {
+            responseType: 'blob'
+        });
+        return response;
     },
 
     // Reconciliation operations
