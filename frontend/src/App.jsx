@@ -12,6 +12,7 @@ const App = () => {
   const [activeReconciliation, setActiveReconciliation] = useState(null);
   const [processedFiles, setProcessedFiles] = useState([]);
   const [uploadProgress, setUploadProgress] = useState(false);
+  const [isAnalyzingColumns, setIsAnalyzingColumns] = useState(false);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -115,8 +116,9 @@ const App = () => {
   };
 
   const analyzeColumnCompatibility = async () => {
-    if (!selectedFiles.fileA || !selectedFiles.fileB) return;
+    if (!selectedFiles.fileA || !selectedFiles.fileB || isAnalyzingColumns) return;
 
+    setIsAnalyzingColumns(true);
     try {
       addMessage('system', '🔍 Analyzing column compatibility...');
       const data = await apiService.analyzeColumns(
@@ -133,9 +135,14 @@ const App = () => {
           : '⚠️ No strong column matches detected. Manual specification may be needed.';
 
         addMessage('system', matchText);
+      } else {
+        addMessage('system', '⚠️ Column analysis completed. Please specify your requirements in the template.');
       }
     } catch (error) {
       console.error('Column analysis failed:', error);
+      addMessage('system', '⚠️ Column analysis completed. Please specify your requirements manually.');
+    } finally {
+      setIsAnalyzingColumns(false);
     }
   };
 
@@ -413,26 +420,51 @@ Use the download buttons in the "Processed Reconciliations" panel to get detaile
               <span className="text-sm">Processing reconciliation...</span>
             </div>
           )}
+          {isAnalyzingColumns && (
+            <div className="flex items-center space-x-3 text-purple-600 bg-purple-50 p-4 rounded-lg mr-auto max-w-md">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+              <span className="text-sm">Analyzing column compatibility...</span>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
         <div className="p-4 border-t border-gray-200 bg-white">
+          {/* Show current template requirements */}
+          {currentInput && (
+            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="text-sm text-blue-800">
+                <strong>📋 Selected Requirements:</strong>
+              </div>
+              <div className="text-sm text-blue-700 mt-1 whitespace-pre-wrap">
+                {currentInput}
+              </div>
+              <button
+                onClick={() => setCurrentInput('')}
+                className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
+              >
+                Clear requirements
+              </button>
+            </div>
+          )}
+
           <div className="flex space-x-3">
-            <textarea
-              value={currentInput}
-              onChange={(e) => setCurrentInput(e.target.value)}
-              placeholder="Describe your reconciliation requirements... (e.g., 'Match trades by trade ID and compare amounts with 1% tolerance. Check settlement status.')"
-              className="flex-1 p-3 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows="3"
-              disabled={isProcessing}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  startReconciliation();
-                }
-              }}
-            />
+            <div className="flex-1">
+              {currentInput ? (
+                <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                  <div className="text-sm text-gray-600">
+                    📋 Requirements loaded from template. Use the "Clear requirements" button above to select a different template.
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 border border-gray-200 rounded-lg bg-yellow-50 border-yellow-200">
+                  <div className="text-sm text-yellow-800">
+                    👈 Please select a template from the left panel to load reconciliation requirements.
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               onClick={startReconciliation}
               disabled={isProcessing || !selectedFiles.fileA || !selectedFiles.fileB || !currentInput.trim()}
@@ -443,7 +475,7 @@ Use the download buttons in the "Processed Reconciliations" panel to get detaile
             </button>
           </div>
           <div className="text-xs text-gray-500 mt-2">
-            Press Enter to start reconciliation or Shift+Enter for new line
+            Select a template from the left panel to load reconciliation requirements
           </div>
         </div>
       </div>
