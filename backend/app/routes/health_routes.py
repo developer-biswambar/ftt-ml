@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter
 from openai import AsyncOpenAI
 
-from app.storage import uploaded_files, extractions
+from app.services.storage_service import uploaded_files, extractions
 
 # Get configuration from environment
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

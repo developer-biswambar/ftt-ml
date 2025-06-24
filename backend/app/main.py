@@ -8,7 +8,7 @@ import pandas as pd
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.storage import uploaded_files, extractions, comparisons, reconciliations  # Added 'reconciliations'
+from app.services.storage_service import uploaded_files, extractions, comparisons, reconciliations  # Added 'reconciliations'
 
 # Load .env file
 try:
@@ -323,9 +323,9 @@ sys.modules['app_storage'].reconciliations = reconciliations
 
 # Import and include routers
 try:
-    from app.extraction_routes import router as extraction_router
-    from app.health_routes import router as health_routes
-    from app.reconciliation_routes import router as reconciliation_router  # NEW
+    from app.routes.extraction_routes import router as extraction_router
+    from app.routes.health_routes import router as health_routes
+    from app.routes.reconciliation_routes import router as reconciliation_router  # NEW
 
     app.include_router(extraction_router)
     app.include_router(health_routes)

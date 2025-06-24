@@ -12,7 +12,7 @@ from openai import AsyncOpenAI
 
 from app.services.reconciliation_service import ReconciliationRequest, process_reconciliation, analyze_file_schema, \
     FinancialPatternDetector
-from app.storage import uploaded_files, reconciliations
+from app.services.storage_service import uploaded_files, reconciliations
 
 # Get configuration from environment
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
