@@ -61,12 +61,8 @@ export const apiService = {
     },
 
     analyzeColumns: async (fileAId, fileBId) => {
-        const response = await api.post('/api/v1/reconcile/analyze-columns', {
-            params: {
-                file_a_id: fileAId,
-                file_b_id: fileBId
-            }
-        });
+        const url = `/api/v1/reconcile/analyze-columns?file_a_id=${fileAId}&file_b_id=${fileBId}`;
+        const response = await api.post(url)
         return response.data;
     }
 };
