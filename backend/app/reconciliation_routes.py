@@ -84,7 +84,7 @@ async def start_reconciliation(request: ReconciliationRequest):
         raise HTTPException(400, f"Failed to start reconciliation: {str(e)}")
 
 
-@router.get("/{reconciliation_id}")
+@router.get("/{reconciliation_id}/status")
 async def get_reconciliation_status(reconciliation_id: str):
     """Get reconciliation status and results"""
 
