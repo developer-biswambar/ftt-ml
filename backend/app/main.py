@@ -1,12 +1,11 @@
 # main.py - Main FastAPI Application
-import json
 import logging
 import os
 import uuid
 from datetime import datetime
 
 import pandas as pd
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.storage import uploaded_files, extractions, comparisons, reconciliations  # Added 'reconciliations'
@@ -71,8 +70,6 @@ app.add_middleware(
 #     )
 #     return response
 
-
-from fastapi.concurrency import run_in_threadpool
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -305,7 +302,8 @@ async def debug_status():
                 {
                     "id": rec_id[-8:],
                     "status": rec_data.get("status"),
-                    "match_rate": rec_data.get("result", {}).get("match_rate", 0) if rec_data.get("status") == "completed" else None,
+                    "match_rate": rec_data.get("result", {}).get("match_rate", 0) if rec_data.get(
+                        "status") == "completed" else None,
                     "created": rec_data.get("created_at", "")[:19]
                 }
                 for rec_id, rec_data in list(reconciliations.items())[-5:]
@@ -339,8 +337,10 @@ except ImportError as e:
 @app.on_event("startup")
 async def startup_event():
     print("🚀 Financial Data Extraction, Analysis & Reconciliation API Started")
-    print(f"📊 Storage initialized: {len(uploaded_files)} files, {len(extractions)} extractions, {len(comparisons)} comparisons, {len(reconciliations)} reconciliations")
-    print(f"🤖 OpenAI: {'✅ Configured' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌ Not configured'}")
+    print(
+        f"📊 Storage initialized: {len(uploaded_files)} files, {len(extractions)} extractions, {len(comparisons)} comparisons, {len(reconciliations)} reconciliations")
+    print(
+        f"🤖 OpenAI: {'✅ Configured' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌ Not configured'}")
     print("🔄 Multi-Column Processing: ✅ Enabled")
     print("🔍 File Comparison: ✅ Enabled")
     print("🔗 LLM-based Reconciliation: ✅ Enabled")  # NEW
