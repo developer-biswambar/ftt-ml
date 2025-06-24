@@ -1,10 +1,13 @@
-import React, {useEffect, useState} from 'react';
-import {apiService} from './services/api';
+// src/App.jsx - Updated with React Router for viewer
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { apiService } from './services/api';
 import LeftSidebar from './components/LeftSidebar';
 import ChatInterface from './components/ChatInterface';
 import RightSidebar from './components/RightSideBar';
+import ViewerPage from './pages/ViewerPage';
 
-const App = () => {
+const MainApp = () => {
     const [files, setFiles] = useState([]);
     const [templates, setTemplates] = useState([]);
     const [selectedFiles, setSelectedFiles] = useState({fileA: null, fileB: null});
@@ -78,7 +81,7 @@ const App = () => {
     // Initial setup
     useEffect(() => {
         // Add welcome message with typing effect
-        simulateTyping('system', '🎯 Welcome to Financial Data Reconciliation!\n\n📋 **Getting Started:**\n1. Upload two files to compare\n2. Select them in the file selector\n3. Choose a template or describe your requirements\n4. Click Start to begin reconciliation\n\nI\'ll analyze your data and provide detailed matching results with downloadable reports.');
+        simulateTyping('system', '🎯 Welcome to Financial Data Reconciliation!\n\n📋 **Getting Started:**\n1. Upload two files to compare\n2. Select them in the file selector\n3. Choose a template or describe your requirements\n4. Click Start to begin reconciliation\n\nI\'ll analyze your data and provide detailed matching results with downloadable reports.\n\n💡 **New:** Click the 👁️ eye icon next to any file to open it in the Data Viewer for editing!');
         loadInitialData();
     }, []);
 
@@ -105,7 +108,7 @@ const App = () => {
         let currentIndex = 0;
         const typingInterval = setInterval(() => {
             if (currentIndex < content.length) {
-                setTypingMessage(content.substring(0, currentIndex + 1)); // ✅ Use substring instead of prev + char
+                setTypingMessage(content.substring(0, currentIndex + 1));
                 currentIndex++;
             } else {
                 clearInterval(typingInterval);
@@ -211,7 +214,7 @@ const App = () => {
                 // Also refresh the file list to ensure consistency
                 await loadFiles();
 
-                addMessage('system', `✅ File "${file.name}" uploaded successfully!\n📊 Rows: ${newFile.total_rows} | Columns: ${newFile.columns.length}`, true);
+                addMessage('system', `✅ File "${file.name}" uploaded successfully!\n📊 Rows: ${newFile.total_rows} | Columns: ${newFile.columns.length}\n💡 Click the 👁️ eye icon to view and edit the data!`, true);
             } else {
                 addMessage('error', `❌ Upload failed: ${data.message}`, false);
             }
@@ -462,6 +465,17 @@ Summary keys: ${Object.keys(summary).join(', ')}`;
                 width={rightPanelWidth}
             />
         </div>
+    );
+};
+
+const App = () => {
+    return (
+        <Router>
+            <Routes>
+                <Route path="/" element={<MainApp />} />
+                <Route path="/viewer/:fileId" element={<ViewerPage />} />
+            </Routes>
+        </Router>
     );
 };
 

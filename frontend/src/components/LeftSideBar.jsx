@@ -10,9 +10,15 @@ const LeftSidebar = ({
                          uploadProgress,
                          onFileUpload,
                          onTemplateSelect,
-                         onRefreshFiles
+                         onRefreshFiles,
+                         width = 320
                      }) => {
     const fileInputRef = useRef(null);
+
+    const openFileViewer = (fileId) => {
+        const viewerUrl = `/viewer/${fileId}`;
+        window.open(viewerUrl, '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
+    };
 
     const handleFileUpload = (event) => {
         onFileUpload(event);

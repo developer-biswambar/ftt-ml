@@ -1,3 +1,4 @@
+# backend/app/main.py - Updated to include viewer routes
 # main.py - Main FastAPI Application
 import logging
 import os
@@ -8,7 +9,7 @@ import pandas as pd
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.services.storage_service import uploaded_files, extractions, comparisons, reconciliations  # Added 'reconciliations'
+from app.services.storage_service import uploaded_files, extractions, comparisons, reconciliations
 
 # Load .env file
 try:
@@ -41,7 +42,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Financial Data Extraction & Reconciliation API",
     version="3.0.0",
-    description="AI-powered financial data extraction, comparison, and reconciliation with LLM-based rule generation"
+    description="AI-powered financial data extraction, comparison, and reconciliation with LLM-based rule generation and data viewer"
 )
 
 app.add_middleware(
@@ -51,26 +52,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-# @app.middleware("http")
-# async def log_requests(request: Request, call_next):
-#     logger.info(f"Incoming request: {request.method} {request.url.path}")
-#     response = await call_next(request)
-#     body_bytes = await request.body()
-#     body_str = body_bytes.decode("utf-8")
-#     try:
-#         json_body = json.loads(body_str)
-#     except json.JSONDecodeError:
-#         json_body = body_str or "No JSON Body"
-#     logger.info(
-#         f"{request.method} {request.url.path} - "
-#         f"Query: {request.query_params} - "
-#         f"IP: {request.client.host} - "
-#         f"Body: {json_body}"
-#     )
-#     return response
-
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -112,7 +93,6 @@ async def upload_file(file: UploadFile = File(...)):
         logger.error(f"Upload error: {e}")
         raise HTTPException(400, f"Upload failed: {str(e)}")
 
-
 @app.get("/files")
 async def list_files():
     try:
@@ -136,7 +116,6 @@ async def list_files():
             "message": f"Failed to list files: {str(e)}",
             "data": {"files": [], "total_count": 0}
         }
-
 
 @app.get("/files/{file_id}")
 async def get_file_info(file_id: str):
@@ -168,7 +147,6 @@ async def get_file_info(file_id: str):
             "column_statistics": column_stats
         }
     }
-
 
 @app.get("/templates/multi-column")
 async def get_multi_column_templates():
@@ -240,7 +218,6 @@ async def get_multi_column_templates():
         "data": templates
     }
 
-
 @app.get("/templates")
 async def get_templates():
     """Get single-column templates (backward compatibility)"""
@@ -273,7 +250,6 @@ async def get_templates():
         "data": templates
     }
 
-
 @app.get("/debug/status")
 async def debug_status():
     return {
@@ -289,6 +265,7 @@ async def debug_status():
             "openai_model": OPENAI_MODEL,
             "multi_column_support": True,
             "reconciliation_support": True,
+            "data_viewer_support": True,  # NEW
             "recent_extractions": [
                 {
                     "id": ext_id[-8:],
@@ -312,7 +289,6 @@ async def debug_status():
         }
     }
 
-
 # Make storage available for other modules
 import sys
 
@@ -325,15 +301,16 @@ sys.modules['app_storage'].reconciliations = reconciliations
 try:
     from app.routes.extraction_routes import router as extraction_router
     from app.routes.health_routes import router as health_routes
-    from app.routes.reconciliation_routes import router as reconciliation_router  # NEW
+    from app.routes.reconciliation_routes import router as reconciliation_router
+    from app.routes.viewer_routes import router as viewer_router  # NEW
 
     app.include_router(extraction_router)
     app.include_router(health_routes)
-    app.include_router(reconciliation_router)  # NEW
+    app.include_router(reconciliation_router)
+    app.include_router(viewer_router)  # NEW
     print("✅ All routes loaded successfully")
 except ImportError as e:
     print(f"❌ Failed to load routes: {e}")
-
 
 @app.on_event("startup")
 async def startup_event():
@@ -344,9 +321,9 @@ async def startup_event():
         f"🤖 OpenAI: {'✅ Configured' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌ Not configured'}")
     print("🔄 Multi-Column Processing: ✅ Enabled")
     print("🔍 File Comparison: ✅ Enabled")
-    print("🔗 LLM-based Reconciliation: ✅ Enabled")  # NEW
+    print("🔗 LLM-based Reconciliation: ✅ Enabled")
+    print("📊 Data Viewer: ✅ Enabled")  # NEW
     print("📋 API Docs: http://localhost:8000/docs")
-
 
 if __name__ == "__main__":
     import uvicorn
@@ -357,4 +334,5 @@ if __name__ == "__main__":
     print(f"🔑 OpenAI configured: {'✅' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌'}")
     print("🔄 Multi-Column Support: ✅ Enabled")
     print("🔗 LLM Reconciliation: ✅ Enabled")
+    print("📊 Data Viewer: ✅ Enabled")  # NEW
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
