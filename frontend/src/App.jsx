@@ -16,6 +16,28 @@ const App = () => {
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
+  // Set document title based on current state
+  useEffect(() => {
+    let title = 'Financial Reconciliation Chat';
+
+    if (isProcessing && activeReconciliation) {
+      title = '🔄 Processing Reconciliation...';
+    } else if (isAnalyzingColumns) {
+      title = '🔍 Analyzing Columns...';
+    } else if (uploadProgress) {
+      title = '📤 Uploading File...';
+    } else if (selectedFiles.fileA && selectedFiles.fileB) {
+      title = '✅ Ready to Reconcile';
+    }
+
+    document.title = title;
+
+    // Cleanup: reset title when component unmounts
+    return () => {
+      document.title = 'Financial Reconciliation Chat';
+    };
+  }, [isProcessing, activeReconciliation, isAnalyzingColumns, uploadProgress, selectedFiles]);
+
   // Initial setup
   useEffect(() => {
     setMessages([{
@@ -83,13 +105,19 @@ const App = () => {
     try {
       const data = await apiService.uploadFile(file);
       if (data.success) {
-        setFiles(prev => [...prev, data.data]);
-        addMessage('system', `✅ File "${file.name}" uploaded successfully!\n📊 Rows: ${data.data.total_rows} | Columns: ${data.data.columns.length}`);
+        // Immediately add to files list
+        const newFile = data.data;
+        setFiles(prev => [...prev, newFile]);
+
+        // Also refresh the file list to ensure consistency
+        await loadFiles();
+
+        addMessage('system', `✅ File "${file.name}" uploaded successfully!\n📊 Rows: ${newFile.total_rows} | Columns: ${newFile.columns.length}`);
       } else {
         addMessage('error', `❌ Upload failed: ${data.message}`);
       }
     } catch (error) {
-      addMessage('error', `❌ Upload error: ${error.message}`);
+      addMessage('error', `❌ Upload error: ${error.response?.data?.detail || error.message}`);
     } finally {
       setUploadProgress(false);
       // Reset file input
@@ -189,23 +217,29 @@ const App = () => {
           const reconciliation = data.data;
 
           if (reconciliation.status === 'completed') {
+            setIsProcessing(false); // Clear processing state
+            setActiveReconciliation(null);
             addMessage('success', '🎉 Reconciliation completed successfully!');
             displayResults(reconciliation.result);
             await loadProcessedFiles();
-            setActiveReconciliation(null);
-            setIsProcessing(false);
           } else if (reconciliation.status === 'failed') {
-            addMessage('error', `❌ Reconciliation failed: ${reconciliation.error || 'Unknown error'}`);
+            setIsProcessing(false); // Clear processing state
             setActiveReconciliation(null);
-            setIsProcessing(false);
+            addMessage('error', `❌ Reconciliation failed: ${reconciliation.error || 'Unknown error'}`);
           } else {
             // Still processing, check again
             setTimeout(checkStatus, 3000);
           }
+        } else {
+          setIsProcessing(false); // Clear processing state on error
+          setActiveReconciliation(null);
+          addMessage('error', 'Failed to check reconciliation status');
         }
       } catch (error) {
         console.error('Error checking status:', error);
-        setTimeout(checkStatus, 5000);
+        setIsProcessing(false); // Clear processing state on error
+        setActiveReconciliation(null);
+        addMessage('error', 'Error monitoring reconciliation progress');
       }
     };
 
