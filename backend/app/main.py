@@ -9,7 +9,7 @@ import pandas as pd
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.storage import uploaded_files, extractions, comparisons  # Added 'comparisons' to imports
+from app.storage import uploaded_files, extractions, comparisons, reconciliations  # Added 'reconciliations'
 
 # Load .env file
 try:
@@ -40,9 +40,9 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
-    title="Financial Data Extraction API - Multi-Column",
-    version="2.0.0",
-    description="AI-powered financial data extraction with multi-column support and batch processing"
+    title="Financial Data Extraction & Reconciliation API",
+    version="3.0.0",
+    description="AI-powered financial data extraction, comparison, and reconciliation with LLM-based rule generation"
 )
 
 app.add_middleware(
@@ -264,10 +264,13 @@ async def debug_status():
         "data": {
             "uploaded_files_count": len(uploaded_files),
             "extractions_count": len(extractions),
+            "comparisons_count": len(comparisons),
+            "reconciliations_count": len(reconciliations),
             "openai_configured": bool(OPENAI_API_KEY and OPENAI_API_KEY != "sk-placeholder"),
             "current_batch_size": BATCH_SIZE,
             "openai_model": OPENAI_MODEL,
             "multi_column_support": True,
+            "reconciliation_support": True,
             "recent_extractions": [
                 {
                     "id": ext_id[-8:],
@@ -277,6 +280,16 @@ async def debug_status():
                     "created": ext_data.get("created_at", "")[:19]
                 }
                 for ext_id, ext_data in list(extractions.items())[-5:]
+            ],
+            "recent_reconciliations": [
+                {
+                    "id": rec_id[-8:],
+                    "status": rec_data.get("status"),
+                    "match_rate": rec_data.get("result", {}).get("match_rate", 0) if rec_data.get(
+                        "status") == "completed" else None,
+                    "created": rec_data.get("created_at", "")[:19]
+                }
+                for rec_id, rec_data in list(reconciliations.items())[-5:]
             ]
         }
     }
@@ -288,16 +301,17 @@ import sys
 sys.modules['app_storage'] = type(sys)('app_storage')
 sys.modules['app_storage'].uploaded_files = uploaded_files
 sys.modules['app_storage'].extractions = extractions
+sys.modules['app_storage'].reconciliations = reconciliations
 
 # Import and include routers
 try:
     from app.extraction_routes import router as extraction_router
     from app.health_routes import router as health_routes
-    from app.comparison_routes import router as comparison_router  # NEW
+    from app.reconciliation_routes import router as reconciliation_router  # NEW
 
     app.include_router(extraction_router)
     app.include_router(health_routes)
-    app.include_router(comparison_router)  # NEW
+    app.include_router(reconciliation_router)  # NEW
     print("✅ All routes loaded successfully")
 except ImportError as e:
     print(f"❌ Failed to load routes: {e}")
@@ -305,22 +319,24 @@ except ImportError as e:
 
 @app.on_event("startup")
 async def startup_event():
-    print("🚀 Financial Data Extraction & Analysis API Started")
+    print("🚀 Financial Data Extraction, Analysis & Reconciliation API Started")
     print(
-        f"📊 Storage initialized: {len(uploaded_files)} files, {len(extractions)} extractions, {len(comparisons)} comparisons")
+        f"📊 Storage initialized: {len(uploaded_files)} files, {len(extractions)} extractions, {len(comparisons)} comparisons, {len(reconciliations)} reconciliations")
     print(
         f"🤖 OpenAI: {'✅ Configured' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌ Not configured'}")
     print("🔄 Multi-Column Processing: ✅ Enabled")
-    print("🔍 File Comparison: ✅ Enabled")  # NEW
+    print("🔍 File Comparison: ✅ Enabled")
+    print("🔗 LLM-based Reconciliation: ✅ Enabled")  # NEW
     print("📋 API Docs: http://localhost:8000/docs")
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    print("🚀 Starting Financial Data Extraction API - Multi-Column")
+    print("🚀 Starting Financial Data Extraction & Reconciliation API")
     print(f"📊 Batch size: {BATCH_SIZE}")
     print(f"🤖 OpenAI Model: {OPENAI_MODEL}")
     print(f"🔑 OpenAI configured: {'✅' if (OPENAI_API_KEY and OPENAI_API_KEY != 'sk-placeholder') else '❌'}")
     print("🔄 Multi-Column Support: ✅ Enabled")
+    print("🔗 LLM Reconciliation: ✅ Enabled")
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
