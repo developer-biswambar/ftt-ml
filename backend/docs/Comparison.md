@@ -28,26 +28,26 @@ Initiates an asynchronous comparison between two uploaded files.
 
 ```python
 class ComparisonRequest(BaseModel):
-   file_a_id: str  # UUID of first file
-   file_b_id: str  # UUID of second file
-   analysis_prompt: str  # Natural language instructions
-   column_mappings: Optional[List[ColumnMapping]] = None  # For manual mode
-   join_columns: Optional[Dict[str, str]] = None  # For joining data
-   comparison_mode: str = "ai_guided"
-   advanced_options: Optional[Dict[str, str]] = {
-      "MIN_SAMPLE_SIZE": 50,
-      "MAX_SAMPLE_SIZE": 200,
-      "VALIDATE_ON_FULL_DATASET": true,
-      "PATTERN_CONFIDENCE_THRESHOLD": 0.8
-   }
-   # ai_guided|manual_mapping|auto_detect
+    file_a_id: str  # UUID of first file
+    file_b_id: str  # UUID of second file
+    analysis_prompt: str  # Natural language instructions
+    column_mappings: Optional[List[ColumnMapping]] = None  # For manual mode
+    join_columns: Optional[Dict[str, str]] = None  # For joining data
+    comparison_mode: str = "ai_guided"
+    advanced_options: Optional[Dict[str, str]] = {
+        "MIN_SAMPLE_SIZE": 50,
+        "MAX_SAMPLE_SIZE": 200,
+        "VALIDATE_ON_FULL_DATASET": true,
+        "PATTERN_CONFIDENCE_THRESHOLD": 0.8
+    }
+    # ai_guided|manual_mapping|auto_detect
 ```
 
 #### Technical Flow
 
 1. **Validation Phase**
-   - Verifies both file IDs exist in `uploaded_files` storage
-   - Raises `HTTPException(404)` if files not found
+    - Verifies both file IDs exist in `uploaded_files` storage
+    - Raises `HTTPException(404)` if files not found
 
 2. **Initialization**
    ```python
@@ -61,9 +61,9 @@ class ComparisonRequest(BaseModel):
    ```
 
 3. **Async Processing**
-   - Uses `asyncio.create_task()` to spawn background processing
-   - Non-blocking - returns immediately with comparison ID
-   - Background task runs `process_comparison()` function
+    - Uses `asyncio.create_task()` to spawn background processing
+    - Non-blocking - returns immediately with comparison ID
+    - Background task runs `process_comparison()` function
 
 #### Response
 
@@ -176,7 +176,7 @@ async def process_comparison(comparison_id: str, request: ComparisonRequest)
 3. **Mode-Specific Processing**
 
    | Mode | Description | Process |
-      |------|-------------|---------|
+            |------|-------------|---------|
    | **AI-Guided** | Uses GPT-4 for intelligent analysis | Calls `analyze_with_openai()` with full context |
    | **Manual Mapping** | Compares specific column pairs | Iterates through mappings, calls `compare_column_values()` |
    | **Auto-Detect** | Automatically finds similar columns | Runs `detect_column_relationships()`, compares top matches |
@@ -253,9 +253,9 @@ async def detect_column_relationships(df_a: pd.DataFrame, df_b: pd.DataFrame) ->
 #### Detection Algorithm
 
 1. **Name Matching**
-   - Exact match: `confidence = 0.9`
-   - Partial match (substring): `confidence = 0.7`
-   - Case-insensitive comparison
+    - Exact match: `confidence = 0.9`
+    - Partial match (substring): `confidence = 0.7`
+    - Case-insensitive comparison
 
 2. **Data Type Compatibility**
    ```python
@@ -272,8 +272,8 @@ async def detect_column_relationships(df_a: pd.DataFrame, df_b: pd.DataFrame) ->
    ```
 
 4. **Confidence Scoring**
-   - Returns sorted list by confidence score
-   - Requires >10% overlap for consideration
+    - Returns sorted list by confidence score
+    - Requires >10% overlap for consideration
 
 ### 4. Detailed Column Comparison
 
