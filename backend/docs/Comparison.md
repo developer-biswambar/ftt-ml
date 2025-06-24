@@ -176,7 +176,7 @@ async def process_comparison(comparison_id: str, request: ComparisonRequest)
 3. **Mode-Specific Processing**
 
    | Mode | Description | Process |
-            |------|-------------|---------|
+               |------|-------------|---------|
    | **AI-Guided** | Uses GPT-4 for intelligent analysis | Calls `analyze_with_openai()` with full context |
    | **Manual Mapping** | Compares specific column pairs | Iterates through mappings, calls `compare_column_values()` |
    | **Auto-Detect** | Automatically finds similar columns | Runs `detect_column_relationships()`, compares top matches |
