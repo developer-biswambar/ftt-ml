@@ -2,13 +2,17 @@ import React from 'react';
 import { FileText, CheckCircle, Clock, AlertCircle, Download, RefreshCw } from 'lucide-react';
 
 const RightSidebar = ({
-  processedFiles,
+  processedFiles = [], // ✅ Add default empty array
   autoRefreshInterval,
   onRefreshProcessedFiles,
-  onDownloadResults
+  onDownloadResults,
+  width = 320
 }) => {
   return (
-    <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
+    <div
+      className="bg-white border-l border-gray-200 flex flex-col"
+      style={{ width: `${width}px` }}
+    >
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
@@ -47,7 +51,7 @@ const RightSidebar = ({
             {processedFiles.map((reconciliation) => (
               <div
                 key={reconciliation.reconciliation_id}
-                className="border border-gray-200 rounded-lg p-3 hover:border-gray-300 transition-colors"
+                className="border border-gray-200 rounded-lg p-3 hover:border-gray-300 transition-all duration-200 hover:shadow-md transform hover:scale-[1.02]"
               >
                 {/* Status Header */}
                 <div className="flex items-center justify-between mb-2">
@@ -88,7 +92,7 @@ const RightSidebar = ({
                     <div className="grid grid-cols-3 gap-1">
                       <button
                         onClick={() => onDownloadResults(reconciliation.reconciliation_id, 'matched')}
-                        className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                        className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-all duration-200 hover:scale-105"
                         title="Download Matched Records"
                       >
                         <Download size={10} className="inline mr-1" />
@@ -96,7 +100,7 @@ const RightSidebar = ({
                       </button>
                       <button
                         onClick={() => onDownloadResults(reconciliation.reconciliation_id, 'unmatched_a')}
-                        className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
+                        className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-all duration-200 hover:scale-105"
                         title="Download Unmatched from File A"
                       >
                         <Download size={10} className="inline mr-1" />
@@ -104,7 +108,7 @@ const RightSidebar = ({
                       </button>
                       <button
                         onClick={() => onDownloadResults(reconciliation.reconciliation_id, 'unmatched_b')}
-                        className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                        className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-all duration-200 hover:scale-105"
                         title="Download Unmatched from File B"
                       >
                         <Download size={10} className="inline mr-1" />
