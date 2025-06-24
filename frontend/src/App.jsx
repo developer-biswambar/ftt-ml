@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiService } from './services/api';
 import LeftSidebar from './components/LeftSidebar';
 import ChatInterface from './components/ChatInterface';
-import RightSidebar from './components/RightSidebar';
+import RightSidebar from './components/RightSideBar';
 
 const App = () => {
   const [files, setFiles] = useState([]);
@@ -16,6 +16,13 @@ const App = () => {
   const [uploadProgress, setUploadProgress] = useState(false);
   const [isAnalyzingColumns, setIsAnalyzingColumns] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingMessage, setTypingMessage] = useState('');
+
+  // Panel widths state
+  const [leftPanelWidth, setLeftPanelWidth] = useState(320);
+  const [rightPanelWidth, setRightPanelWidth] = useState(320);
+  const [isResizing, setIsResizing] = useState(null);
 
   // Set document title based on current state
   useEffect(() => {
@@ -39,14 +46,39 @@ const App = () => {
     };
   }, [isProcessing, activeReconciliation, isAnalyzingColumns, uploadProgress, selectedFiles]);
 
+  // Mouse events for resizing
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing) return;
+
+      if (isResizing === 'left') {
+        const newWidth = Math.max(250, Math.min(600, e.clientX));
+        setLeftPanelWidth(newWidth);
+      } else if (isResizing === 'right') {
+        const newWidth = Math.max(250, Math.min(600, window.innerWidth - e.clientX));
+        setRightPanelWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(null);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
   // Initial setup
   useEffect(() => {
-    setMessages([{
-      id: 1,
-      type: 'system',
-      content: '🎯 Welcome to Financial Data Reconciliation!\n\n📋 **Getting Started:**\n1. Upload two files to compare\n2. Select them in the file selector\n3. Choose a template or describe your requirements\n4. Click Start to begin reconciliation\n\nI\'ll analyze your data and provide detailed matching results with downloadable reports.',
-      timestamp: new Date()
-    }]);
+    // Add welcome message with typing effect
+    simulateTyping('system', '🎯 Welcome to Financial Data Reconciliation!\n\n📋 **Getting Started:**\n1. Upload two files to compare\n2. Select them in the file selector\n3. Choose a template or describe your requirements\n4. Click Start to begin reconciliation\n\nI\'ll analyze your data and provide detailed matching results with downloadable reports.');
     loadInitialData();
   }, []);
 
@@ -66,6 +98,32 @@ const App = () => {
     };
   }, [autoRefreshInterval]);
 
+  const simulateTyping = (type, content, delay = 30) => {
+    setIsTyping(true);
+    setTypingMessage('');
+
+    let currentIndex = 0;
+    const typingInterval = setInterval(() => {
+      if (currentIndex < content.length) {
+        setTypingMessage(content.substring(0, currentIndex + 1)); // ✅ Use substring instead of prev + char
+        currentIndex++;
+      } else {
+        clearInterval(typingInterval);
+        setIsTyping(false);
+        setTypingMessage('');
+
+        // Add the complete message
+        const newMessage = {
+          id: Date.now() + Math.random(),
+          type,
+          content,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, newMessage]);
+      }
+    }, delay);
+  };
+
   const loadInitialData = async () => {
     await Promise.all([
       loadTemplates(),
@@ -82,7 +140,7 @@ const App = () => {
       }
     } catch (error) {
       console.error('Failed to load templates:', error);
-      addMessage('error', 'Failed to load reconciliation templates');
+      simulateTyping('error', 'Failed to load reconciliation templates');
     }
   };
 
@@ -122,14 +180,18 @@ const App = () => {
     }
   };
 
-  const addMessage = (type, content) => {
-    const newMessage = {
-      id: Date.now() + Math.random(),
-      type,
-      content,
-      timestamp: new Date()
-    };
-    setMessages(prev => [...prev, newMessage]);
+  const addMessage = (type, content, useTyping = true) => {
+    if (useTyping && (type === 'system' || type === 'success' || type === 'result')) {
+      simulateTyping(type, content);
+    } else {
+      const newMessage = {
+        id: Date.now() + Math.random(),
+        type,
+        content,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, newMessage]);
+    }
   };
 
   const handleFileUpload = async (event) => {
@@ -137,7 +199,7 @@ const App = () => {
     if (!file) return;
 
     setUploadProgress(true);
-    addMessage('system', `📤 Uploading "${file.name}"...`);
+    addMessage('system', `📤 Uploading "${file.name}"...`, true);
 
     try {
       const data = await apiService.uploadFile(file);
@@ -149,12 +211,12 @@ const App = () => {
         // Also refresh the file list to ensure consistency
         await loadFiles();
 
-        addMessage('system', `✅ File "${file.name}" uploaded successfully!\n📊 Rows: ${newFile.total_rows} | Columns: ${newFile.columns.length}`);
+        addMessage('system', `✅ File "${file.name}" uploaded successfully!\n📊 Rows: ${newFile.total_rows} | Columns: ${newFile.columns.length}`, true);
       } else {
-        addMessage('error', `❌ Upload failed: ${data.message}`);
+        addMessage('error', `❌ Upload failed: ${data.message}`, false);
       }
     } catch (error) {
-      addMessage('error', `❌ Upload error: ${error.response?.data?.detail || error.message}`);
+      addMessage('error', `❌ Upload error: ${error.response?.data?.detail || error.message}`, false);
     } finally {
       setUploadProgress(false);
     }
@@ -162,8 +224,8 @@ const App = () => {
 
   const handleTemplateSelect = (template) => {
     setCurrentInput(template.user_requirements);
-    addMessage('user', `📋 Selected template: ${template.name}`);
-    addMessage('system', `✅ Template loaded: "${template.description}"\n\n📝 **Requirements loaded:**\n${template.user_requirements}\n\nYou can modify these requirements or click Start to proceed.`);
+    addMessage('user', `📋 Selected template: ${template.name}`, false);
+    addMessage('system', `✅ Template loaded: "${template.description}"\n\n📝 **Requirements loaded:**\n${template.user_requirements}\n\nYou can modify these requirements or click Start to proceed.`, true);
   };
 
   const analyzeColumnCompatibility = async () => {
@@ -171,7 +233,7 @@ const App = () => {
 
     setIsAnalyzingColumns(true);
     try {
-      addMessage('system', '🔍 Analyzing column compatibility...');
+      addMessage('system', '🔍 Analyzing column compatibility...', true);
       const data = await apiService.analyzeColumns(
         selectedFiles.fileA.file_id,
         selectedFiles.fileB.file_id
@@ -185,13 +247,13 @@ const App = () => {
             ).join('\n')}`
           : '⚠️ No strong column matches detected. Manual specification may be needed.';
 
-        addMessage('system', matchText);
+        addMessage('system', matchText, true);
       } else {
-        addMessage('system', '⚠️ Column analysis completed. Please specify your requirements in the template.');
+        addMessage('system', '⚠️ Column analysis completed. Please specify your requirements in the template.', true);
       }
     } catch (error) {
       console.error('Column analysis failed:', error);
-      addMessage('system', '⚠️ Column analysis completed. Please specify your requirements manually.');
+      addMessage('system', '⚠️ Column analysis completed. Please specify your requirements manually.', true);
     } finally {
       setIsAnalyzingColumns(false);
     }
@@ -199,13 +261,13 @@ const App = () => {
 
   const startReconciliation = async () => {
     if (!selectedFiles.fileA || !selectedFiles.fileB || !currentInput.trim()) {
-      addMessage('error', '❌ Please select two files and provide reconciliation requirements.');
+      addMessage('error', '❌ Please select two files and provide reconciliation requirements.', false);
       return;
     }
 
     setIsProcessing(true);
-    addMessage('user', currentInput);
-    addMessage('system', '🚀 Starting reconciliation process...\n\n⏳ This may take 30-60 seconds depending on file size and complexity.');
+    addMessage('user', currentInput, false);
+    addMessage('system', '🚀 Starting reconciliation process...\n\n⏳ This may take 30-60 seconds depending on file size and complexity.', true);
 
     try {
       const reconciliationRequest = {
@@ -218,15 +280,15 @@ const App = () => {
 
       if (data.success) {
         setActiveReconciliation(data.data.reconciliation_id);
-        addMessage('system', '✅ Reconciliation started! Monitoring progress...');
+        addMessage('system', '✅ Reconciliation started! Monitoring progress...', true);
         setCurrentInput('');
         monitorReconciliation(data.data.reconciliation_id);
       } else {
-        addMessage('error', `❌ Failed to start: ${data.message}`);
+        addMessage('error', `❌ Failed to start: ${data.message}`, false);
         setIsProcessing(false);
       }
     } catch (error) {
-      addMessage('error', `❌ Error: ${error.message}`);
+      addMessage('error', `❌ Error: ${error.message}`, false);
       setIsProcessing(false);
     }
   };
@@ -242,13 +304,13 @@ const App = () => {
           if (reconciliation.status === 'completed') {
             setIsProcessing(false);
             setActiveReconciliation(null);
-            addMessage('success', '🎉 Reconciliation completed successfully!');
+            addMessage('success', '🎉 Reconciliation completed successfully!', true);
             displayResults(reconciliation.result);
             await loadProcessedFiles();
           } else if (reconciliation.status === 'failed') {
             setIsProcessing(false);
             setActiveReconciliation(null);
-            addMessage('error', `❌ Reconciliation failed: ${reconciliation.error || 'Unknown error'}`);
+            addMessage('error', `❌ Reconciliation failed: ${reconciliation.error || 'Unknown error'}`, false);
           } else {
             // Still processing, check again
             setTimeout(checkStatus, 3000);
@@ -256,13 +318,13 @@ const App = () => {
         } else {
           setIsProcessing(false);
           setActiveReconciliation(null);
-          addMessage('error', 'Failed to check reconciliation status');
+          addMessage('error', 'Failed to check reconciliation status', false);
         }
       } catch (error) {
         console.error('Error checking status:', error);
         setIsProcessing(false);
         setActiveReconciliation(null);
-        addMessage('error', 'Error monitoring reconciliation progress');
+        addMessage('error', 'Error monitoring reconciliation progress', false);
       }
     };
 
@@ -321,7 +383,7 @@ Use the download buttons in the "Processed Reconciliations" panel to get detaile
 Raw result keys: ${Object.keys(result).join(', ')}
 Summary keys: ${Object.keys(summary).join(', ')}`;
 
-    addMessage('result', resultText);
+    addMessage('result', resultText, true);
   };
 
   const downloadResults = async (reconciliationId, fileType) => {
@@ -337,16 +399,16 @@ Summary keys: ${Object.keys(summary).join(', ')}`;
         a.click();
         window.URL.revokeObjectURL(url);
 
-        addMessage('system', `📥 Downloaded: ${data.data.filename}`);
+        addMessage('system', `📥 Downloaded: ${data.data.filename}`, true);
       }
     } catch (error) {
       console.error('Download failed:', error);
-      addMessage('error', `❌ Download failed: ${error.message}`);
+      addMessage('error', `❌ Download failed: ${error.message}`, false);
     }
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       <LeftSidebar
         files={files}
         templates={templates}
@@ -357,7 +419,17 @@ Summary keys: ${Object.keys(summary).join(', ')}`;
         onFileUpload={handleFileUpload}
         onTemplateSelect={handleTemplateSelect}
         onRefreshFiles={loadFiles}
+        width={leftPanelWidth}
       />
+
+      {/* Left Resize Handle */}
+      <div
+        className="w-1 bg-gray-300 hover:bg-blue-400 cursor-col-resize transition-colors duration-200 relative group"
+        onMouseDown={() => setIsResizing('left')}
+      >
+        <div className="absolute inset-0 w-2 -translate-x-0.5"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-8 bg-gray-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+      </div>
 
       <ChatInterface
         messages={messages}
@@ -367,13 +439,25 @@ Summary keys: ${Object.keys(summary).join(', ')}`;
         isAnalyzingColumns={isAnalyzingColumns}
         selectedFiles={selectedFiles}
         onStartReconciliation={startReconciliation}
+        isTyping={isTyping}
+        typingMessage={typingMessage}
       />
+
+      {/* Right Resize Handle */}
+      <div
+        className="w-1 bg-gray-300 hover:bg-blue-400 cursor-col-resize transition-colors duration-200 relative group"
+        onMouseDown={() => setIsResizing('right')}
+      >
+        <div className="absolute inset-0 w-2 -translate-x-0.5"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-8 bg-gray-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+      </div>
 
       <RightSidebar
         processedFiles={processedFiles}
         autoRefreshInterval={autoRefreshInterval}
         onRefreshProcessedFiles={loadProcessedFiles}
         onDownloadResults={downloadResults}
+        width={rightPanelWidth}
       />
     </div>
   );
