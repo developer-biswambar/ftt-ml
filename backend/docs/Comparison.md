@@ -102,25 +102,25 @@ Returns formatted results of completed comparisons.
 
 ```json
 {
-   "comparison_info": {
-      "comparison_id": "uuid",
-      "file_a": "filename_a.csv",
-      "file_b": "filename_b.csv",
-      "analysis_prompt": "...",
-      "mode": "ai_guided",
-      "processing_time": 15.2
-   },
-   "results": {
-      "summary": {
-         ...
-      },
-      "findings": [
-         ...
-      ],
-      "recommendations": [
-         ...
-      ]
-   }
+  "comparison_info": {
+    "comparison_id": "uuid",
+    "file_a": "filename_a.csv",
+    "file_b": "filename_b.csv",
+    "analysis_prompt": "...",
+    "mode": "ai_guided",
+    "processing_time": 15.2
+  },
+  "results": {
+    "summary": {
+      ...
+    },
+    "findings": [
+      ...
+    ],
+    "recommendations": [
+      ...
+    ]
+  }
 }
 ```
 
@@ -176,7 +176,7 @@ async def process_comparison(comparison_id: str, request: ComparisonRequest)
 3. **Mode-Specific Processing**
 
    | Mode | Description | Process |
-               |------|-------------|---------|
+                  |------|-------------|---------|
    | **AI-Guided** | Uses GPT-4 for intelligent analysis | Calls `analyze_with_openai()` with full context |
    | **Manual Mapping** | Compares specific column pairs | Iterates through mappings, calls `compare_column_values()` |
    | **Auto-Detect** | Automatically finds similar columns | Runs `detect_column_relationships()`, compares top matches |
@@ -203,44 +203,44 @@ response = await openai_client.chat.completions.create(
 
 ```json
 {
-   "summary": {
-      "total_matches": 150,
-      "total_mismatches": 23,
-      "match_rate": 86.7,
-      "key_insights": [
-         "insight1",
-         "insight2"
+  "summary": {
+    "total_matches": 150,
+    "total_mismatches": 23,
+    "match_rate": 86.7,
+    "key_insights": [
+      "insight1",
+      "insight2"
+    ]
+  },
+  "findings": [
+    {
+      "type": "match|mismatch|pattern|anomaly",
+      "description": "detailed description",
+      "severity": "high|medium|low",
+      "examples": [
+        {
+          "file_a_row": "...",
+          "file_b_row": "..."
+        }
+      ],
+      "affected_rows": 15
+    }
+  ],
+  "column_analysis": {
+    "Trade_ID": {
+      "data_type": "string",
+      "unique_values": 200,
+      "null_percentage": 0.5,
+      "patterns_found": [
+        "TRD prefix",
+        "6-digit numbers"
       ]
-   },
-   "findings": [
-      {
-         "type": "match|mismatch|pattern|anomaly",
-         "description": "detailed description",
-         "severity": "high|medium|low",
-         "examples": [
-            {
-               "file_a_row": "...",
-               "file_b_row": "..."
-            }
-         ],
-         "affected_rows": 15
-      }
-   ],
-   "column_analysis": {
-      "Trade_ID": {
-         "data_type": "string",
-         "unique_values": 200,
-         "null_percentage": 0.5,
-         "patterns_found": [
-            "TRD prefix",
-            "6-digit numbers"
-         ]
-      }
-   },
-   "recommendations": [
-      "Standardize date formats",
-      "Investigate missing trades"
-   ]
+    }
+  },
+  "recommendations": [
+    "Standardize date formats",
+    "Investigate missing trades"
+  ]
 }
 ```
 
