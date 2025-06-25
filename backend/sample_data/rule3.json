@@ -2,6 +2,7 @@
   "Files": [
     {
       "Name": "FileA",
+      "SheetName": "",
       "Extract": [
         {
           "ResultColumnName": "Isin",

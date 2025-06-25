@@ -1,0 +1,568 @@
+{
+	"info": {
+		"_postman_id": "d30e4585-e68c-40ae-aff1-4d923877ba7c",
+		"name": "File Reconciliation API",
+		"description": "Collection for testing the file reconciliation API with extraction, filtering, and matching capabilities",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "46038962",
+		"_collection_link": "https://biswambarpradhan-3159942.postman.co/workspace/Biswambar-Pradhan's-Workspace~44edaa11-edca-48db-83c4-e65e895f667a/collection/46038962-d30e4585-e68c-40ae-aff1-4d923877ba7c?action=share&source=collection_link&creator=46038962"
+	},
+	"item": [
+		{
+			"name": "1. Process Reconciliation - Basic",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Response has reconciliation ID\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('reconciliation_id');",
+							"    pm.environment.set(\"reconciliation_id\", jsonData.reconciliation_id);",
+							"});",
+							"",
+							"pm.test(\"Success is true\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.success).to.eql(true);",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Sample CSV content for FileA",
+							"const fileAContent = `Description,Amount,Status",
+							"Trade ISIN: US0378331005 Apple Inc. Amount: $15,000.00,15000,completed",
+							"Purchase ISIN: GB0002374006 Diageo Amount: $8,500,8500,completed",
+							"Sale ISIN: DE0007164600 SAP SE Total: $22,000.50,22000.50,completed",
+							"Transfer ISIN: FR0000120271 Total Value: $5,000,5000,pending",
+							"Trade ISIN: JP3633400001 Toyota Cost: $18,000,18000,completed",
+							"Invalid trade XYZ123 Price: $3,000,3000,completed",
+							"Purchase ISIN: US5949181045 Microsoft Amount: $25,000,25000,completed`;",
+							"",
+							"// Sample CSV content for FileB",
+							"const fileBContent = `Details,Amount,Trade_Date,Status",
+							"ISIN: US0378331005 - Apple transaction $15,000,15000,2024-01-15,active",
+							"ISIN: GB0002374006 - Diageo purchase Amount: $8,600,8600,2024-01-16,active",
+							"ISIN: DE0007164600 - SAP order Total $22,000.50,22000.50,2024-01-17,active",
+							"ISIN: CH0012005267 - Novartis $12,000,12000,2024-01-18,active",
+							"ISIN: JP3633400001 - Toyota Motor Value: $18,090,18090,2024-01-19,active",
+							"Random transaction without ISIN $7,000,7000,2024-01-20,active",
+							"ISIN: US5949181045 - MSFT trade $24,950,24950,2024-01-21,active`;",
+							"",
+							"// Create file blobs",
+							"pm.environment.set('fileAContent', fileAContent);",
+							"pm.environment.set('fileBContent', fileBContent);"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "fileA",
+							"description": "Create a CSV file with this content:\nDescription,Amount,Status\nTrade ISIN: US0378331005 Apple Inc,15000,completed\nPurchase ISIN: GB0002374006 Diageo,8500,completed\nSale ISIN: DE0007164600 SAP SE,22000,completed\nTransfer ISIN: FR0000120271 Total,5000,pending\nTrade ISIN: JP3633400001 Toyota,18000,completed\nInvalid trade XYZ123,3000,completed\nPurchase ISIN: US5949181045 Microsoft,25000,completed",
+							"type": "file",
+							"src": "postman-cloud:///1f051817-d184-4920-806a-ed3c290a333f"
+						},
+						{
+							"key": "fileB",
+							"description": "Create a CSV file with this content:\nDetails,Amount,Trade_Date,Status\nISIN: US0378331005 - Apple transaction,15000,2024-01-15,active\nISIN: GB0002374006 - Diageo purchase,8600,2024-01-16,active\nISIN: DE0007164600 - SAP order,22000,2024-01-17,active\nISIN: CH0012005267 - Novartis,12000,2024-01-18,active\nISIN: JP3633400001 - Toyota Motor,18090,2024-01-19,active\nRandom transaction without ISIN,7000,2024-01-20,active\nISIN: US5949181045 - MSFT trade,24950,2024-01-21,active",
+							"type": "file",
+							"src": "postman-cloud:///1f051818-41d5-4030-bcb3-7cf20cf1fe8f"
+						},
+						{
+							"key": "rules",
+							"value": "{\n  \"Files\": [\n    {\n      \"Name\": \"FileA\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Description\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"\n          ]\n        }\n      ],\n      \"Filter\": [\n        {\n          \"ColumnName\": \"Status\",\n          \"MatchType\": \"equals\",\n          \"Value\": \"Settled\"\n        }\n      ]\n    },\n    {\n      \"Name\": \"FileB\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Details\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"\n          ]\n        },\n        {\n          \"ResultColumnName\": \"ExtractedAmount\",\n          \"SourceColumn\": \"Details\",\n          \"MatchType\": \"regex\",\n          \"Conditions\": {\n            \"operator\": \"OR\",\n            \"patterns\": [\n              \"(?:Amount:?\\\\s*)?(?:[\\\\$€£¥₹]\\\\s*)([\\\\d,]+(?:\\\\.\\\\d{2})?)\",\n              \"(?:Price|Value|Cost|Total):\\\\s*(?:[\\\\$€£¥₹]\\\\s*)?([\\\\d,]+(?:\\\\.\\\\d{2})?)\",\n              \"\\\\b((?:\\\\d{1,3},)+\\\\d{3}(?:\\\\.\\\\d{2})?)\\\\b(?!\\\\d)\"\n            ]\n          }\n        }\n      ]\n    }\n  ],\n  \"ReconciliationRules\": [\n    {\n      \"LeftFileColumn\": \"Isin\",\n      \"RightFileColumn\": \"Isin\",\n      \"MatchType\": \"equals\"\n    },\n    {\n      \"LeftFileColumn\": \"Amount\",\n      \"RightFileColumn\": \"ExtractedAmount\",\n      \"MatchType\": \"tolerance\",\n      \"ToleranceValue\": 50\n    }\n  ]\n}",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/reconciliation/process",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"reconciliation",
+						"process"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2. Process Reconciliation - Nested Conditions",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Response has reconciliation ID\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('reconciliation_id');",
+							"    pm.environment.set(\"reconciliation_id_nested\", jsonData.reconciliation_id);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "fileA",
+							"description": "Create a CSV file with trading data containing ISINs and status",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "fileB",
+							"description": "Create a CSV file with transaction details",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "rules",
+							"value": "{\n  \"Files\": [\n    {\n      \"Name\": \"FileA\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Description\",\n          \"MatchType\": \"regex\",\n          \"Conditions\": {\n            \"operator\": \"AND\",\n            \"conditions\": [\n              {\n                \"operator\": \"OR\",\n                \"patterns\": [\n                  \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\",\n                  \"\\\\b[A-Z]{3}[0-9]{6}\\\\b\"\n                ]\n              },\n              {\n                \"pattern\": \"\\\\b(Trade|Purchase|Sale)\\\\b\"\n              }\n            ]\n          }\n        }\n      ],\n      \"Filter\": [\n        {\n          \"ColumnName\": \"Status\",\n          \"MatchType\": \"equals\",\n          \"Value\": \"completed\"\n        }\n      ]\n    },\n    {\n      \"Name\": \"FileB\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Details\",\n          \"MatchType\": \"regex\",\n          \"Conditions\": {\n            \"operator\": \"OR\",\n            \"patterns\": [\n              \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\",\n              \"\\\\b[A-Z]{3}[0-9]{6}\\\\b\"\n            ]\n          }\n        }\n      ],\n      \"Filter\": [\n        {\n          \"ColumnName\": \"Status\",\n          \"MatchType\": \"equals\",\n          \"Value\": \"active\"\n        }\n      ]\n    }\n  ],\n  \"ReconciliationRules\": [\n    {\n      \"LeftFileColumn\": \"Isin\",\n      \"RightFileColumn\": \"Isin\",\n      \"MatchType\": \"equals\"\n    },\n    {\n      \"LeftFileColumn\": \"Amount\",\n      \"RightFileColumn\": \"Amount\",\n      \"MatchType\": \"tolerance\",\n      \"ToleranceValue\": 2.5\n    }\n  ]\n}",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/reconciliation/process",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"reconciliation",
+						"process"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3. Process Reconciliation - Excel Files",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Response has reconciliation ID\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('reconciliation_id');",
+							"    pm.environment.set(\"reconciliation_id_excel\", jsonData.reconciliation_id);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "fileA",
+							"description": "Upload an Excel file (.xlsx) with trading data",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "fileB",
+							"description": "Upload an Excel file (.xlsx) with transaction data",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "rules",
+							"value": "{\n  \"Files\": [\n    {\n      \"Name\": \"FileA\",\n      \"SheetName\": \"Trades\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Description\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"\n          ]\n        }\n      ],\n      \"Filter\": [\n        {\n          \"ColumnName\": \"Status\",\n          \"MatchType\": \"in\",\n          \"Value\": \"completed,settled\"\n        }\n      ]\n    },\n    {\n      \"Name\": \"FileB\",\n      \"SheetName\": \"Transactions\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Details\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"\n          ]\n        }\n      ]\n    }\n  ],\n  \"ReconciliationRules\": [\n    {\n      \"LeftFileColumn\": \"Isin\",\n      \"RightFileColumn\": \"Isin\",\n      \"MatchType\": \"equals\"\n    },\n    {\n      \"LeftFileColumn\": \"Amount\",\n      \"RightFileColumn\": \"Amount\",\n      \"MatchType\": \"tolerance\",\n      \"ToleranceValue\": 0.5\n    }\n  ]\n}",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/reconciliation/process",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"reconciliation",
+						"process"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "4. Get Reconciliation Results - JSON",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Response has all required sections\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('matched');",
+							"    pm.expect(jsonData).to.have.property('unmatched_file_a');",
+							"    pm.expect(jsonData).to.have.property('unmatched_file_b');",
+							"    pm.expect(jsonData).to.have.property('timestamp');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/reconciliation/results/{{reconciliation_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"reconciliation",
+						"results",
+						"{{reconciliation_id}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "5. Download Results - Excel",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Content-Type is Excel\", function () {",
+							"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/reconciliation/download/{{reconciliation_id}}?format=excel",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"reconciliation",
+						"download",
+						"{{reconciliation_id}}"
+					],
+					"query": [
+						{
+							"key": "format",
+							"value": "excel"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "6. Download Results - CSV",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Content-Type is CSV\", function () {",
+							"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/csv\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/reconciliation/download/{{reconciliation_id}}?format=csv",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"reconciliation",
+						"download",
+						"{{reconciliation_id}}"
+					],
+					"query": [
+						{
+							"key": "format",
+							"value": "csv"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "7. Error Test - Invalid Column",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 400\", function () {",
+							"    pm.response.to.have.status(400);",
+							"});",
+							"",
+							"pm.test(\"Error message mentions missing column\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(JSON.stringify(jsonData)).to.include(\"not found\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "fileA",
+							"description": "Upload any CSV file",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "fileB",
+							"description": "Upload any CSV file",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "rules",
+							"value": "{\n  \"Files\": [\n    {\n      \"Name\": \"FileA\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"NonExistentColumn\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"\n          ]\n        }\n      ]\n    },\n    {\n      \"Name\": \"FileB\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Details\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"\n          ]\n        }\n      ]\n    }\n  ],\n  \"ReconciliationRules\": [\n    {\n      \"LeftFileColumn\": \"Isin\",\n      \"RightFileColumn\": \"Isin\",\n      \"MatchType\": \"equals\"\n    }\n  ]\n}",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/reconciliation/process",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"reconciliation",
+						"process"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "8. Error Test - Invalid Regex",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Request completes\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Errors array contains regex error\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.errors.length).to.be.above(0);",
+							"    pm.expect(JSON.stringify(jsonData.errors)).to.include(\"Invalid regex\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "fileA",
+							"description": "Upload any CSV file",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "fileB",
+							"description": "Upload any CSV file",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "rules",
+							"value": "{\n  \"Files\": [\n    {\n      \"Name\": \"FileA\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Description\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"[Invalid(Regex\"\n          ]\n        }\n      ]\n    },\n    {\n      \"Name\": \"FileB\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Details\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"\n          ]\n        }\n      ]\n    }\n  ],\n  \"ReconciliationRules\": [\n    {\n      \"LeftFileColumn\": \"Isin\",\n      \"RightFileColumn\": \"Isin\",\n      \"MatchType\": \"equals\"\n    }\n  ]\n}",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/reconciliation/process",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"reconciliation",
+						"process"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "9. Complex Nested Conditions Test",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Reconciliation completes successfully\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.success).to.eql(true);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "fileA",
+							"description": "Upload a CSV with complex data",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "fileB",
+							"description": "Upload a CSV with complex data",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "rules",
+							"value": "{\n  \"Files\": [\n    {\n      \"Name\": \"FileA\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Description\",\n          \"MatchType\": \"regex\",\n          \"Conditions\": {\n            \"operator\": \"OR\",\n            \"conditions\": [\n              {\n                \"operator\": \"AND\",\n                \"conditions\": [\n                  {\n                    \"pattern\": \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"\n                  },\n                  {\n                    \"pattern\": \"\\\\b(Trade|Purchase)\\\\b\"\n                  }\n                ]\n              },\n              {\n                \"operator\": \"AND\",\n                \"conditions\": [\n                  {\n                    \"pattern\": \"\\\\b[A-Z]{3}[0-9]{6}\\\\b\"\n                  },\n                  {\n                    \"pattern\": \"\\\\bSale\\\\b\"\n                  }\n                ]\n              }\n            ]\n          }\n        }\n      ],\n      \"Filter\": [\n        {\n          \"ColumnName\": \"Amount\",\n          \"MatchType\": \"greater_than\",\n          \"Value\": 5000\n        },\n        {\n          \"ColumnName\": \"Status\",\n          \"MatchType\": \"in\",\n          \"Value\": \"completed,settled,processed\"\n        }\n      ]\n    },\n    {\n      \"Name\": \"FileB\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Details\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\",\n            \"\\\\b[A-Z]{3}[0-9]{6}\\\\b\"\n          ]\n        }\n      ]\n    }\n  ],\n  \"ReconciliationRules\": [\n    {\n      \"LeftFileColumn\": \"Isin\",\n      \"RightFileColumn\": \"Isin\",\n      \"MatchType\": \"equals\"\n    },\n    {\n      \"LeftFileColumn\": \"Amount\",\n      \"RightFileColumn\": \"Amount\",\n      \"MatchType\": \"tolerance\",\n      \"ToleranceValue\": 5\n    }\n  ]\n}",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{base_url}}/reconciliation/process",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"reconciliation",
+						"process"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "reconciliation_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "reconciliation_id_nested",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "reconciliation_id_excel",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
