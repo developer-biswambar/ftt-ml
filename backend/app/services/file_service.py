@@ -8,27 +8,31 @@ from typing import Dict, List, Optional, Tuple
 import aiofiles
 import pandas as pd
 from fastapi import UploadFile, HTTPException
+from dotenv import load_dotenv
 
-from app.config.settings import settings
-from app.models.schemas import FileInfo, FileType
+# Load environment variables
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 
 class FileProcessingService:
     def __init__(self):
-        self.temp_dir = settings.TEMP_DIR
-        self.max_file_size = settings.MAX_FILE_SIZE
-        self.allowed_extensions = settings.ALLOWED_EXTENSIONS
-        self.max_rows = settings.MAX_ROWS_PER_FILE
+        self.temp_dir = os.getenv("TEMP_DIR", "./temp")
+        self.max_file_size = int(os.getenv("MAX_FILE_SIZE", "100")) * 1024 * 1024  # Default 100MB
+        self.allowed_extensions = ['.csv', '.xlsx', '.xls']
+        # REMOVED: max_rows - No row limit
+
+        # Ensure temp directory exists
+        os.makedirs(self.temp_dir, exist_ok=True)
 
         # In-memory storage for file metadata (use database in production)
-        self.file_registry: Dict[str, FileInfo] = {}
+        self.file_registry: Dict[str, dict] = {}
         self.file_data_cache: Dict[str, pd.DataFrame] = {}
 
-    async def upload_and_process_file(self, file: UploadFile) -> FileInfo:
+    async def upload_and_process_file(self, file: UploadFile) -> dict:
         """
-        Upload and process Excel/CSV file
+        Upload and process Excel/CSV file with no row limit
         """
         try:
             # Validate file
@@ -52,7 +56,7 @@ class FileProcessingService:
             # Clean up temp file
             os.unlink(file_path)
 
-            logger.info(f"Successfully processed file {file.filename} with ID {file_id}")
+            logger.info(f"Successfully processed file {file.filename} with ID {file_id} - {len(df)} rows")
             return file_info
 
         except Exception as e:
@@ -60,7 +64,7 @@ class FileProcessingService:
             raise HTTPException(status_code=400, detail=f"File processing error: {str(e)}")
 
     def _validate_file(self, file: UploadFile) -> None:
-        """Validate uploaded file"""
+        """Validate uploaded file - no row limit"""
 
         # Check file extension
         file_ext = os.path.splitext(file.filename)[1].lower()
@@ -83,25 +87,28 @@ class FileProcessingService:
 
         return temp_path
 
-    async def _process_file(self, file_path: str, file_id: str, filename: str) -> Tuple[pd.DataFrame, FileInfo]:
-        """Process the uploaded file and extract metadata"""
+    async def _process_file(self, file_path: str, file_id: str, filename: str) -> Tuple[pd.DataFrame, dict]:
+        """Process the uploaded file and extract metadata - no row limit"""
 
         try:
             # Determine file type
             file_ext = os.path.splitext(filename)[1].lower()
 
             if file_ext == '.csv':
-                df = pd.read_csv(file_path, encoding='utf-8')
-                file_type = FileType.CSV
+                # Read CSV with optimized settings for large files
+                df = pd.read_csv(file_path, encoding='utf-8', low_memory=False)
+                file_type = "CSV"
             elif file_ext in ['.xlsx', '.xls']:
-                df = pd.read_excel(file_path)
-                file_type = FileType.EXCEL
+                # Read Excel with optimized settings for large files
+                df = pd.read_excel(file_path, engine='openpyxl' if file_ext == '.xlsx' else 'xlrd')
+                file_type = "EXCEL"
             else:
                 raise ValueError(f"Unsupported file extension: {file_ext}")
 
-            # Validate row count
-            if len(df) > self.max_rows:
-                raise ValueError(f"File has too many rows ({len(df)}). Maximum: {self.max_rows}")
+            # REMOVED: Row count validation
+            # Log info about large files
+            if len(df) > 10000:
+                logger.info(f"Processing large file: {filename} with {len(df)} rows")
 
             # Clean column names
             df.columns = df.columns.astype(str).str.strip()
@@ -109,16 +116,16 @@ class FileProcessingService:
             # Get file size
             file_size = os.path.getsize(file_path)
 
-            # Create FileInfo object
-            file_info = FileInfo(
-                file_id=file_id,
-                filename=filename,
-                file_type=file_type,
-                size=file_size,
-                total_rows=len(df),
-                columns=list(df.columns),
-                upload_time=datetime.utcnow()
-            )
+            # Create file info dictionary
+            file_info = {
+                "file_id": file_id,
+                "filename": filename,
+                "file_type": file_type,
+                "size": file_size,
+                "total_rows": len(df),
+                "columns": list(df.columns),
+                "upload_time": datetime.utcnow().isoformat()
+            }
 
             logger.info(f"Processed file: {filename}, Rows: {len(df)}, Columns: {len(df.columns)}")
 
@@ -128,7 +135,7 @@ class FileProcessingService:
             logger.error(f"Error processing file {filename}: {str(e)}")
             raise
 
-    def get_file_info(self, file_id: str) -> Optional[FileInfo]:
+    def get_file_info(self, file_id: str) -> Optional[dict]:
         """Get file information by ID"""
         return self.file_registry.get(file_id)
 
@@ -163,9 +170,9 @@ class FileProcessingService:
         if not file_info:
             raise ValueError(f"File with ID {file_id} not found")
 
-        if source_column not in file_info.columns:
+        if source_column not in file_info["columns"]:
             raise ValueError(
-                f"Column '{source_column}' not found in file. Available columns: {', '.join(file_info.columns)}")
+                f"Column '{source_column}' not found in file. Available columns: {', '.join(file_info['columns'])}")
 
         return True
 
@@ -209,7 +216,7 @@ class FileProcessingService:
             logger.error(f"Error cleaning up file {file_id}: {str(e)}")
             return False
 
-    def get_all_files(self) -> List[FileInfo]:
+    def get_all_files(self) -> List[dict]:
         """Get all uploaded files"""
         return list(self.file_registry.values())
 

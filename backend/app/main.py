@@ -3,11 +3,14 @@
 import logging
 import os
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
 import io
 
 import pandas as pd
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI,Request, UploadFile, File, HTTPException
+from fastapi.responses import JSONResponse
+
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.services.storage_service import uploaded_files, extractions, comparisons, reconciliations
@@ -54,6 +57,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting File Processing API")
+    temp_dir = os.getenv("TEMP_DIR", "./temp")
+    max_file_size = int(os.getenv("MAX_FILE_SIZE", "100"))
+
+    logger.info(f"Temp directory: {temp_dir}")
+    logger.info(f"Max file size: {max_file_size}MB")
+    logger.info("No row limits configured - unlimited file processing")
+
+    # Ensure temp directory exists
+    os.makedirs(temp_dir, exist_ok=True)
+
+    yield
+    # Shutdown
+    logger.info("Shutting down File Processing API")
+
+
+# Custom exception handler for large file processing
+@app.exception_handler(Exception)
+async def custom_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {str(exc)}")
+    debug_mode = os.getenv("DEBUG", "false").lower() == "true"
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "message": "Internal server error during file processing",
+            "detail": str(exc) if debug_mode else "An error occurred"
+        }
+    )
 @app.get("/templates")
 async def get_templates():
     """Get single-column templates (backward compatibility)"""
@@ -137,13 +174,11 @@ sys.modules['app_storage'].reconciliations = reconciliations
 
 # Import and include routers
 try:
-    from app.routes.extraction_routes import router as extraction_router
     from app.routes.health_routes import router as health_routes
     from app.routes.reconciliation_routes import router as reconciliation_router
     from app.routes.viewer_routes import router as viewer_router  # NEW
     from app.routes.file_routes import router as file_router
 
-    app.include_router(extraction_router)
     app.include_router(health_routes)
     app.include_router(reconciliation_router)
     app.include_router(viewer_router)
