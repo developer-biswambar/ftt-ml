@@ -17,7 +17,17 @@ const LeftSidebar = ({
 
     const openFileViewer = (fileId) => {
         const viewerUrl = `/viewer/${fileId}`;
-        window.open(viewerUrl, '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
+        // UPDATED: Use more specific window features to force tab opening in modern browsers
+        const newWindow = window.open(
+            viewerUrl,
+            `viewer_${fileId}`,
+            'toolbar=yes,scrollbars=yes,resizable=yes,width=1400,height=900,menubar=yes,location=yes,directories=no,status=yes'
+        );
+
+        // Fallback: If window opening fails, try to focus the new tab
+        if (newWindow) {
+            newWindow.focus();
+        }
     };
 
     const handleFileUpload = (event) => {

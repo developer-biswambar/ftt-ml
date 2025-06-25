@@ -147,7 +147,7 @@ async def list_files():
 
 
 @router.get("/{file_id}")
-async def get_file_info(file_id: str, include_sample: bool = True, sample_rows: int = 10):
+async def get_file_info(file_id: str, include_sample: bool = False, sample_rows: int = 10):
     """Get detailed information about a specific file"""
     if file_id not in uploaded_files:
         raise HTTPException(404, "File not found")
