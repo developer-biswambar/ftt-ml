@@ -19,6 +19,9 @@ const DataViewer = ({ fileId, onClose }) => {
     const [sortConfig, setSortConfig] = useState({ column: null, direction: 'asc' });
     const [filterConfig, setFilterConfig] = useState({});
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(50);
+    const [totalRows, setTotalRows] = useState(0);
     const [hasChanges, setHasChanges] = useState(false);
     const [saving, setSaving] = useState(false);
     const [history, setHistory] = useState([]);
@@ -30,7 +33,7 @@ const DataViewer = ({ fileId, onClose }) => {
     useEffect(() => {
         loadFileData();
         loadFileName();
-    }, [fileId]);
+    }, [fileId, currentPage, pageSize]);
 
     const loadFileName = async () => {
         try {
@@ -59,10 +62,11 @@ const DataViewer = ({ fileId, onClose }) => {
 
             // Try to load real data first, fallback to sample if endpoint doesn't exist
             try {
-                const response = await apiService.getFileData(fileId, 1, 1000);
+                const response = await apiService.getFileData(fileId, currentPage, pageSize);
                 if (response.success) {
                     setData(response.data.rows);
                     setColumns(response.data.columns);
+                    setTotalRows(response.data.total_rows);
 
                     if (history.length === 0) {
                         setHistory([{ data: response.data.rows, columns: response.data.columns }]);
@@ -80,11 +84,17 @@ const DataViewer = ({ fileId, onClose }) => {
                 { id: 2, name: 'Example Row', amount: 200, date: '2024-01-02', status: 'Pending' },
                 { id: 3, name: 'Test Entry', amount: 300, date: '2024-01-03', status: 'Complete' },
                 { id: 4, name: 'Demo Item', amount: 150, date: '2024-01-04', status: 'Active' },
-                { id: 5, name: 'Sample Entry', amount: 250, date: '2024-01-05', status: 'Pending' }
+                { id: 5, name: 'Sample Entry', amount: 250, date: '2024-01-05', status: 'Pending' },
+                { id: 6, name: 'Another Row', amount: 175, date: '2024-01-06', status: 'Active' },
+                { id: 7, name: 'More Data', amount: 225, date: '2024-01-07', status: 'Complete' },
+                { id: 8, name: 'Test Item', amount: 125, date: '2024-01-08', status: 'Pending' },
+                { id: 9, name: 'Demo Data', amount: 275, date: '2024-01-09', status: 'Active' },
+                { id: 10, name: 'Final Entry', amount: 325, date: '2024-01-10', status: 'Complete' }
             ];
 
             setData(sampleData);
             setColumns(['id', 'name', 'amount', 'date', 'status']);
+            setTotalRows(100); // Simulate larger dataset for pagination demo
 
             if (history.length === 0) {
                 setHistory([{ data: sampleData, columns: ['id', 'name', 'amount', 'date', 'status'] }]);
@@ -295,7 +305,7 @@ const DataViewer = ({ fileId, onClose }) => {
         addToHistory(sortedData, columns);
     };
 
-    // Filtering
+    // Filtering and Pagination
     const filteredData = useMemo(() => {
         let filtered = [...data];
 
@@ -317,6 +327,12 @@ const DataViewer = ({ fileId, onClose }) => {
 
         return filtered;
     }, [data, searchTerm, filterConfig]);
+
+    // Pagination calculations
+    const totalPages = Math.ceil(totalRows / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const displayedData = filteredData; // Show all filtered data on current page
 
     if (loading) {
         return (
@@ -559,11 +575,11 @@ const DataViewer = ({ fileId, onClose }) => {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredData.map((row, rowIndex) => (
+                            {displayedData.map((row, rowIndex) => (
                                 <tr key={rowIndex} className="hover:bg-gray-50 group">
                                     <td className="px-2 py-2 text-xs text-gray-500 text-center border border-gray-200 bg-gray-50">
                                         <div className="flex items-center justify-center space-x-1">
-                                            <span>{rowIndex + 1}</span>
+                                            <span>{startIndex + rowIndex + 1}</span>
                                             <button
                                                 onClick={() => deleteRow(rowIndex)}
                                                 className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700"
@@ -606,11 +622,59 @@ const DataViewer = ({ fileId, onClose }) => {
                 </div>
             </div>
 
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="bg-white border-t border-gray-200 px-4 py-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-700">
+                                Showing {startIndex + 1} to {Math.min(endIndex, totalRows)} of {totalRows} rows
+                            </span>
+                            <select
+                                value={pageSize}
+                                onChange={(e) => {
+                                    setPageSize(Number(e.target.value));
+                                    setCurrentPage(1); // Reset to first page when changing page size
+                                }}
+                                className="text-sm border border-gray-300 rounded px-2 py-1"
+                            >
+                                <option value={25}>25 per page</option>
+                                <option value={50}>50 per page</option>
+                                <option value={100}>100 per page</option>
+                                <option value={250}>250 per page</option>
+                            </select>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                            <button
+                                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                                disabled={currentPage === 1}
+                                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Previous
+                            </button>
+
+                            <span className="text-sm text-gray-700">
+                                Page {currentPage} of {totalPages}
+                            </span>
+
+                            <button
+                                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Footer */}
             <div className="bg-white border-t border-gray-200 px-4 py-3">
                 <div className="flex items-center justify-between text-sm text-gray-600">
                     <span>
-                        Showing {filteredData.length} of {data.length} rows
+                        Showing {displayedData.length} of {data.length} rows on this page
                         {searchTerm && ` (filtered)`}
                     </span>
                     <span>
