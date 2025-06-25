@@ -1,15 +1,12 @@
 # backend/app/routes/viewer_routes.py - New file for viewer API endpoints
+import io
 import logging
 import os
-import uuid
 from datetime import datetime
-from typing import Dict, Any, List, Optional
-import json
-import io
+from typing import Dict, Any, List
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query, Response
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.services.storage_service import uploaded_files
