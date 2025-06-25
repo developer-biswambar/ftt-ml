@@ -15,7 +15,7 @@ from app.services.storage_service import uploaded_files
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/files", tags=["reconciliation"])
+router = APIRouter(prefix="/files", tags=["files"])
 
 
 
