@@ -1,4 +1,4 @@
-# backend/app/routes/viewer_routes.py - New file for viewer API endpoints
+# backend/app/routes/viewer_routes.py - Updated to include filename
 import io
 import logging
 import os
@@ -8,6 +8,10 @@ from typing import Dict, Any, List
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 from app.services.storage_service import uploaded_files
 
@@ -20,12 +24,14 @@ router = APIRouter(prefix="/files", tags=["viewer"])
 
 # Pydantic models
 class FileDataResponse(BaseModel):
+    filename: str
     columns: List[str]
     rows: List[Dict[str, Any]]
     total_rows: int
     current_page: int
     page_size: int
     total_pages: int
+    file_info: Dict[str, Any]
 
 
 class UpdateFileDataRequest(BaseModel):
@@ -38,13 +44,14 @@ async def get_file_data(
         page: int = Query(1, ge=1, description="Page number"),
         page_size: int = Query(1000, ge=1, le=5000, description="Items per page")
 ):
-    """Get paginated file data for the viewer"""
+    """Get paginated file data for the viewer with filename"""
     try:
         if file_id not in uploaded_files:
             raise HTTPException(404, f"File {file_id} not found")
 
         file_data = uploaded_files[file_id]
         df = file_data["data"]
+        file_info = file_data["info"]
 
         # Calculate pagination
         total_rows = len(df)
@@ -74,12 +81,21 @@ async def get_file_data(
             "success": True,
             "message": f"Retrieved {len(rows)} rows from file",
             "data": FileDataResponse(
+                filename=file_info.get("filename", "Unknown File"),
                 columns=list(df.columns),
                 rows=rows,
                 total_rows=total_rows,
                 current_page=page,
                 page_size=page_size,
-                total_pages=total_pages
+                total_pages=total_pages,
+                file_info={
+                    "file_id": file_id,
+                    "filename": file_info.get("filename", "Unknown File"),
+                    "file_size_mb": file_info.get("file_size_mb", 0),
+                    "upload_time": file_info.get("upload_time", ""),
+                    "total_rows": total_rows,
+                    "total_columns": len(df.columns)
+                }
             )
         }
 
@@ -88,6 +104,37 @@ async def get_file_data(
     except Exception as e:
         logger.error(f"Error retrieving file data: {e}")
         raise HTTPException(500, f"Failed to retrieve file data: {str(e)}")
+
+
+@router.get("/{file_id}/info")
+async def get_file_info_for_viewer(file_id: str):
+    """Get basic file information for the viewer header"""
+    try:
+        if file_id not in uploaded_files:
+            raise HTTPException(404, f"File {file_id} not found")
+
+        file_data = uploaded_files[file_id]
+        file_info = file_data["info"]
+        df = file_data["data"]
+
+        return {
+            "success": True,
+            "data": {
+                "file_id": file_id,
+                "filename": file_info.get("filename", "Unknown File"),
+                "file_size_mb": file_info.get("file_size_mb", 0),
+                "upload_time": file_info.get("upload_time", ""),
+                "total_rows": len(df),
+                "total_columns": len(df.columns),
+                "last_modified": file_info.get("last_modified", file_info.get("upload_time", ""))
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving file info: {e}")
+        raise HTTPException(500, f"Failed to retrieve file info: {str(e)}")
 
 
 @router.put("/{file_id}/data")
@@ -118,12 +165,13 @@ async def update_file_data(file_id: str, request: UpdateFileDataRequest):
         file_info["columns"] = list(df.columns)
         file_info["last_modified"] = datetime.utcnow().isoformat()
 
-        logger.info(f"Updated file {file_id} with {len(df)} rows and {len(df.columns)} columns")
+        logger.info(f"Updated file {file_info.get('filename', file_id)} with {len(df)} rows and {len(df.columns)} columns")
 
         return {
             "success": True,
             "message": "File data updated successfully",
             "data": {
+                "filename": file_info.get("filename", "Unknown File"),
                 "total_rows": len(df),
                 "columns": len(df.columns),
                 "last_modified": file_info["last_modified"]
@@ -152,7 +200,8 @@ async def download_modified_file(
         file_info = file_data["info"]
 
         # Get base filename without extension
-        base_filename = os.path.splitext(file_info["filename"])[0]
+        original_filename = file_info.get("filename", "data")
+        base_filename = os.path.splitext(original_filename)[0]
 
         if format.lower() == "csv":
             # Generate CSV
@@ -204,9 +253,11 @@ async def get_file_stats(file_id: str):
 
         file_data = uploaded_files[file_id]
         df = file_data["data"]
+        file_info = file_data["info"]
 
         # Calculate basic statistics
         stats = {
+            "filename": file_info.get("filename", "Unknown File"),
             "total_rows": len(df),
             "total_columns": len(df.columns),
             "memory_usage": df.memory_usage(deep=True).sum(),
@@ -257,8 +308,10 @@ async def validate_file_data(file_id: str):
 
         file_data = uploaded_files[file_id]
         df = file_data["data"]
+        file_info = file_data["info"]
 
         validation_results = {
+            "filename": file_info.get("filename", "Unknown File"),
             "is_valid": True,
             "issues": [],
             "warnings": [],
