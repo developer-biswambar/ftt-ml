@@ -1,0 +1,304 @@
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi.responses import JSONResponse, StreamingResponse
+from typing import Dict, List, Any, Optional, Union
+import pandas as pd
+import numpy as np
+import re
+import json
+import io
+from datetime import datetime
+import uuid
+from pydantic import BaseModel, Field, validator
+
+from app.models.recon_models import PatternCondition, FileRule, ExtractRule, FilterRule, ReconciliationRule
+
+# Update forward reference
+PatternCondition.model_rebuild()
+
+# Create rout
+
+class FileProcessor:
+    def __init__(self):
+        self.errors = []
+        self.warnings = []
+
+    def read_file(self, file: UploadFile, sheet_name: Optional[str] = None) -> pd.DataFrame:
+        """Read CSV or Excel file into DataFrame"""
+        try:
+            content = file.file.read()
+            file.file.seek(0)
+
+            if file.filename.endswith('.csv'):
+                return pd.read_csv(io.BytesIO(content))
+            elif file.filename.endswith(('.xlsx', '.xls')):
+                if sheet_name:
+                    return pd.read_excel(io.BytesIO(content), sheet_name=sheet_name)
+                else:
+                    return pd.read_excel(io.BytesIO(content))
+            else:
+                raise ValueError(f"Unsupported file format: {file.filename}")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error reading file {file.filename}: {str(e)}")
+
+    def validate_rules_against_columns(self, df: pd.DataFrame, file_rule: FileRule) -> List[str]:
+        """Validate that all columns mentioned in rules exist in the DataFrame"""
+        errors = []
+        df_columns = df.columns.tolist()
+
+        # Check extract rules
+        for extract in file_rule.Extract:
+            if extract.SourceColumn not in df_columns:
+                errors.append(
+                    f"Column '{extract.SourceColumn}' not found in file '{file_rule.Name}'. Available columns: {df_columns}")
+
+        # Check filter rules
+        for filter_rule in file_rule.Filter or []:
+            if filter_rule.ColumnName not in df_columns:
+                errors.append(
+                    f"Column '{filter_rule.ColumnName}' not found in file '{file_rule.Name}'. Available columns: {df_columns}")
+
+        return errors
+
+    def evaluate_pattern_condition(self, text: str, condition: PatternCondition) -> bool:
+        """Recursively evaluate pattern conditions"""
+        if condition.pattern:
+            # Single pattern
+            try:
+                return bool(re.search(condition.pattern, str(text)))
+            except re.error as e:
+                self.errors.append(f"Invalid regex pattern '{condition.pattern}': {str(e)}")
+                return False
+
+        elif condition.patterns:
+            # Multiple patterns with OR operator (default)
+            results = []
+            for pattern in condition.patterns:
+                try:
+                    results.append(bool(re.search(pattern, str(text))))
+                except re.error as e:
+                    self.errors.append(f"Invalid regex pattern '{pattern}': {str(e)}")
+                    results.append(False)
+
+            if condition.operator == "AND":
+                return all(results)
+            else:  # Default OR
+                return any(results)
+
+        elif condition.conditions:
+            # Nested conditions
+            results = []
+            for sub_condition in condition.conditions:
+                results.append(self.evaluate_pattern_condition(text, sub_condition))
+
+            if condition.operator == "AND":
+                return all(results)
+            else:  # Default OR
+                return any(results)
+
+        return False
+
+    def extract_patterns(self, df: pd.DataFrame, extract_rule: ExtractRule) -> pd.Series:
+        """Extract patterns from source column based on rules"""
+
+        def extract_from_text(text):
+            if pd.isna(text):
+                return None
+
+            text = str(text)
+
+            # Special handling for amount extraction
+            if extract_rule.ResultColumnName.lower() in ['amount', 'extractedamount', 'value']:
+                # Use a more specific pattern for amounts that avoids ISINs
+                amount_patterns = [
+                    r'(?:Amount:?\s*)?(?:[\$€£¥₹]\s*)([\d,]+(?:\.\d{2})?)',  # With currency symbol
+                    r'(?:Amount|Price|Value|Cost|Total):\s*([\d,]+(?:\.\d{2})?)',  # With label
+                    r'\b((?:\d{1,3},)+\d{3}(?:\.\d{2})?)\b(?!\d)',  # Formatted number with commas
+                    r'(?:[\$€£¥₹]\s*)(\d+(?:\.\d{2})?)\b'  # Simple currency
+                ]
+
+                for pattern in amount_patterns:
+                    try:
+                        match = re.search(pattern, text, re.IGNORECASE)
+                        if match:
+                            # Extract the numeric group and clean it
+                            amount_str = match.group(1).replace(',', '').replace('$', '')
+                            try:
+                                # Validate it's a reasonable amount (not an ID)
+                                amount = float(amount_str)
+                                if amount > 100:  # Likely a real amount, not part of an ID
+                                    return amount_str
+                            except ValueError:
+                                continue
+                    except re.error:
+                        continue
+
+            # Handle new nested condition format
+            if extract_rule.Conditions:
+                if self.evaluate_pattern_condition(text, extract_rule.Conditions):
+                    # Extract the actual value using the first matching pattern
+                    matched_value = self.extract_first_match(text, extract_rule.Conditions)
+                    return matched_value
+
+            # Handle legacy format
+            elif extract_rule.Patterns:
+                for pattern in extract_rule.Patterns:
+                    try:
+                        match = re.search(pattern, text)
+                        if match:
+                            return match.group(0)
+                    except re.error as e:
+                        self.errors.append(f"Invalid regex pattern '{pattern}': {str(e)}")
+
+            return None
+
+        return df[extract_rule.SourceColumn].apply(extract_from_text)
+
+    def extract_first_match(self, text: str, condition: PatternCondition) -> Optional[str]:
+        """Extract the first matching value from text"""
+        if condition.pattern:
+            try:
+                match = re.search(condition.pattern, text)
+                if match:
+                    return match.group(0)
+            except re.error:
+                pass
+
+        elif condition.patterns:
+            for pattern in condition.patterns:
+                try:
+                    match = re.search(pattern, text)
+                    if match:
+                        return match.group(0)
+                except re.error:
+                    pass
+
+        elif condition.conditions:
+            for sub_condition in condition.conditions:
+                result = self.extract_first_match(text, sub_condition)
+                if result:
+                    return result
+
+        return None
+
+    def apply_filters(self, df: pd.DataFrame, filters: List[FilterRule]) -> pd.DataFrame:
+        """Apply filter rules to DataFrame"""
+        filtered_df = df.copy()
+
+        for filter_rule in filters:
+            column = filter_rule.ColumnName
+            value = filter_rule.Value
+            match_type = filter_rule.MatchType.lower()
+
+            try:
+                if match_type == "equals":
+                    filtered_df = filtered_df[filtered_df[column] == value]
+                elif match_type == "not_equals":
+                    filtered_df = filtered_df[filtered_df[column] != value]
+                elif match_type == "greater_than":
+                    # Convert to numeric and handle NaN values
+                    numeric_col = pd.to_numeric(filtered_df[column], errors='coerce')
+                    filtered_df = filtered_df[numeric_col > value]
+                elif match_type == "less_than":
+                    # Convert to numeric and handle NaN values
+                    numeric_col = pd.to_numeric(filtered_df[column], errors='coerce')
+                    filtered_df = filtered_df[numeric_col < value]
+                elif match_type == "contains":
+                    filtered_df = filtered_df[filtered_df[column].astype(str).str.contains(str(value), na=False)]
+                elif match_type == "in":
+                    if isinstance(value, str):
+                        value = [v.strip() for v in value.split(',')]
+                    filtered_df = filtered_df[filtered_df[column].isin(value)]
+                else:
+                    self.warnings.append(f"Unknown filter match type: {match_type}")
+            except Exception as e:
+                self.errors.append(f"Error applying filter on column '{column}': {str(e)}")
+
+        return filtered_df
+
+    def reconcile_files(self, df_a: pd.DataFrame, df_b: pd.DataFrame,
+                        recon_rules: List[ReconciliationRule]) -> Dict[str, pd.DataFrame]:
+        """Reconcile two DataFrames based on rules"""
+        # Create copies for reconciliation
+        df_a_work = df_a.copy()
+        df_b_work = df_b.copy()
+
+        # Add unique identifiers
+        df_a_work['_orig_index_a'] = range(len(df_a_work))
+        df_b_work['_orig_index_b'] = range(len(df_b_work))
+
+        # Build matching conditions
+        matched_indices_a = set()
+        matched_indices_b = set()
+        matches = []
+
+        for idx_a, row_a in df_a_work.iterrows():
+            for idx_b, row_b in df_b_work.iterrows():
+                if idx_b in matched_indices_b:
+                    continue
+
+                all_rules_match = True
+
+                for rule in recon_rules:
+                    val_a = row_a[rule.LeftFileColumn]
+                    val_b = row_b[rule.RightFileColumn]
+
+                    if rule.MatchType.lower() == "equals":
+                        if pd.isna(val_a) and pd.isna(val_b):
+                            continue
+                        if val_a != val_b:
+                            all_rules_match = False
+                            break
+
+                    elif rule.MatchType.lower() == "tolerance":
+                        try:
+                            # Handle NaN values properly
+                            if pd.isna(val_a) or pd.isna(val_b):
+                                all_rules_match = False
+                                break
+
+                            num_a = float(val_a)
+                            num_b = float(val_b)
+
+                            if num_b != 0:
+                                percentage_diff = abs(num_a - num_b) / abs(num_b) * 100
+                                if percentage_diff > rule.ToleranceValue:
+                                    all_rules_match = False
+                                    break
+                            elif num_a != 0:
+                                # If B is 0 but A is not, they don't match
+                                all_rules_match = False
+                                break
+                            # If both are 0, they match
+                        except (ValueError, TypeError):
+                            self.warnings.append(
+                                f"Could not convert values to numeric for tolerance comparison: {val_a}, {val_b}")
+                            all_rules_match = False
+                            break
+
+                if all_rules_match:
+                    matched_indices_a.add(row_a['_orig_index_a'])
+                    matched_indices_b.add(row_b['_orig_index_b'])
+
+                    # Merge the matched records
+                    match_record = {}
+                    for col in df_a.columns:
+                        match_record[f"FileA_{col}"] = row_a[col]
+                    for col in df_b.columns:
+                        match_record[f"FileB_{col}"] = row_b[col]
+                    matches.append(match_record)
+                    break
+
+        # Create result DataFrames
+        matched_df = pd.DataFrame(matches) if matches else pd.DataFrame()
+        unmatched_a = df_a_work[~df_a_work['_orig_index_a'].isin(matched_indices_a)].drop('_orig_index_a', axis=1)
+        unmatched_b = df_b_work[~df_b_work['_orig_index_b'].isin(matched_indices_b)].drop('_orig_index_b', axis=1)
+
+        return {
+            'matched': matched_df,
+            'unmatched_file_a': unmatched_a,
+            'unmatched_file_b': unmatched_b
+        }
+
+
+# Store reconciliation results temporarily (in production, use proper storage)
+reconciliation_storage = {}
