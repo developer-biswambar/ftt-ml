@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Save, Download, Plus, Minus, ArrowUp, ArrowDown,
-    Undo, Redo, Search, AlertCircle, X, Edit3, FileText
+    Undo, Redo, Search, AlertCircle, X, Edit3, FileText, Settings
 } from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -28,6 +28,17 @@ const DataViewer = ({ fileId, onClose }) => {
     const [historyIndex, setHistoryIndex] = useState(-1);
     const [showAddColumn, setShowAddColumn] = useState(false);
     const [newColumnName, setNewColumnName] = useState('');
+
+    // UI Configuration state
+    const [uiConfig, setUiConfig] = useState({
+        cellPadding: 'compact', // compact, normal, comfortable
+        rowHeight: 'compact', // compact, normal, comfortable
+        headerHeight: 'compact', // compact, normal, comfortable
+        fontSize: 'small', // small, normal, large
+        showGridLines: true,
+        autoSizeColumns: false
+    });
+    const [showConfigPanel, setShowConfigPanel] = useState(false);
 
     // Load file data and extract filename
     useEffect(() => {
@@ -328,6 +339,43 @@ const DataViewer = ({ fileId, onClose }) => {
         return filtered;
     }, [data, searchTerm, filterConfig]);
 
+    // Get CSS classes based on UI configuration
+    const getCellClasses = () => {
+        const padding = {
+            compact: 'px-2 py-1',
+            normal: 'px-3 py-2',
+            comfortable: 'px-4 py-3'
+        };
+
+        const fontSize = {
+            small: 'text-xs',
+            normal: 'text-sm',
+            large: 'text-base'
+        };
+
+        return `${padding[uiConfig.cellPadding]} ${fontSize[uiConfig.fontSize]} border cursor-pointer hover:bg-blue-50 ${uiConfig.showGridLines ? 'border-gray-200' : 'border-transparent'}`;
+    };
+
+    const getHeaderClasses = () => {
+        const padding = {
+            compact: 'px-2 py-1',
+            normal: 'px-3 py-2',
+            comfortable: 'px-4 py-3'
+        };
+
+        return `${padding[uiConfig.headerHeight]} text-left text-xs font-medium text-gray-500 uppercase tracking-wider border relative group ${uiConfig.showGridLines ? 'border-gray-200' : 'border-transparent'}`;
+    };
+
+    const getRowClasses = () => {
+        const height = {
+            compact: 'h-8',
+            normal: 'h-10',
+            comfortable: 'h-12'
+        };
+
+        return `hover:bg-gray-50 group ${height[uiConfig.rowHeight]}`;
+    };
+
     // Pagination calculations
     const totalPages = Math.ceil(totalRows / pageSize);
     const startIndex = (currentPage - 1) * pageSize;
@@ -367,7 +415,7 @@ const DataViewer = ({ fileId, onClose }) => {
             {/* Header with prominent filename */}
             <div className="bg-white border-b border-gray-200 shadow-sm">
                 {/* Top section with filename prominently displayed */}
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 px-6 py-4 border-b border-gray-100">
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 px-6 py-1 border-b border-gray-100">
                     <div className="text-center">
                         <div className="flex items-center justify-center space-x-3 mb-2">
                             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -387,9 +435,9 @@ const DataViewer = ({ fileId, onClose }) => {
                 </div>
 
                 {/* Controls section */}
-                <div className="px-6 py-4">
+                <div className="px-4 py-2">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-3">
                             <div className="flex items-center space-x-2">
                                 <span className="text-sm font-medium text-gray-700">📊 Data Viewer</span>
                                 {hasChanges && (
@@ -402,89 +450,161 @@ const DataViewer = ({ fileId, onClose }) => {
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1">
                             <button
                                 onClick={undo}
                                 disabled={historyIndex <= 0}
-                                className="p-2 text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                className="p-1.5 text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed"
                                 title="Undo"
                             >
-                                <Undo size={18} />
+                                <Undo size={16} />
                             </button>
                             <button
                                 onClick={redo}
                                 disabled={historyIndex >= history.length - 1}
-                                className="p-2 text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                className="p-1.5 text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed"
                                 title="Redo"
                             >
-                                <Redo size={18} />
+                                <Redo size={16} />
                             </button>
 
-                            <div className="border-l border-gray-300 h-6 mx-2"></div>
+                            <div className="border-l border-gray-300 h-6 mx-1"></div>
+
+                            <button
+                                onClick={() => setShowConfigPanel(!showConfigPanel)}
+                                className="p-1.5 text-gray-600 hover:text-gray-800"
+                                title="Display Settings"
+                            >
+                                <Settings size={16} />
+                            </button>
 
                             <button
                                 onClick={saveChanges}
                                 disabled={!hasChanges || saving}
-                                className="flex items-center px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                className="flex items-center px-2 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
                             >
-                                <Save size={16} className="mr-1" />
+                                <Save size={14} className="mr-1" />
                                 {saving ? 'Saving...' : 'Save'}
                             </button>
 
                             <div className="relative">
                                 <select
                                     onChange={(e) => downloadFile(e.target.value)}
-                                    className="appearance-none bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 cursor-pointer pr-8"
+                                    className="appearance-none bg-green-600 text-white px-2 py-1.5 rounded hover:bg-green-700 cursor-pointer pr-6 text-sm"
                                     defaultValue=""
                                 >
                                     <option value="" disabled>Download</option>
-                                    <option value="csv">Download as CSV</option>
-                                    <option value="xlsx">Download as Excel</option>
+                                    <option value="csv">CSV</option>
+                                    <option value="xlsx">Excel</option>
                                 </select>
-                                <Download size={16} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white pointer-events-none" />
+                                <Download size={14} className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white pointer-events-none" />
                             </div>
 
                             <button
                                 onClick={() => window.close()}
-                                className="p-2 text-gray-600 hover:text-red-600"
+                                className="p-1.5 text-gray-600 hover:text-red-600"
                                 title="Close"
                             >
-                                <X size={18} />
+                                <X size={16} />
                             </button>
                         </div>
                     </div>
 
                     {/* Search and Filter Bar */}
-                    <div className="flex items-center space-x-4 mt-4">
-                        <div className="relative flex-1 max-w-md">
-                            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <div className="flex items-center space-x-3 mt-2">
+                        <div className="relative flex-1 max-w-sm">
+                            <Search size={14} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
                             <input
                                 type="text"
                                 placeholder="Search data..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full pl-7 pr-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             />
                         </div>
 
                         <button
                             onClick={addRow}
-                            className="flex items-center px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                            className="flex items-center px-2 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
                             title="Add Row"
                         >
-                            <Plus size={16} className="mr-1" />
+                            <Plus size={14} className="mr-1" />
                             Row
                         </button>
 
                         <button
                             onClick={() => setShowAddColumn(true)}
-                            className="flex items-center px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                            className="flex items-center px-2 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
                             title="Add Column"
                         >
-                            <Plus size={16} className="mr-1" />
+                            <Plus size={14} className="mr-1" />
                             Column
                         </button>
                     </div>
+
+                    {/* Configuration Panel */}
+                    {showConfigPanel && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded-lg border">
+                            <div className="grid grid-cols-3 gap-4 text-sm">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Cell Size</label>
+                                    <select
+                                        value={uiConfig.cellPadding}
+                                        onChange={(e) => setUiConfig({...uiConfig, cellPadding: e.target.value})}
+                                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                                    >
+                                        <option value="compact">Compact</option>
+                                        <option value="normal">Normal</option>
+                                        <option value="comfortable">Comfortable</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Row Height</label>
+                                    <select
+                                        value={uiConfig.rowHeight}
+                                        onChange={(e) => setUiConfig({...uiConfig, rowHeight: e.target.value})}
+                                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                                    >
+                                        <option value="compact">Compact</option>
+                                        <option value="normal">Normal</option>
+                                        <option value="comfortable">Comfortable</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Font Size</label>
+                                    <select
+                                        value={uiConfig.fontSize}
+                                        onChange={(e) => setUiConfig({...uiConfig, fontSize: e.target.value})}
+                                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                                    >
+                                        <option value="small">Small</option>
+                                        <option value="normal">Normal</option>
+                                        <option value="large">Large</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-4 mt-2">
+                                <label className="flex items-center text-xs">
+                                    <input
+                                        type="checkbox"
+                                        checked={uiConfig.showGridLines}
+                                        onChange={(e) => setUiConfig({...uiConfig, showGridLines: e.target.checked})}
+                                        className="mr-1"
+                                    />
+                                    Show Grid Lines
+                                </label>
+                                <label className="flex items-center text-xs">
+                                    <input
+                                        type="checkbox"
+                                        checked={uiConfig.autoSizeColumns}
+                                        onChange={(e) => setUiConfig({...uiConfig, autoSizeColumns: e.target.checked})}
+                                        className="mr-1"
+                                    />
+                                    Auto-size Columns
+                                </label>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -526,35 +646,37 @@ const DataViewer = ({ fileId, onClose }) => {
             {/* Data Table */}
             <div className="flex-1 overflow-auto">
                 <div className="min-w-full">
-                    <table className="w-full bg-white">
+                    <table className={`w-full bg-white ${uiConfig.autoSizeColumns ? 'table-auto' : 'table-fixed'}`}>
                         <thead className="bg-gray-50 sticky top-0">
                             <tr>
-                                <th className="w-12 px-2 py-2 text-xs font-medium text-gray-500 text-center border border-gray-200">
+                                <th className="w-12 px-1 py-1 text-xs font-medium text-gray-500 text-center border border-gray-200">
                                     #
                                 </th>
                                 {columns.map((column, columnIndex) => (
                                     <th
                                         key={column}
-                                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border border-gray-200 relative group"
+                                        className={getHeaderClasses()}
+                                        style={uiConfig.autoSizeColumns ? {} : { width: `${100 / columns.length}%` }}
                                     >
                                         <div className="flex items-center justify-between">
                                             <span
-                                                className="cursor-pointer flex items-center hover:text-blue-600"
+                                                className="cursor-pointer flex items-center hover:text-blue-600 truncate"
                                                 onClick={() => handleSort(column)}
+                                                title={column}
                                             >
                                                 {column}
                                                 {sortConfig.column === column && (
                                                     sortConfig.direction === 'asc' ?
-                                                    <ArrowUp size={12} className="ml-1" /> :
-                                                    <ArrowDown size={12} className="ml-1" />
+                                                    <ArrowUp size={10} className="ml-1 flex-shrink-0" /> :
+                                                    <ArrowDown size={10} className="ml-1 flex-shrink-0" />
                                                 )}
                                             </span>
                                             <button
                                                 onClick={() => deleteColumn(columnIndex)}
-                                                className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 ml-2"
+                                                className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 ml-1 flex-shrink-0"
                                                 title="Delete Column"
                                             >
-                                                <Minus size={12} />
+                                                <Minus size={10} />
                                             </button>
                                         </div>
 
@@ -567,7 +689,7 @@ const DataViewer = ({ fileId, onClose }) => {
                                                 ...filterConfig,
                                                 [column]: e.target.value
                                             })}
-                                            className="w-full mt-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="w-full mt-1 px-1 py-0.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                             onClick={(e) => e.stopPropagation()}
                                         />
                                     </th>
@@ -576,23 +698,23 @@ const DataViewer = ({ fileId, onClose }) => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {displayedData.map((row, rowIndex) => (
-                                <tr key={rowIndex} className="hover:bg-gray-50 group">
-                                    <td className="px-2 py-2 text-xs text-gray-500 text-center border border-gray-200 bg-gray-50">
+                                <tr key={rowIndex} className={getRowClasses()}>
+                                    <td className="w-12 px-1 py-1 text-xs text-gray-500 text-center border border-gray-200 bg-gray-50">
                                         <div className="flex items-center justify-center space-x-1">
-                                            <span>{startIndex + rowIndex + 1}</span>
+                                            <span className="text-xs">{startIndex + rowIndex + 1}</span>
                                             <button
                                                 onClick={() => deleteRow(rowIndex)}
                                                 className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700"
                                                 title="Delete Row"
                                             >
-                                                <Minus size={10} />
+                                                <Minus size={8} />
                                             </button>
                                         </div>
                                     </td>
                                     {columns.map((column, columnIndex) => (
                                         <td
                                             key={`${rowIndex}-${columnIndex}`}
-                                            className="px-3 py-2 border border-gray-200 cursor-pointer hover:bg-blue-50"
+                                            className={getCellClasses()}
                                             onClick={() => startEditing(rowIndex, columnIndex)}
                                         >
                                             {editingCell?.row === rowIndex && editingCell?.col === columnIndex ? (
@@ -605,11 +727,11 @@ const DataViewer = ({ fileId, onClose }) => {
                                                         if (e.key === 'Enter') saveEdit();
                                                         if (e.key === 'Escape') cancelEdit();
                                                     }}
-                                                    className="w-full p-1 border border-blue-500 rounded focus:outline-none"
+                                                    className="w-full p-0.5 border border-blue-500 rounded focus:outline-none text-xs"
                                                     autoFocus
                                                 />
                                             ) : (
-                                                <span className="text-sm text-gray-900">
+                                                <span className={`text-gray-900 truncate block ${uiConfig.fontSize === 'small' ? 'text-xs' : uiConfig.fontSize === 'large' ? 'text-base' : 'text-sm'}`} title={row[column]}>
                                                     {row[column] || ''}
                                                 </span>
                                             )}
