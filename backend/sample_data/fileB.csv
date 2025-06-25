@@ -1,11 +1,6 @@
-TradeRef,SecurityInfo,Value,Date,ClientAccount,Counterparty,SettlementStatus
-TRD001,"US0378331005 - Apple Inc - 1000 qty",150500.00,01/15/2024,ACC001,Goldman Sachs,COMPLETED
-TRD002,"US5949181045 - Microsoft - 500 shares",140125.00,01/15/2024,ACC002,Morgan Stanley,COMPLETED
-TRD003,"GB0002634946 - BAE Systems plc - 2000",25000.00,01/16/2024,ACC001,Barclays,IN_PROGRESS
-TRD004,"US88160R1014 - Tesla Motors - 300",55500.00,01/16/2024,ACC003,JP Morgan,COMPLETED
-TRD005,"JP3435000009 - Sony - 100 units",125000.00,01/17/2024,ACC002,Nomura,COMPLETED
-TRD011,"US9311421039 - Walmart Inc - 200",30400.00,01/18/2024,ACC005,Citi,COMPLETED
-TRD007,"US0231351067 - Amazon - 400 shares",62300.00,01/18/2024,ACC004,Deutsche Bank,COMPLETED
-TRD008,"CH0012005267 - Novartis - 600",53100.00,01/18/2024,ACC003,UBS,PENDING
-TRD012,"IE00BTN1Y115 - Medtronic - 1000",85000.00,01/19/2024,ACC004,HSBC,COMPLETED
-TRD010,"US4592001014 - Intl Business Machines - 800",129840.00,01/19/2024,ACC001,BNP Paribas,COMPLETED
+Details,Date,Comments,Account
+"US0378331005 Apple Inc. Amount: $1,500,000 Currency: Dollar Trade Ref: TX001",2024-01-10,Settlement: T+2 Counterparty: Goldman Sachs,German
+"Security: MSFT CUSIP: 594918104 Amount: €750,000 Currency: EUR",2024-01-11,Account: MAIN-001 Trader: John Smith,
+"Trade Ref: TX123456 Amount: £2,000,000 Settlement: 2024-01-15 ISIN: GB0002634946",2024-01-12,Portfolio: EQUITY-UK Counterparty: Barclays T+2 days maybe,German
+"Tesla Inc TSLA Amount: $850,000 USD ISIN: US88160R1014",2024-01-13,Long position opened,German
+"Bond Trade ISIN: US912828XM14 Amount: $5,000,000 Maturity: 2034-01-15",2024-01-14,US Treasury Bond,
