@@ -53,6 +53,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
@@ -93,6 +94,7 @@ async def upload_file(file: UploadFile = File(...)):
         logger.error(f"Upload error: {e}")
         raise HTTPException(400, f"Upload failed: {str(e)}")
 
+
 @app.get("/files")
 async def list_files():
     try:
@@ -116,6 +118,7 @@ async def list_files():
             "message": f"Failed to list files: {str(e)}",
             "data": {"files": [], "total_count": 0}
         }
+
 
 @app.get("/files/{file_id}")
 async def get_file_info(file_id: str):
@@ -147,6 +150,7 @@ async def get_file_info(file_id: str):
             "column_statistics": column_stats
         }
     }
+
 
 @app.get("/templates/multi-column")
 async def get_multi_column_templates():
@@ -218,6 +222,7 @@ async def get_multi_column_templates():
         "data": templates
     }
 
+
 @app.get("/templates")
 async def get_templates():
     """Get single-column templates (backward compatibility)"""
@@ -249,6 +254,7 @@ async def get_templates():
         "message": "Single-column templates retrieved",
         "data": templates
     }
+
 
 @app.get("/debug/status")
 async def debug_status():
@@ -289,6 +295,7 @@ async def debug_status():
         }
     }
 
+
 # Make storage available for other modules
 import sys
 
@@ -312,6 +319,7 @@ try:
 except ImportError as e:
     print(f"❌ Failed to load routes: {e}")
 
+
 @app.on_event("startup")
 async def startup_event():
     print("🚀 Financial Data Extraction, Analysis & Reconciliation API Started")
@@ -324,6 +332,7 @@ async def startup_event():
     print("🔗 LLM-based Reconciliation: ✅ Enabled")
     print("📊 Data Viewer: ✅ Enabled")  # NEW
     print("📋 API Docs: http://localhost:8000/docs")
+
 
 if __name__ == "__main__":
     import uvicorn

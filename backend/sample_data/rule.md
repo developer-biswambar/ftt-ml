@@ -1,8 +1,9 @@
- ## Rule Schema Explanation
+## Rule Schema Explanation
 
 ### 🔧 MatchType Supported Values
 
-You can use the following `MatchType` options to control how values are matched during extraction, filtering, or reconciliation:
+You can use the following `MatchType` options to control how values are matched during extraction, filtering, or
+reconciliation:
 
 * `equals`: Match exact value.
 * `contains`: Value contains a substring.
@@ -24,18 +25,20 @@ To support complex use cases and future enhancements, the schema may include the
 
 * `CaseSensitive`: `true` or `false` — controls whether string comparisons are case-sensitive.
 
-* `Negate`: Allows logical inversion of a match condition. E.g., `Negate: true` with `equals: "X"` will act like `!= "X"`.
+* `Negate`: Allows logical inversion of a match condition. E.g., `Negate: true` with `equals: "X"` will act like
+  `!= "X"`.
 
 * `Logic`: Used to combine multiple filter conditions.
 
-  * `AND`: All conditions must match.
-  * `OR`: Any condition can match.
+    * `AND`: All conditions must match.
+    * `OR`: Any condition can match.
 
 * `ApplyToRows`: Controls how to apply rules across rows.
 
-  * `all`: Rule must match **all** rows.
-  * `any`: Rule must match **at least one** row.
-  * `first`: Apply the rule to the first matching row.
-  * `custom script`: Allows injecting custom logic for evaluation (advanced use).
+    * `all`: Rule must match **all** rows.
+    * `any`: Rule must match **at least one** row.
+    * `first`: Apply the rule to the first matching row.
+    * `custom script`: Allows injecting custom logic for evaluation (advanced use).
 
-This flexible rule structure allows the system to be dynamic, extensible, and capable of handling a wide variety of real-world data processing scenarios.
+This flexible rule structure allows the system to be dynamic, extensible, and capable of handling a wide variety of
+real-world data processing scenarios.

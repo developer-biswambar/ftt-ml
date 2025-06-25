@@ -1,19 +1,15 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
-from fastapi.responses import JSONResponse, StreamingResponse
-from typing import Dict, List, Any, Optional, Union
-import pandas as pd
-import numpy as np
-import re
-import json
 import io
-from datetime import datetime
-import uuid
-from pydantic import BaseModel, Field, validator
+import re
+from typing import Dict, List, Optional
+
+import pandas as pd
+from fastapi import UploadFile, HTTPException
 
 from app.models.recon_models import PatternCondition, FileRule, ExtractRule, FilterRule, ReconciliationRule
 
 # Update forward reference
 PatternCondition.model_rebuild()
+
 
 # Create rout
 
