@@ -46,17 +46,19 @@ class OptimizedFileProcessor:
         errors = []
         df_columns = df.columns.tolist()
 
-        # Check extract rules
-        for extract in file_rule.Extract:
-            if extract.SourceColumn not in df_columns:
-                errors.append(
-                    f"Column '{extract.SourceColumn}' not found in file '{file_rule.Name}'. Available columns: {df_columns}")
+        # Check extract rules - Handle optional Extract
+        if hasattr(file_rule, 'Extract') and file_rule.Extract:
+            for extract in file_rule.Extract:
+                if extract.SourceColumn not in df_columns:
+                    errors.append(
+                        f"Column '{extract.SourceColumn}' not found in file '{file_rule.Name}'. Available columns: {df_columns}")
 
-        # Check filter rules
-        for filter_rule in file_rule.Filter or []:
-            if filter_rule.ColumnName not in df_columns:
-                errors.append(
-                    f"Column '{filter_rule.ColumnName}' not found in file '{file_rule.Name}'. Available columns: {df_columns}")
+        # Check filter rules - Handle optional Filter
+        if hasattr(file_rule, 'Filter') and file_rule.Filter:
+            for filter_rule in file_rule.Filter:
+                if filter_rule.ColumnName not in df_columns:
+                    errors.append(
+                        f"Column '{filter_rule.ColumnName}' not found in file '{file_rule.Name}'. Available columns: {df_columns}")
 
         return errors
 
@@ -136,13 +138,13 @@ class OptimizedFileProcessor:
                         continue
 
             # Handle new nested condition format
-            if extract_rule.Conditions:
+            if hasattr(extract_rule, 'Conditions') and extract_rule.Conditions:
                 if self.evaluate_pattern_condition(text, extract_rule.Conditions):
                     matched_value = self.extract_first_match(text, extract_rule.Conditions)
                     return matched_value
 
             # Handle legacy format
-            elif extract_rule.Patterns:
+            elif hasattr(extract_rule, 'Patterns') and extract_rule.Patterns:
                 for pattern in extract_rule.Patterns:
                     try:
                         compiled_pattern = self._get_compiled_pattern(pattern)
@@ -224,7 +226,8 @@ class OptimizedFileProcessor:
         return filtered_df
 
     def get_mandatory_columns(self, recon_rules: List[ReconciliationRule],
-                              file_a_rules: FileRule, file_b_rules: FileRule) -> Tuple[Set[str], Set[str]]:
+                              file_a_rules: Optional[FileRule], file_b_rules: Optional[FileRule]) -> Tuple[
+        Set[str], Set[str]]:
         """Get mandatory columns that must be included in results"""
         mandatory_a = set()
         mandatory_b = set()
@@ -234,17 +237,23 @@ class OptimizedFileProcessor:
             mandatory_a.add(rule.LeftFileColumn)
             mandatory_b.add(rule.RightFileColumn)
 
-        # Add extracted columns
-        for extract_rule in file_a_rules.Extract:
-            mandatory_a.add(extract_rule.ResultColumnName)
-        for extract_rule in file_b_rules.Extract:
-            mandatory_b.add(extract_rule.ResultColumnName)
+        # Add extracted columns - Handle optional rules
+        if file_a_rules and hasattr(file_a_rules, 'Extract') and file_a_rules.Extract:
+            for extract_rule in file_a_rules.Extract:
+                mandatory_a.add(extract_rule.ResultColumnName)
 
-        # Add filter columns
-        for filter_rule in file_a_rules.Filter or []:
-            mandatory_a.add(filter_rule.ColumnName)
-        for filter_rule in file_b_rules.Filter or []:
-            mandatory_b.add(filter_rule.ColumnName)
+        if file_b_rules and hasattr(file_b_rules, 'Extract') and file_b_rules.Extract:
+            for extract_rule in file_b_rules.Extract:
+                mandatory_b.add(extract_rule.ResultColumnName)
+
+        # Add filter columns - Handle optional filters
+        if file_a_rules and hasattr(file_a_rules, 'Filter') and file_a_rules.Filter:
+            for filter_rule in file_a_rules.Filter:
+                mandatory_a.add(filter_rule.ColumnName)
+
+        if file_b_rules and hasattr(file_b_rules, 'Filter') and file_b_rules.Filter:
+            for filter_rule in file_b_rules.Filter:
+                mandatory_b.add(filter_rule.ColumnName)
 
         return mandatory_a, mandatory_b
 
