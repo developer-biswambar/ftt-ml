@@ -54,7 +54,7 @@ export const apiService = {
 
     // Reconciliation operations
     getReconciliationTemplates: async () => {
-        const response = await api.get('/api/v1/reconcile/templates');
+        const response = await api.get('/templates');
         return response.data;
     },
 
