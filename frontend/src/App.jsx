@@ -228,7 +228,7 @@ const MainApp = () => {
     const handleTemplateSelect = (template) => {
         setCurrentInput(template.user_requirements);
         addMessage('user', `📋 Selected template: ${template.name}`, false);
-        addMessage('system', `✅ Template loaded: "${template.description}"\n\n📝 **Requirements loaded:**\n${template.user_requirements}\n\nYou can modify these requirements or click Start to proceed.`, true);
+        addMessage('system', `✅ Template loaded: "${template.name}"\n\n📝 **Requirements loaded:**\n${template.prompt}\n\nYou can modify these requirements or click Start to proceed.`, true);
     };
 
     const analyzeColumnCompatibility = async () => {

@@ -93,35 +93,9 @@ async def get_templates():
     """Get enhanced templates with column selection examples"""
     templates = [
         {
-            "name": "ISIN Extraction with Column Selection",
-            "prompt": "Extract ISIN codes from the text",
+            "name": "Reconciliation",
+            "prompt": "Extract, Filter and match data between 2 files",
             "example": "Extract 12-character ISIN codes like US0378331005",
-            "column_selection": {
-                "file_a_columns": ["Description", "Amount", "Status"],
-                "file_b_columns": ["Details", "Value", "Date"],
-                "include_mandatory": True
-            }
-        },
-        {
-            "name": "Multi-field Extraction Optimized",
-            "prompt": "Extract ISIN, amount, currency, and trade reference from the text",
-            "example": "Comprehensive extraction with performance optimization",
-            "processing_options": {
-                "batch_size": 1000,
-                "use_parallel_processing": True,
-                "memory_optimization": True
-            }
-        },
-        {
-            "name": "Large Dataset Reconciliation",
-            "prompt": "Optimized reconciliation for 50k+ records",
-            "example": "High-performance reconciliation with hash-based matching",
-            "features": [
-                "hash_based_matching",
-                "vectorized_extraction",
-                "streaming_downloads",
-                "paginated_results"
-            ]
         }
     ]
 
