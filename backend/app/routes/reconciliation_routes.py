@@ -73,8 +73,8 @@ async def process_reconciliation_optimized(
             raise HTTPException(status_code=400, detail="Rules must contain configurations for 'FileA' and 'FileB'")
 
         # Read files
-        df_a = processor.read_file(fileA, file_rule_a.SheetName)
-        df_b = processor.read_file(fileB, file_rule_b.SheetName)
+        df_a = processor.read_file(fileA, getattr(file_rule_a, 'SheetName', None))
+        df_b = processor.read_file(fileB, getattr(file_rule_b, 'SheetName', None))
 
         print(f"Read files: FileA {len(df_a)} rows, FileB {len(df_b)} rows")
 
@@ -86,21 +86,25 @@ async def process_reconciliation_optimized(
             processor.errors.extend(errors_a + errors_b)
             raise HTTPException(status_code=400, detail={"errors": processor.errors})
 
-        # Process FileA with optimized extraction
-        print("Processing FileA extractions...")
-        for extract_rule in file_rule_a.Extract:
-            df_a[extract_rule.ResultColumnName] = processor.extract_patterns_vectorized(df_a, extract_rule)
+        # Process FileA with optimized extraction - Handle optional Extract
+        if hasattr(file_rule_a, 'Extract') and file_rule_a.Extract:
+            print("Processing FileA extractions...")
+            for extract_rule in file_rule_a.Extract:
+                df_a[extract_rule.ResultColumnName] = processor.extract_patterns_vectorized(df_a, extract_rule)
 
-        if file_rule_a.Filter:
+        # Apply FileA filters - Handle optional Filter
+        if hasattr(file_rule_a, 'Filter') and file_rule_a.Filter:
             print("Applying FileA filters...")
             df_a = processor.apply_filters_optimized(df_a, file_rule_a.Filter)
 
-        # Process FileB with optimized extraction
-        print("Processing FileB extractions...")
-        for extract_rule in file_rule_b.Extract:
-            df_b[extract_rule.ResultColumnName] = processor.extract_patterns_vectorized(df_b, extract_rule)
+        # Process FileB with optimized extraction - Handle optional Extract
+        if hasattr(file_rule_b, 'Extract') and file_rule_b.Extract:
+            print("Processing FileB extractions...")
+            for extract_rule in file_rule_b.Extract:
+                df_b[extract_rule.ResultColumnName] = processor.extract_patterns_vectorized(df_b, extract_rule)
 
-        if file_rule_b.Filter:
+        # Apply FileB filters - Handle optional Filter
+        if hasattr(file_rule_b, 'Filter') and file_rule_b.Filter:
             print("Applying FileB filters...")
             df_b = processor.apply_filters_optimized(df_b, file_rule_b.Filter)
 

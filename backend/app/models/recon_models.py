@@ -29,8 +29,8 @@ class FilterRule(BaseModel):
 class FileRule(BaseModel):
     Name: str
     SheetName: Optional[str] = None  # For Excel files
-    Extract: List[ExtractRule]
-    Filter: Optional[List[FilterRule]] = []
+    Extract: Optional[List[ExtractRule]] = []  # Made optional with default empty list
+    Filter: Optional[List[FilterRule]] = []    # Made optional with default empty list
 
 
 class ReconciliationRule(BaseModel):
