@@ -65,7 +65,7 @@ const ChatInterface = ({
     isAnalyzingColumns,
     selectedFiles,
     selectedTemplate,
-    areAllFilesSelected,
+    requiredFiles,  // Add this prop
     onStartReconciliation,
     isTyping,
     typingMessage,
@@ -75,6 +75,12 @@ const ChatInterface = ({
     const messagesEndRef = useRef(null);
     const [currentFlow, setCurrentFlow] = useState(null);
     const [flowData, setFlowData] = useState({});
+
+    // Helper function to check if all files are selected
+    const areAllFilesSelected = () => {
+        if (!selectedTemplate || !requiredFiles) return false;
+        return requiredFiles.every(rf => selectedFiles[rf.key]);
+    };
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -109,7 +115,7 @@ const ChatInterface = ({
                 }, 500);
             }
         }
-    }, [messages, selectedFiles, currentInput, selectedTemplate, areAllFilesSelected]);
+    }, [messages, selectedFiles, currentInput, selectedTemplate, requiredFiles]);
 
     const handleFlowComplete = (processConfig) => {
         setCurrentFlow(null);
@@ -160,7 +166,9 @@ const ChatInterface = ({
             } else if (!selectedTemplate) {
                 onSendMessage('system', '⚠️ Please select a process template first from the left panel.');
             } else if (!areAllFilesSelected()) {
-                const missing = selectedTemplate.filesRequired - Object.keys(selectedFiles).length;
+                const selectedCount = Object.keys(selectedFiles).length;
+                const requiredCount = selectedTemplate.filesRequired;
+                const missing = requiredCount - selectedCount;
                 onSendMessage('system', `⚠️ Please select ${missing} more file${missing !== 1 ? 's' : ''} to proceed with ${selectedTemplate.name}.`);
             }
         }
