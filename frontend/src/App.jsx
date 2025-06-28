@@ -30,6 +30,14 @@ const MainApp = () => {
     const [rightPanelWidth, setRightPanelWidth] = useState(320);
     const [isResizing, setIsResizing] = useState(null);
 
+    // Helper function to check if all files are selected
+    const areAllFilesSelected = () => {
+        if (!selectedTemplate || !requiredFiles || requiredFiles.length === 0) {
+            return false;
+        }
+        return requiredFiles.every(rf => selectedFiles[rf.key]);
+    };
+
     // Set document title based on current state
     useEffect(() => {
         let title = 'Financial Reconciliation Chat';
@@ -95,7 +103,7 @@ const MainApp = () => {
                 analyzeSingleFileStructure();
             }
         }
-    }, [selectedFiles, selectedTemplate]);
+    }, [selectedFiles, selectedTemplate, requiredFiles]);
 
     // Cleanup auto-refresh interval on unmount
     useEffect(() => {
@@ -442,7 +450,7 @@ Your file is ready for ${selectedTemplate.name.toLowerCase()}. Click Start to be
                 processRequest.reconciliation_config = reconciliationConfig;
             }
 
-            const data = await apiService.startProcess(processRequest);
+            const data = await apiService.startReconciliation(processRequest);
 
             if (data.success) {
                 setActiveReconciliation(data.data.process_id);
@@ -462,7 +470,7 @@ Your file is ready for ${selectedTemplate.name.toLowerCase()}. Click Start to be
     const monitorProcess = async (processId) => {
         const checkStatus = async () => {
             try {
-                const data = await apiService.getProcessStatus(processId);
+                const data = await apiService.getReconciliationStatus(processId);
 
                 if (data.success) {
                     const process = data.data;
@@ -570,6 +578,8 @@ Use the download buttons in the "Processed Reconciliations" panel to get detaile
                 templates={templates}
                 selectedFiles={selectedFiles}
                 setSelectedFiles={setSelectedFiles}
+                selectedTemplate={selectedTemplate}
+                requiredFiles={requiredFiles}
                 currentInput={currentInput}
                 uploadProgress={uploadProgress}
                 onFileUpload={handleFileUpload}
@@ -593,6 +603,8 @@ Use the download buttons in the "Processed Reconciliations" panel to get detaile
                 isProcessing={isProcessing}
                 isAnalyzingColumns={isAnalyzingColumns}
                 selectedFiles={selectedFiles}
+                selectedTemplate={selectedTemplate}
+                requiredFiles={requiredFiles}
                 onStartReconciliation={startReconciliation}
                 isTyping={isTyping}
                 typingMessage={typingMessage}
