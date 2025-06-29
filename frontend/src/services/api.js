@@ -88,7 +88,7 @@ export const apiService = {
     },
 
     startReconciliation: async (reconciliationRequest) => {
-        const response = await api.post('/api/v1/reconcile/', reconciliationRequest);
+        const response = await api.post('/reconciliation/process', reconciliationRequest);
         return response.data;
     },
 

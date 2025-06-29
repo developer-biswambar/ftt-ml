@@ -182,8 +182,9 @@ const ReconciliationFlow = ({
         const { fileIndex, ruleIndex } = currentAIContext;
         updateExtractionRule(fileIndex, ruleIndex, 'Patterns', generatedRegex);
         updateExtractionRule(fileIndex, ruleIndex, 'MatchType', 'regex');
-        setShowAIRegexGenerator(false);
         onSendMessage('system', `✨ AI generated regex pattern applied to extraction rule`);
+
+        // The modal will be closed by the onClose callback in the AIRegexGenerator
     };
 
     // Filter rule functions remain the same

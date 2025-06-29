@@ -1,9 +1,9 @@
 // src/components/AIRegexGenerator.jsx - Updated to use backend API
-import React, { useState, useEffect } from 'react';
-import { Wand2, Loader2, Copy, Check, AlertCircle, Lightbulb, RefreshCw } from 'lucide-react';
+import React, {useState, useEffect} from 'react';
+import {Wand2, Loader2, Copy, Check, AlertCircle, Lightbulb, RefreshCw} from 'lucide-react';
 import apiService from '../services/api';
 
-const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnName = '' }) => {
+const AIRegexGenerator = ({onRegexGenerated, onClose, sampleText = '', columnName = ''}) => {
     const [description, setDescription] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [generatedRegex, setGeneratedRegex] = useState('');
@@ -89,7 +89,7 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
                 description.trim(),
                 sampleText,
                 columnName,
-                { source: 'reconciliation_flow' }
+                {source: 'reconciliation_flow'}
             );
 
             if (response.success) {
@@ -148,10 +148,10 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
     const handleUseRegex = () => {
         if (generatedRegex && onRegexGenerated) {
             onRegexGenerated(generatedRegex);
-
-            console.log(generatedRegex);
-            console.log('closing')
-            onClose();
+            // Close the modal immediately after calling the callback
+            if (onClose) {
+                onClose();
+            }
         }
     };
 
@@ -163,7 +163,7 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
         if (suggestion) {
             setGeneratedRegex(suggestion.regex);
             setExplanation(suggestion.explanation);
-           // setIsFallback(true);
+            // setIsFallback(true);
 
             if (sampleText) {
                 testRegexAgainstSample(suggestion.regex, sampleText);
@@ -188,7 +188,7 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
                     {/* Header */}
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center space-x-2">
-                            <Wand2 className="text-purple-500" size={24} />
+                            <Wand2 className="text-purple-500" size={24}/>
                             <h3 className="text-xl font-semibold text-gray-800">AI Regex Generator</h3>
                             {isFallback && (
                                 <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
@@ -210,7 +210,8 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Sample Text from {columnName || 'Column'}:
                             </label>
-                            <div className="text-sm text-gray-600 font-mono bg-white p-2 rounded border max-h-20 overflow-y-auto">
+                            <div
+                                className="text-sm text-gray-600 font-mono bg-white p-2 rounded border max-h-20 overflow-y-auto">
                                 {sampleText}
                             </div>
                         </div>
@@ -252,7 +253,7 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
                     {/* Sample Descriptions */}
                     <div className="mb-6">
                         <div className="flex items-center space-x-1 mb-2">
-                            <Lightbulb size={16} className="text-yellow-500" />
+                            <Lightbulb size={16} className="text-yellow-500"/>
                             <span className="text-sm font-medium text-gray-700">Quick Examples:</span>
                         </div>
                         <div className="grid grid-cols-1 gap-2">
@@ -272,7 +273,7 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
                     {Object.keys(commonPatterns).length > 0 && (
                         <div className="mb-6">
                             <div className="flex items-center space-x-1 mb-2">
-                                <RefreshCw size={16} className="text-green-500" />
+                                <RefreshCw size={16} className="text-green-500"/>
                                 <span className="text-sm font-medium text-gray-700">Common Patterns:</span>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
@@ -282,7 +283,8 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
                                         onClick={() => useCommonPattern(pattern)}
                                         className="text-left text-xs p-2 border border-gray-200 rounded hover:bg-gray-50 transition-colors"
                                     >
-                                        <div className="font-medium text-gray-800 capitalize">{key.replace('_', ' ')}</div>
+                                        <div
+                                            className="font-medium text-gray-800 capitalize">{key.replace('_', ' ')}</div>
                                         <div className="text-gray-600">{pattern.explanation}</div>
                                     </button>
                                 ))}
@@ -298,12 +300,12 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
                     >
                         {isGenerating ? (
                             <>
-                                <Loader2 size={20} className="animate-spin" />
+                                <Loader2 size={20} className="animate-spin"/>
                                 <span>Generating Regex with AI...</span>
                             </>
                         ) : (
                             <>
-                                <Wand2 size={20} />
+                                <Wand2 size={20}/>
                                 <span>Generate Regex with AI</span>
                             </>
                         )}
@@ -312,7 +314,7 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
                     {/* Error Display */}
                     {error && (
                         <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-2">
-                            <AlertCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
+                            <AlertCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0"/>
                             <div className="text-sm text-red-700">{error}</div>
                         </div>
                     )}
@@ -329,7 +331,7 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
                                         onClick={copyToClipboard}
                                         className="flex items-center space-x-1 text-xs text-green-600 hover:text-green-800"
                                     >
-                                        {copied ? <Check size={14} /> : <Copy size={14} />}
+                                        {copied ? <Check size={14}/> : <Copy size={14}/>}
                                         <span>{copied ? 'Copied!' : 'Copy'}</span>
                                     </button>
                                 </div>
@@ -355,7 +357,8 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
                                     <div className="space-y-1 max-h-32 overflow-y-auto">
                                         {testResults.map((result, index) => (
                                             <div key={index} className="text-xs font-mono bg-white p-2 rounded border">
-                                                <span className="text-green-600">Match {index + 1}:</span> {result.match}
+                                                <span
+                                                    className="text-green-600">Match {index + 1}:</span> {result.match}
                                                 {result.groups.length > 0 && (
                                                     <span className="text-blue-600 ml-2">
                                                         Groups: [{result.groups.join(', ')}]
