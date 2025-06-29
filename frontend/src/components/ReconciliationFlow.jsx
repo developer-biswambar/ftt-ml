@@ -8,6 +8,7 @@ import {
 const ReconciliationFlow = ({
     files,
     selectedFiles,
+    selectedTemplate,
     flowData,
     onComplete,
     onCancel,
@@ -35,32 +36,42 @@ const ReconciliationFlow = ({
 
     const getCurrentStepIndex = () => steps.findIndex(step => step.id === currentStep);
 
+    // Helper function to get files array from selectedFiles object
+    const getSelectedFilesArray = () => {
+        return Object.keys(selectedFiles)
+            .sort() // Ensure consistent order (file_0, file_1, etc.)
+            .map(key => selectedFiles[key])
+            .filter(file => file !== null && file !== undefined);
+    };
+
+    // Helper function to get file by index
+    const getFileByIndex = (index) => {
+        const key = `file_${index}`;
+        return selectedFiles[key];
+    };
+
     useEffect(() => {
         // Initialize config with selected files
-        if (selectedFiles.fileA && selectedFiles.fileB) {
+        const filesArray = getSelectedFilesArray();
+        if (filesArray.length >= 2) {
             setConfig({
-                Files: [
-                    {
-                        Name: 'FileA',
-                        SheetName: '',
-                        Extract: [],
-                        Filter: []
-                    },
-                    {
-                        Name: 'FileB',
-                        SheetName: '',
-                        Extract: [],
-                        Filter: []
-                    }
-                ],
+                Files: filesArray.map((file, index) => ({
+                    Name: `File${String.fromCharCode(65 + index)}`, // FileA, FileB, etc.
+                    SheetName: '',
+                    Extract: [],
+                    Filter: []
+                })),
                 ReconciliationRules: []
             });
 
-            // Mock file columns (in real app, fetch from API)
-            setFileColumns({
-                [selectedFiles.fileA.file_id]: selectedFiles.fileA.columns || ['Amount', 'Description', 'Date', 'Status', 'Reference'],
-                [selectedFiles.fileB.file_id]: selectedFiles.fileB.columns || ['Value', 'Details', 'TransactionDate', 'State', 'ID']
+            // Set up file columns (use actual columns from files or mock data)
+            const newFileColumns = {};
+            filesArray.forEach((file, index) => {
+                newFileColumns[file.file_id] = file.columns || [
+                    'Amount', 'Description', 'Date', 'Status', 'Reference', 'ID', 'Value', 'Details'
+                ];
             });
+            setFileColumns(newFileColumns);
         }
     }, [selectedFiles]);
 
@@ -86,10 +97,13 @@ const ReconciliationFlow = ({
         // Build final configuration
         const finalConfig = {
             ...config,
-            extractionRules,
-            filterRules,
-            reconciliationRules,
-            user_requirements: `Reconcile ${selectedFiles.fileA.filename} with ${selectedFiles.fileB.filename} using the configured rules`
+            ReconciliationRules: reconciliationRules,
+            user_requirements: `Reconcile files using the configured rules`,
+            files: getSelectedFilesArray().map((file, index) => ({
+                file_id: file.file_id,
+                role: `file_${index}`,
+                label: selectedTemplate?.fileLabels[index] || `File ${index + 1}`
+            }))
         };
 
         onSendMessage('system', '🎉 Reconciliation configuration completed! Starting process...');
@@ -105,6 +119,12 @@ const ReconciliationFlow = ({
         };
 
         const updatedConfig = { ...config };
+        if (!updatedConfig.Files[fileIndex]) {
+            updatedConfig.Files[fileIndex] = { Extract: [], Filter: [] };
+        }
+        if (!updatedConfig.Files[fileIndex].Extract) {
+            updatedConfig.Files[fileIndex].Extract = [];
+        }
         updatedConfig.Files[fileIndex].Extract.push(newRule);
         setConfig(updatedConfig);
     };
@@ -133,6 +153,12 @@ const ReconciliationFlow = ({
         };
 
         const updatedConfig = { ...config };
+        if (!updatedConfig.Files[fileIndex]) {
+            updatedConfig.Files[fileIndex] = { Extract: [], Filter: [] };
+        }
+        if (!updatedConfig.Files[fileIndex].Filter) {
+            updatedConfig.Files[fileIndex].Filter = [];
+        }
         updatedConfig.Files[fileIndex].Filter.push(newRule);
         setConfig(updatedConfig);
     };
@@ -171,6 +197,8 @@ const ReconciliationFlow = ({
     };
 
     const renderStepContent = () => {
+        const filesArray = getSelectedFilesArray();
+
         switch (currentStep) {
             case 'file_selection':
                 return (
@@ -178,27 +206,26 @@ const ReconciliationFlow = ({
                         <h3 className="text-lg font-semibold text-gray-800">Selected Files for Reconciliation</h3>
 
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="p-4 border border-green-200 bg-green-50 rounded-lg">
-                                <div className="flex items-center space-x-2 mb-2">
-                                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-bold">A</div>
-                                    <span className="font-medium text-green-800">Primary File</span>
-                                </div>
-                                <div className="text-sm text-green-700">
-                                    <p className="font-medium">{selectedFiles.fileA?.filename}</p>
-                                    <p className="text-xs">{selectedFiles.fileA?.total_rows} rows • {selectedFiles.fileA?.columns?.length} columns</p>
-                                </div>
-                            </div>
+                            {filesArray.slice(0, 2).map((file, index) => {
+                                const colors = ['green', 'purple'];
+                                const labels = ['Primary File', 'Comparison File'];
+                                const letters = ['A', 'B'];
 
-                            <div className="p-4 border border-purple-200 bg-purple-50 rounded-lg">
-                                <div className="flex items-center space-x-2 mb-2">
-                                    <div className="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold">B</div>
-                                    <span className="font-medium text-purple-800">Comparison File</span>
-                                </div>
-                                <div className="text-sm text-purple-700">
-                                    <p className="font-medium">{selectedFiles.fileB?.filename}</p>
-                                    <p className="text-xs">{selectedFiles.fileB?.total_rows} rows • {selectedFiles.fileB?.columns?.length} columns</p>
-                                </div>
-                            </div>
+                                return (
+                                    <div key={index} className={`p-4 border border-${colors[index]}-200 bg-${colors[index]}-50 rounded-lg`}>
+                                        <div className="flex items-center space-x-2 mb-2">
+                                            <div className={`w-6 h-6 bg-${colors[index]}-500 rounded-full flex items-center justify-center text-white text-sm font-bold`}>
+                                                {letters[index]}
+                                            </div>
+                                            <span className={`font-medium text-${colors[index]}-800`}>{labels[index]}</span>
+                                        </div>
+                                        <div className={`text-sm text-${colors[index]}-700`}>
+                                            <p className="font-medium">{file?.filename}</p>
+                                            <p className="text-xs">{file?.total_rows} rows • {file?.columns?.length} columns</p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
 
                         <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
@@ -214,27 +241,32 @@ const ReconciliationFlow = ({
                         <p className="text-sm text-gray-600">Select the specific sheet/tab from each file to use for reconciliation.</p>
 
                         <div className="space-y-4">
-                            {config.Files.map((file, index) => (
-                                <div key={index} className="p-4 border border-gray-200 rounded-lg">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        {file.Name} Sheet: {index === 0 ? selectedFiles.fileA?.filename : selectedFiles.fileB?.filename}
-                                    </label>
-                                    <select
-                                        value={file.SheetName}
-                                        onChange={(e) => {
-                                            const updatedConfig = { ...config };
-                                            updatedConfig.Files[index].SheetName = e.target.value;
-                                            setConfig(updatedConfig);
-                                        }}
-                                        className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        <option value="">Main Sheet (Default)</option>
-                                        <option value="Sheet1">Sheet1</option>
-                                        <option value="Data">Data</option>
-                                        <option value="Transactions">Transactions</option>
-                                    </select>
-                                </div>
-                            ))}
+                            {config.Files.map((file, index) => {
+                                const selectedFile = getFileByIndex(index);
+                                return (
+                                    <div key={index} className="p-4 border border-gray-200 rounded-lg">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            {file.Name} Sheet: {selectedFile?.filename}
+                                        </label>
+                                        <select
+                                            value={file.SheetName || ''}
+                                            onChange={(e) => {
+                                                const updatedConfig = { ...config };
+                                                updatedConfig.Files[index].SheetName = e.target.value;
+                                                setConfig(updatedConfig);
+                                            }}
+                                            className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="">Main Sheet (Default)</option>
+                                            <option value="Sheet1">Sheet1</option>
+                                            <option value="Data">Data</option>
+                                            <option value="Transactions">Transactions</option>
+                                            <option value="Holdings">Holdings</option>
+                                            <option value="Summary">Summary</option>
+                                        </select>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 );
@@ -247,94 +279,101 @@ const ReconciliationFlow = ({
                             <p className="text-sm text-gray-600">Define how to extract and transform data from each file.</p>
                         </div>
 
-                        {config.Files.map((file, fileIndex) => (
-                            <div key={fileIndex} className="p-4 border border-gray-200 rounded-lg">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h4 className="text-md font-medium text-gray-800">
-                                        {file.Name}: {fileIndex === 0 ? selectedFiles.fileA?.filename : selectedFiles.fileB?.filename}
-                                    </h4>
-                                    <button
-                                        onClick={() => addExtractionRule(fileIndex)}
-                                        className="flex items-center space-x-1 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-                                    >
-                                        <Plus size={14} />
-                                        <span>Add Rule</span>
-                                    </button>
-                                </div>
+                        {config.Files.map((file, fileIndex) => {
+                            const selectedFile = getFileByIndex(fileIndex);
+                            const availableColumns = fileColumns[selectedFile?.file_id] || [];
 
-                                <div className="space-y-3">
-                                    {file.Extract.map((rule, ruleIndex) => (
-                                        <div key={ruleIndex} className="p-3 bg-gray-50 rounded border">
-                                            <div className="grid grid-cols-2 gap-3 mb-3">
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-700 mb-1">Result Column Name</label>
-                                                    <input
-                                                        type="text"
-                                                        value={rule.ResultColumnName}
-                                                        onChange={(e) => updateExtractionRule(fileIndex, ruleIndex, 'ResultColumnName', e.target.value)}
-                                                        className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                        placeholder="e.g., Isin"
-                                                    />
+                            return (
+                                <div key={fileIndex} className="p-4 border border-gray-200 rounded-lg">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-md font-medium text-gray-800">
+                                            {file.Name}: {selectedFile?.filename}
+                                        </h4>
+                                        <button
+                                            onClick={() => addExtractionRule(fileIndex)}
+                                            className="flex items-center space-x-1 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+                                        >
+                                            <Plus size={14} />
+                                            <span>Add Rule</span>
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {(file.Extract || []).map((rule, ruleIndex) => (
+                                            <div key={ruleIndex} className="p-3 bg-gray-50 rounded border">
+                                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-700 mb-1">Result Column Name</label>
+                                                        <input
+                                                            type="text"
+                                                            value={rule.ResultColumnName || ''}
+                                                            onChange={(e) => updateExtractionRule(fileIndex, ruleIndex, 'ResultColumnName', e.target.value)}
+                                                            className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                            placeholder="e.g., ExtractedAmount"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-700 mb-1">Source Column</label>
+                                                        <select
+                                                            value={rule.SourceColumn || ''}
+                                                            onChange={(e) => updateExtractionRule(fileIndex, ruleIndex, 'SourceColumn', e.target.value)}
+                                                            className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                        >
+                                                            <option value="">Select Column</option>
+                                                            {availableColumns.map(col => (
+                                                                <option key={col} value={col}>{col}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-700 mb-1">Source Column</label>
-                                                    <select
-                                                        value={rule.SourceColumn}
-                                                        onChange={(e) => updateExtractionRule(fileIndex, ruleIndex, 'SourceColumn', e.target.value)}
-                                                        className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                    >
-                                                        <option value="">Select Column</option>
-                                                        {(fileColumns[fileIndex === 0 ? selectedFiles.fileA?.file_id : selectedFiles.fileB?.file_id] || []).map(col => (
-                                                            <option key={col} value={col}>{col}</option>
-                                                        ))}
-                                                    </select>
+
+                                                <div className="grid grid-cols-3 gap-3 mb-3">
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                                                        <select
+                                                            value={rule.MatchType || 'regex'}
+                                                            onChange={(e) => updateExtractionRule(fileIndex, ruleIndex, 'MatchType', e.target.value)}
+                                                            className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                        >
+                                                            <option value="regex">Regex Pattern</option>
+                                                            <option value="exact">Exact Match</option>
+                                                            <option value="contains">Contains</option>
+                                                            <option value="starts_with">Starts With</option>
+                                                            <option value="ends_with">Ends With</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="col-span-2">
+                                                        <label className="block text-xs font-medium text-gray-700 mb-1">Pattern/Value</label>
+                                                        <input
+                                                            type="text"
+                                                            value={rule.Patterns?.[0] || ''}
+                                                            onChange={(e) => updateExtractionRule(fileIndex, ruleIndex, 'Patterns', e.target.value)}
+                                                            className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                            placeholder="e.g., \\$?([\\d,]+(?:\\.\\d{2})?)"
+                                                        />
+                                                    </div>
                                                 </div>
+
+                                                <button
+                                                    onClick={() => removeExtractionRule(fileIndex, ruleIndex)}
+                                                    className="flex items-center space-x-1 text-red-600 hover:text-red-800 text-sm"
+                                                >
+                                                    <Minus size={14} />
+                                                    <span>Remove Rule</span>
+                                                </button>
                                             </div>
+                                        ))}
 
-                                            <div className="grid grid-cols-3 gap-3 mb-3">
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
-                                                    <select
-                                                        value={rule.MatchType}
-                                                        onChange={(e) => updateExtractionRule(fileIndex, ruleIndex, 'MatchType', e.target.value)}
-                                                        className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                    >
-                                                        <option value="regex">Regex Pattern</option>
-                                                        <option value="exact">Exact Match</option>
-                                                        <option value="contains">Contains</option>
-                                                    </select>
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <label className="block text-xs font-medium text-gray-700 mb-1">Pattern/Value</label>
-                                                    <input
-                                                        type="text"
-                                                        value={rule.Patterns?.[0] || ''}
-                                                        onChange={(e) => updateExtractionRule(fileIndex, ruleIndex, 'Patterns', e.target.value)}
-                                                        className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                        placeholder="e.g., \\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\b"
-                                                    />
-                                                </div>
+                                        {(!file.Extract || file.Extract.length === 0) && (
+                                            <div className="text-center text-gray-500 py-4">
+                                                <p className="text-sm">No extraction rules defined yet.</p>
+                                                <p className="text-xs">Click "Add Rule" to create extraction patterns.</p>
                                             </div>
-
-                                            <button
-                                                onClick={() => removeExtractionRule(fileIndex, ruleIndex)}
-                                                className="flex items-center space-x-1 text-red-600 hover:text-red-800 text-sm"
-                                            >
-                                                <Minus size={14} />
-                                                <span>Remove Rule</span>
-                                            </button>
-                                        </div>
-                                    ))}
-
-                                    {file.Extract.length === 0 && (
-                                        <div className="text-center text-gray-500 py-4">
-                                            <p className="text-sm">No extraction rules defined yet.</p>
-                                            <p className="text-xs">Click "Add Rule" to create extraction patterns.</p>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 );
 
@@ -346,83 +385,90 @@ const ReconciliationFlow = ({
                             <p className="text-sm text-gray-600">Define filters to include only relevant rows from each file.</p>
                         </div>
 
-                        {config.Files.map((file, fileIndex) => (
-                            <div key={fileIndex} className="p-4 border border-gray-200 rounded-lg">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h4 className="text-md font-medium text-gray-800">
-                                        {file.Name}: {fileIndex === 0 ? selectedFiles.fileA?.filename : selectedFiles.fileB?.filename}
-                                    </h4>
-                                    <button
-                                        onClick={() => addFilterRule(fileIndex)}
-                                        className="flex items-center space-x-1 px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
-                                    >
-                                        <Plus size={14} />
-                                        <span>Add Filter</span>
-                                    </button>
-                                </div>
+                        {config.Files.map((file, fileIndex) => {
+                            const selectedFile = getFileByIndex(fileIndex);
+                            const availableColumns = fileColumns[selectedFile?.file_id] || [];
 
-                                <div className="space-y-3">
-                                    {file.Filter.map((rule, ruleIndex) => (
-                                        <div key={ruleIndex} className="p-3 bg-gray-50 rounded border">
-                                            <div className="grid grid-cols-3 gap-3 mb-3">
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-700 mb-1">Column Name</label>
-                                                    <select
-                                                        value={rule.ColumnName}
-                                                        onChange={(e) => updateFilterRule(fileIndex, ruleIndex, 'ColumnName', e.target.value)}
-                                                        className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                    >
-                                                        <option value="">Select Column</option>
-                                                        {(fileColumns[fileIndex === 0 ? selectedFiles.fileA?.file_id : selectedFiles.fileB?.file_id] || []).map(col => (
-                                                            <option key={col} value={col}>{col}</option>
-                                                        ))}
-                                                    </select>
+                            return (
+                                <div key={fileIndex} className="p-4 border border-gray-200 rounded-lg">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-md font-medium text-gray-800">
+                                            {file.Name}: {selectedFile?.filename}
+                                        </h4>
+                                        <button
+                                            onClick={() => addFilterRule(fileIndex)}
+                                            className="flex items-center space-x-1 px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+                                        >
+                                            <Plus size={14} />
+                                            <span>Add Filter</span>
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {(file.Filter || []).map((rule, ruleIndex) => (
+                                            <div key={ruleIndex} className="p-3 bg-gray-50 rounded border">
+                                                <div className="grid grid-cols-3 gap-3 mb-3">
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-700 mb-1">Column Name</label>
+                                                        <select
+                                                            value={rule.ColumnName || ''}
+                                                            onChange={(e) => updateFilterRule(fileIndex, ruleIndex, 'ColumnName', e.target.value)}
+                                                            className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                        >
+                                                            <option value="">Select Column</option>
+                                                            {availableColumns.map(col => (
+                                                                <option key={col} value={col}>{col}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                                                        <select
+                                                            value={rule.MatchType || 'equals'}
+                                                            onChange={(e) => updateFilterRule(fileIndex, ruleIndex, 'MatchType', e.target.value)}
+                                                            className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                        >
+                                                            <option value="equals">Equals</option>
+                                                            <option value="contains">Contains</option>
+                                                            <option value="not_equals">Not Equals</option>
+                                                            <option value="greater_than">Greater Than</option>
+                                                            <option value="less_than">Less Than</option>
+                                                            <option value="starts_with">Starts With</option>
+                                                            <option value="ends_with">Ends With</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-700 mb-1">Value</label>
+                                                        <input
+                                                            type="text"
+                                                            value={rule.Value || ''}
+                                                            onChange={(e) => updateFilterRule(fileIndex, ruleIndex, 'Value', e.target.value)}
+                                                            className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                            placeholder="e.g., Settled"
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
-                                                    <select
-                                                        value={rule.MatchType}
-                                                        onChange={(e) => updateFilterRule(fileIndex, ruleIndex, 'MatchType', e.target.value)}
-                                                        className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                    >
-                                                        <option value="equals">Equals</option>
-                                                        <option value="contains">Contains</option>
-                                                        <option value="not_equals">Not Equals</option>
-                                                        <option value="greater_than">Greater Than</option>
-                                                        <option value="less_than">Less Than</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium text-gray-700 mb-1">Value</label>
-                                                    <input
-                                                        type="text"
-                                                        value={rule.Value}
-                                                        onChange={(e) => updateFilterRule(fileIndex, ruleIndex, 'Value', e.target.value)}
-                                                        className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                        placeholder="e.g., Settled"
-                                                    />
-                                                </div>
+
+                                                <button
+                                                    onClick={() => removeFilterRule(fileIndex, ruleIndex)}
+                                                    className="flex items-center space-x-1 text-red-600 hover:text-red-800 text-sm"
+                                                >
+                                                    <Minus size={14} />
+                                                    <span>Remove Filter</span>
+                                                </button>
                                             </div>
+                                        ))}
 
-                                            <button
-                                                onClick={() => removeFilterRule(fileIndex, ruleIndex)}
-                                                className="flex items-center space-x-1 text-red-600 hover:text-red-800 text-sm"
-                                            >
-                                                <Minus size={14} />
-                                                <span>Remove Filter</span>
-                                            </button>
-                                        </div>
-                                    ))}
-
-                                    {file.Filter.length === 0 && (
-                                        <div className="text-center text-gray-500 py-4">
-                                            <p className="text-sm">No filter rules defined yet.</p>
-                                            <p className="text-xs">Click "Add Filter" to create filtering conditions.</p>
-                                        </div>
-                                    )}
+                                        {(!file.Filter || file.Filter.length === 0) && (
+                                            <div className="text-center text-gray-500 py-4">
+                                                <p className="text-sm">No filter rules defined yet.</p>
+                                                <p className="text-xs">Click "Add Filter" to create filtering conditions.</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 );
 
@@ -447,82 +493,90 @@ const ReconciliationFlow = ({
                             </div>
 
                             <div className="space-y-3">
-                                {reconciliationRules.map((rule, ruleIndex) => (
-                                    <div key={ruleIndex} className="p-3 bg-gray-50 rounded border">
-                                        <div className="grid grid-cols-4 gap-3 mb-3">
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1">File A Column</label>
-                                                <select
-                                                    value={rule.LeftFileColumn}
-                                                    onChange={(e) => updateReconciliationRule(ruleIndex, 'LeftFileColumn', e.target.value)}
-                                                    className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                >
-                                                    <option value="">Select Column</option>
-                                                    {/* Show extracted columns + original columns */}
-                                                    {config.Files[0]?.Extract?.map(ext => (
-                                                        <option key={ext.ResultColumnName} value={ext.ResultColumnName}>
-                                                            {ext.ResultColumnName} (extracted)
-                                                        </option>
-                                                    ))}
-                                                    {(fileColumns[selectedFiles.fileA?.file_id] || []).map(col => (
-                                                        <option key={col} value={col}>{col}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1">File B Column</label>
-                                                <select
-                                                    value={rule.RightFileColumn}
-                                                    onChange={(e) => updateReconciliationRule(ruleIndex, 'RightFileColumn', e.target.value)}
-                                                    className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                >
-                                                    <option value="">Select Column</option>
-                                                    {/* Show extracted columns + original columns */}
-                                                    {config.Files[1]?.Extract?.map(ext => (
-                                                        <option key={ext.ResultColumnName} value={ext.ResultColumnName}>
-                                                            {ext.ResultColumnName} (extracted)
-                                                        </option>
-                                                    ))}
-                                                    {(fileColumns[selectedFiles.fileB?.file_id] || []).map(col => (
-                                                        <option key={col} value={col}>{col}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
-                                                <select
-                                                    value={rule.MatchType}
-                                                    onChange={(e) => updateReconciliationRule(ruleIndex, 'MatchType', e.target.value)}
-                                                    className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                >
-                                                    <option value="equals">Exact Match</option>
-                                                    <option value="tolerance">Tolerance Match</option>
-                                                    <option value="fuzzy">Fuzzy Match</option>
-                                                    <option value="contains">Contains</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1">Tolerance</label>
-                                                <input
-                                                    type="number"
-                                                    value={rule.ToleranceValue || ''}
-                                                    onChange={(e) => updateReconciliationRule(ruleIndex, 'ToleranceValue', e.target.value)}
-                                                    className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                    placeholder="0"
-                                                    disabled={rule.MatchType !== 'tolerance'}
-                                                />
-                                            </div>
-                                        </div>
+                                {reconciliationRules.map((rule, ruleIndex) => {
+                                    const fileA = getFileByIndex(0);
+                                    const fileB = getFileByIndex(1);
+                                    const columnsA = fileColumns[fileA?.file_id] || [];
+                                    const columnsB = fileColumns[fileB?.file_id] || [];
 
-                                        <button
-                                            onClick={() => removeReconciliationRule(ruleIndex)}
-                                            className="flex items-center space-x-1 text-red-600 hover:text-red-800 text-sm"
-                                        >
-                                            <Minus size={14} />
-                                            <span>Remove Rule</span>
-                                        </button>
-                                    </div>
-                                ))}
+                                    return (
+                                        <div key={ruleIndex} className="p-3 bg-gray-50 rounded border">
+                                            <div className="grid grid-cols-4 gap-3 mb-3">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-700 mb-1">File A Column</label>
+                                                    <select
+                                                        value={rule.LeftFileColumn || ''}
+                                                        onChange={(e) => updateReconciliationRule(ruleIndex, 'LeftFileColumn', e.target.value)}
+                                                        className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                    >
+                                                        <option value="">Select Column</option>
+                                                        {/* Show extracted columns + original columns */}
+                                                        {config.Files[0]?.Extract?.map(ext => (
+                                                            <option key={ext.ResultColumnName} value={ext.ResultColumnName}>
+                                                                {ext.ResultColumnName} (extracted)
+                                                            </option>
+                                                        ))}
+                                                        {columnsA.map(col => (
+                                                            <option key={col} value={col}>{col}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-700 mb-1">File B Column</label>
+                                                    <select
+                                                        value={rule.RightFileColumn || ''}
+                                                        onChange={(e) => updateReconciliationRule(ruleIndex, 'RightFileColumn', e.target.value)}
+                                                        className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                    >
+                                                        <option value="">Select Column</option>
+                                                        {/* Show extracted columns + original columns */}
+                                                        {config.Files[1]?.Extract?.map(ext => (
+                                                            <option key={ext.ResultColumnName} value={ext.ResultColumnName}>
+                                                                {ext.ResultColumnName} (extracted)
+                                                            </option>
+                                                        ))}
+                                                        {columnsB.map(col => (
+                                                            <option key={col} value={col}>{col}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
+                                                    <select
+                                                        value={rule.MatchType || 'equals'}
+                                                        onChange={(e) => updateReconciliationRule(ruleIndex, 'MatchType', e.target.value)}
+                                                        className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                    >
+                                                        <option value="equals">Exact Match</option>
+                                                        <option value="tolerance">Tolerance Match</option>
+                                                        <option value="fuzzy">Fuzzy Match</option>
+                                                        <option value="contains">Contains</option>
+                                                        <option value="percentage">Percentage Match</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-700 mb-1">Tolerance</label>
+                                                    <input
+                                                        type="number"
+                                                        value={rule.ToleranceValue || ''}
+                                                        onChange={(e) => updateReconciliationRule(ruleIndex, 'ToleranceValue', e.target.value)}
+                                                        className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                        placeholder="0"
+                                                        disabled={rule.MatchType !== 'tolerance' && rule.MatchType !== 'percentage'}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={() => removeReconciliationRule(ruleIndex)}
+                                                className="flex items-center space-x-1 text-red-600 hover:text-red-800 text-sm"
+                                            >
+                                                <Minus size={14} />
+                                                <span>Remove Rule</span>
+                                            </button>
+                                        </div>
+                                    );
+                                })}
 
                                 {reconciliationRules.length === 0 && (
                                     <div className="text-center text-gray-500 py-4">
@@ -547,16 +601,13 @@ const ReconciliationFlow = ({
                         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                             <h4 className="font-medium text-blue-800 mb-2">Files Selected</h4>
                             <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <span className="font-medium">File A:</span> {selectedFiles.fileA?.filename}
-                                    <br />
-                                    <span className="text-xs text-blue-600">Sheet: {config.Files[0]?.SheetName || 'Default'}</span>
-                                </div>
-                                <div>
-                                    <span className="font-medium">File B:</span> {selectedFiles.fileB?.filename}
-                                    <br />
-                                    <span className="text-xs text-blue-600">Sheet: {config.Files[1]?.SheetName || 'Default'}</span>
-                                </div>
+                                {filesArray.slice(0, 2).map((file, index) => (
+                                    <div key={index}>
+                                        <span className="font-medium">File {String.fromCharCode(65 + index)}:</span> {file?.filename}
+                                        <br />
+                                        <span className="text-xs text-blue-600">Sheet: {config.Files[index]?.SheetName || 'Default'}</span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
@@ -567,7 +618,7 @@ const ReconciliationFlow = ({
                                 {config.Files.map((file, index) => (
                                     <div key={index}>
                                         <span className="font-medium">{file.Name}:</span>
-                                        {file.Extract.length > 0 ? (
+                                        {file.Extract && file.Extract.length > 0 ? (
                                             <ul className="ml-4 list-disc">
                                                 {file.Extract.map((rule, ruleIndex) => (
                                                     <li key={ruleIndex} className="text-xs">
@@ -590,7 +641,7 @@ const ReconciliationFlow = ({
                                 {config.Files.map((file, index) => (
                                     <div key={index}>
                                         <span className="font-medium">{file.Name}:</span>
-                                        {file.Filter.length > 0 ? (
+                                        {file.Filter && file.Filter.length > 0 ? (
                                             <ul className="ml-4 list-disc">
                                                 {file.Filter.map((rule, ruleIndex) => (
                                                     <li key={ruleIndex} className="text-xs">
@@ -615,7 +666,7 @@ const ReconciliationFlow = ({
                                         {reconciliationRules.map((rule, index) => (
                                             <li key={index} className="text-xs">
                                                 Match "{rule.LeftFileColumn}" with "{rule.RightFileColumn}" using {rule.MatchType}
-                                                {rule.MatchType === 'tolerance' && ` (tolerance: ${rule.ToleranceValue})`}
+                                                {(rule.MatchType === 'tolerance' || rule.MatchType === 'percentage') && rule.ToleranceValue && ` (tolerance: ${rule.ToleranceValue})`}
                                             </li>
                                         ))}
                                     </ul>

@@ -149,101 +149,10 @@ const MainApp = () => {
 
     const loadTemplates = async () => {
         try {
-            // Enhanced templates with different file requirements
-            const enhancedTemplates = [
-                {
-                    name: "💰 Financial Transaction Reconciliation",
-                    description: "Match financial transactions between two sources using amount, date, and reference matching",
-                    user_requirements: "Please configure the reconciliation to match financial transactions between the two files.",
-                    prompt: "Configure reconciliation for financial transactions with amount tolerance matching",
-                    category: "reconciliation",
-                    filesRequired: 2,
-                    fileLabels: ["Primary Transactions", "Comparison Transactions"]
-                },
-                {
-                    name: "📋 ISIN Securities Reconciliation",
-                    description: "Extract and match ISIN codes from transaction descriptions for securities reconciliation",
-                    user_requirements: "I need to reconcile securities data by extracting ISIN codes from description fields.",
-                    prompt: "Extract ISIN codes and amounts from descriptions, match with tolerance",
-                    category: "reconciliation",
-                    filesRequired: 2,
-                    fileLabels: ["Securities File A", "Securities File B"]
-                },
-                {
-                    name: "🔍 Data Quality Validation",
-                    description: "Validate data quality, find duplicates, and identify data issues in a single file",
-                    user_requirements: "Analyze the uploaded file for data quality issues, duplicates, and validation errors.",
-                    prompt: "Single file data quality analysis and validation",
-                    category: "validation",
-                    filesRequired: 1,
-                    fileLabels: ["Data File to Validate"]
-                },
-                {
-                    name: "🧹 Data Cleaning & Standardization",
-                    description: "Clean and standardize data formats, remove duplicates, and fix common data issues",
-                    user_requirements: "Clean and standardize the data in the uploaded file.",
-                    prompt: "Data cleaning and standardization process",
-                    category: "cleaning",
-                    filesRequired: 1,
-                    fileLabels: ["File to Clean"]
-                },
-                {
-                    name: "📊 Data Extraction & Transformation",
-                    description: "Extract specific data patterns and transform data structure from a single file",
-                    user_requirements: "Extract and transform data from the uploaded file based on specified patterns.",
-                    prompt: "Data extraction and transformation",
-                    category: "extraction",
-                    filesRequired: 1,
-                    fileLabels: ["Source Data File"]
-                },
-                {
-                    name: "🔄 Multi-File Data Consolidation",
-                    description: "Consolidate and merge data from multiple files into a unified dataset",
-                    user_requirements: "Consolidate data from multiple files into a single unified dataset.",
-                    prompt: "Multi-file data consolidation",
-                    category: "consolidation",
-                    filesRequired: 3,
-                    fileLabels: ["Primary File", "Secondary File", "Additional File"]
-                },
-                {
-                    name: "🤖 AI-Assisted Smart Reconciliation",
-                    description: "Let AI analyze your files and suggest optimal reconciliation rules automatically",
-                    user_requirements: "Use AI to analyze my files and suggest the best reconciliation approach.",
-                    prompt: "AI-powered reconciliation with automatic rule suggestion",
-                    category: "ai-reconciliation",
-                    filesRequired: 2,
-                    fileLabels: ["File A", "File B"]
-                },
-                {
-                    name: "🎯 AI-Powered Data Analysis",
-                    description: "Use AI to analyze patterns, anomalies, and insights in your data",
-                    user_requirements: "Analyze my data using AI to find patterns, anomalies, and generate insights.",
-                    prompt: "AI-powered single file data analysis",
-                    category: "ai-analysis",
-                    filesRequired: 1,
-                    fileLabels: ["Data File to Analyze"]
-                },
-                {
-                    name: "📈 Portfolio Reconciliation",
-                    description: "Reconcile portfolio holdings between custodian and internal records",
-                    user_requirements: "Reconcile portfolio holdings data between two sources.",
-                    prompt: "Portfolio holdings reconciliation with security matching",
-                    category: "reconciliation",
-                    filesRequired: 2,
-                    fileLabels: ["Custodian Holdings", "Internal Records"]
-                },
-                {
-                    name: "💳 Payment Processing Reconciliation",
-                    description: "Reconcile payment processor reports with merchant transaction records",
-                    user_requirements: "Reconcile payment processor data with merchant records.",
-                    prompt: "Payment processing reconciliation with fee adjustments",
-                    category: "reconciliation",
-                    filesRequired: 2,
-                    fileLabels: ["Payment Processor Report", "Merchant Records"]
-                }
-            ];
 
-            setTemplates(enhancedTemplates);
+           const enhancedTemplates= await apiService.getReconciliationTemplates();
+
+            setTemplates(enhancedTemplates.data);
         } catch (error) {
             console.error('Failed to load templates:', error);
             simulateTyping('error', 'Failed to load process templates');
@@ -262,6 +171,7 @@ const MainApp = () => {
     };
 
     const loadProcessedFiles = async () => {
+        return [];
         try {
             const data = await apiService.getReconciliations();
             if (data.success) {
