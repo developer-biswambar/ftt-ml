@@ -148,6 +148,9 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
     const handleUseRegex = () => {
         if (generatedRegex && onRegexGenerated) {
             onRegexGenerated(generatedRegex);
+
+            console.log(generatedRegex);
+            console.log('closing')
             onClose();
         }
     };
@@ -160,7 +163,7 @@ const AIRegexGenerator = ({ onRegexGenerated, onClose, sampleText = '', columnNa
         if (suggestion) {
             setGeneratedRegex(suggestion.regex);
             setExplanation(suggestion.explanation);
-            setIsFallback(true);
+           // setIsFallback(true);
 
             if (sampleText) {
                 testRegexAgainstSample(suggestion.regex, sampleText);
