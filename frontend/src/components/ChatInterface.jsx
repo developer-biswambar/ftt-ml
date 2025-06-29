@@ -1,4 +1,4 @@
-// src/components/ChatInterface.jsx - Enhanced with reconciliation flow
+// src/components/ChatInterface.jsx - Fixed reconciliation flow triggering
 import React, { useEffect, useRef, useState } from 'react';
 import { Send, FileText, Settings, CheckCircle, AlertCircle } from 'lucide-react';
 import ReconciliationFlow from './ReconciliationFlow';
@@ -65,7 +65,7 @@ const ChatInterface = ({
     isAnalyzingColumns,
     selectedFiles,
     selectedTemplate,
-    requiredFiles,  // Add this prop
+    requiredFiles,
     onStartReconciliation,
     isTyping,
     typingMessage,
@@ -86,37 +86,6 @@ const ChatInterface = ({
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isTyping, typingMessage]);
 
-    // Check if we should start a process flow
-    useEffect(() => {
-        const lastMessage = messages[messages.length - 1];
-        if (lastMessage && lastMessage.type === 'user' && currentInput.includes('reconcil')) {
-            if (selectedTemplate && areAllFilesSelected()) {
-                // Send follow-up message to start the flow
-                setTimeout(() => {
-                    onSendMessage('system', `🔧 Let me help you configure this ${selectedTemplate.name.toLowerCase()} step by step.\n\nStarting configuration wizard...`);
-
-                    setTimeout(() => {
-                        if (selectedTemplate.category.includes('reconciliation')) {
-                            setCurrentFlow('reconciliation');
-                            setFlowData({
-                                selectedFiles,
-                                selectedTemplate,
-                                step: 'file_selection'
-                            });
-                        } else {
-                            setCurrentFlow('single_process');
-                            setFlowData({
-                                selectedFiles,
-                                selectedTemplate,
-                                step: 'configuration'
-                            });
-                        }
-                    }, 1000);
-                }, 500);
-            }
-        }
-    }, [messages, selectedFiles, currentInput, selectedTemplate, requiredFiles]);
-
     const handleFlowComplete = (processConfig) => {
         setCurrentFlow(null);
         setFlowData({});
@@ -134,35 +103,64 @@ const ChatInterface = ({
         onSendMessage('system', 'Process configuration cancelled. Please select a different template or try again.');
     };
 
+    const startReconciliationFlow = () => {
+        // Send initial message
+        onSendMessage('system', `🔧 Let me help you configure this ${selectedTemplate.name.toLowerCase()} step by step.\n\nStarting configuration wizard...`);
+
+        // Start the flow after a brief delay
+        setTimeout(() => {
+            if (selectedTemplate.category.includes('reconciliation')) {
+                setCurrentFlow('reconciliation');
+                setFlowData({
+                    selectedFiles,
+                    selectedTemplate,
+                    step: 'file_selection'
+                });
+            } else {
+                setCurrentFlow('single_process');
+                setFlowData({
+                    selectedFiles,
+                    selectedTemplate,
+                    step: 'configuration'
+                });
+            }
+        }, 1000);
+    };
+
     const handleRegularSubmit = () => {
         if (!currentInput.trim()) return;
 
-        onSendMessage('user', currentInput);
+        // Store the input before clearing it
+        const userInput = currentInput.trim();
+
+        onSendMessage('user', userInput);
 
         // Check if user is trying to start a process
-        if (currentInput.toLowerCase().includes('start') ||
-            currentInput.toLowerCase().includes('begin') ||
-            currentInput.toLowerCase().includes('process')) {
+        const isStartCommand = userInput.toLowerCase().includes('start') ||
+                              userInput.toLowerCase().includes('begin') ||
+                              userInput.toLowerCase().includes('process') ||
+                              userInput.toLowerCase().includes('reconcil');
 
+        if (isStartCommand) {
             if (selectedTemplate && areAllFilesSelected()) {
+                // Clear input first
+                setCurrentInput('');
+
+                // Start the appropriate flow
                 if (selectedTemplate.category.includes('reconciliation')) {
-                    setCurrentFlow('reconciliation');
-                    setFlowData({
-                        selectedFiles,
-                        selectedTemplate,
-                        step: 'file_selection'
-                    });
+                    startReconciliationFlow();
                 } else {
                     // For single file processes, start directly
                     handleFlowComplete({
                         process_type: selectedTemplate.category,
-                        luser_requirements: currentInput,
+                        user_requirements: userInput,
                         files: Object.entries(selectedFiles).map(([key, file]) => ({
                             file_id: file.file_id,
                             role: key
                         }))
                     });
                 }
+                return; // Exit early to avoid clearing input again
             } else if (!selectedTemplate) {
                 onSendMessage('system', '⚠️ Please select a process template first from the left panel.');
             } else if (!areAllFilesSelected()) {
