@@ -1,4 +1,4 @@
-// src/services/api.js - Enhanced with viewer endpoints
+// src/services/api.js - Enhanced with regex generation endpoints
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000';
@@ -34,7 +34,7 @@ export const apiService = {
         return response.data;
     },
 
-    // NEW: Viewer operations
+    // Viewer operations
     getFileData: async (fileId, page = 1, pageSize = 1000) => {
         const response = await api.get(`/files/${fileId}/data?page=${page}&page_size=${pageSize}`);
         return response.data;
@@ -50,6 +50,35 @@ export const apiService = {
             responseType: 'blob'
         });
         return response;
+    },
+
+    // NEW: AI Regex Generation operations
+    generateRegex: async (description, sampleText = '', columnName = '', context = null) => {
+        const response = await api.post('/api/regex/generate', {
+            description,
+            sample_text: sampleText,
+            column_name: columnName,
+            context
+        });
+        return response.data;
+    },
+
+    testRegex: async (regex, testText) => {
+        const response = await api.post('/api/regex/test', {
+            regex,
+            test_text: testText
+        });
+        return response.data;
+    },
+
+    getCommonPatterns: async () => {
+        const response = await api.get('/api/regex/patterns');
+        return response.data;
+    },
+
+    getPatternSuggestions: async (description) => {
+        const response = await api.get(`/api/regex/suggestions?description=${encodeURIComponent(description)}`);
+        return response.data;
     },
 
     // Reconciliation operations
@@ -80,9 +109,32 @@ export const apiService = {
 
     analyzeColumns: async (fileAId, fileBId) => {
         const url = `/api/v1/reconcile/analyze-columns?file_a_id=${fileAId}&file_b_id=${fileBId}`;
-        const response = await api.post(url)
+        const response = await api.post(url);
         return response.data;
     }
 };
+
+// Error handling interceptor
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        console.error('API Error:', error);
+
+        // Handle specific error cases
+        if (error.response?.status === 500 && error.response?.data?.detail?.includes('OpenAI')) {
+            throw new Error('AI service is currently unavailable. Please try again later.');
+        }
+
+        if (error.response?.status === 429) {
+            throw new Error('Rate limit exceeded. Please wait a moment before trying again.');
+        }
+
+        if (error.response?.data?.detail) {
+            throw new Error(error.response.data.detail);
+        }
+
+        throw error;
+    }
+);
 
 export default apiService;

@@ -1,9 +1,10 @@
-// src/components/ReconciliationFlow.jsx - Interactive reconciliation configuration
+// src/components/ReconciliationFlow.jsx - Updated with AI regex generation
 import React, { useState, useEffect } from 'react';
 import {
     FileText, ChevronRight, ChevronLeft, Check, X, Plus, Minus,
-    AlertCircle, Eye, Search, Filter, Target, Settings
+    AlertCircle, Eye, Search, Filter, Target, Settings, Wand2
 } from 'lucide-react';
+import AIRegexGenerator from './AIRegexGenerator';
 
 const ReconciliationFlow = ({
     files,
@@ -24,6 +25,13 @@ const ReconciliationFlow = ({
     const [filterRules, setFilterRules] = useState({});
     const [reconciliationRules, setReconciliationRules] = useState([]);
     const [fileColumns, setFileColumns] = useState({});
+    const [showAIRegexGenerator, setShowAIRegexGenerator] = useState(false);
+    const [currentAIContext, setCurrentAIContext] = useState({
+        fileIndex: 0,
+        ruleIndex: 0,
+        sampleText: '',
+        columnName: ''
+    });
 
     const steps = [
         { id: 'file_selection', title: 'File Selection', icon: FileText },
@@ -39,7 +47,7 @@ const ReconciliationFlow = ({
     // Helper function to get files array from selectedFiles object
     const getSelectedFilesArray = () => {
         return Object.keys(selectedFiles)
-            .sort() // Ensure consistent order (file_0, file_1, etc.)
+            .sort()
             .map(key => selectedFiles[key])
             .filter(file => file !== null && file !== undefined);
     };
@@ -50,13 +58,27 @@ const ReconciliationFlow = ({
         return selectedFiles[key];
     };
 
+    // Generate sample text for AI context
+    const getSampleTextForColumn = (fileIndex, columnName) => {
+        const file = getFileByIndex(fileIndex);
+        if (!file || !file.sample_data || !columnName) return '';
+
+        // Get first few non-empty values from the column
+        const sampleValues = file.sample_data
+            .map(row => row[columnName])
+            .filter(val => val && val.toString().trim())
+            .slice(0, 3);
+
+        return sampleValues.join(', ');
+    };
+
     useEffect(() => {
         // Initialize config with selected files
         const filesArray = getSelectedFilesArray();
         if (filesArray.length >= 2) {
             setConfig({
                 Files: filesArray.map((file, index) => ({
-                    Name: `File${String.fromCharCode(65 + index)}`, // FileA, FileB, etc.
+                    Name: `File${String.fromCharCode(65 + index)}`,
                     SheetName: '',
                     Extract: [],
                     Filter: []
@@ -64,7 +86,7 @@ const ReconciliationFlow = ({
                 ReconciliationRules: []
             });
 
-            // Set up file columns (use actual columns from files or mock data)
+            // Set up file columns
             const newFileColumns = {};
             filesArray.forEach((file, index) => {
                 newFileColumns[file.file_id] = file.columns || [
@@ -80,8 +102,6 @@ const ReconciliationFlow = ({
         if (currentIndex < steps.length - 1) {
             const nextStepId = steps[currentIndex + 1].id;
             setCurrentStep(nextStepId);
-
-            // Send progress message
             onSendMessage('system', `✅ Step ${currentIndex + 1} completed. Moving to: ${steps[currentIndex + 1].title}`);
         }
     };
@@ -94,7 +114,6 @@ const ReconciliationFlow = ({
     };
 
     const completeFlow = () => {
-        // Build final configuration
         const finalConfig = {
             ...config,
             ReconciliationRules: reconciliationRules,
@@ -145,6 +164,29 @@ const ReconciliationFlow = ({
         setConfig(updatedConfig);
     };
 
+    // AI Regex Generation Functions
+    const openAIRegexGenerator = (fileIndex, ruleIndex) => {
+        const rule = config.Files[fileIndex]?.Extract?.[ruleIndex];
+        const sampleText = rule?.SourceColumn ? getSampleTextForColumn(fileIndex, rule.SourceColumn) : '';
+
+        setCurrentAIContext({
+            fileIndex,
+            ruleIndex,
+            sampleText,
+            columnName: rule?.SourceColumn || ''
+        });
+        setShowAIRegexGenerator(true);
+    };
+
+    const handleAIRegexGenerated = (generatedRegex) => {
+        const { fileIndex, ruleIndex } = currentAIContext;
+        updateExtractionRule(fileIndex, ruleIndex, 'Patterns', generatedRegex);
+        updateExtractionRule(fileIndex, ruleIndex, 'MatchType', 'regex');
+        setShowAIRegexGenerator(false);
+        onSendMessage('system', `✨ AI generated regex pattern applied to extraction rule`);
+    };
+
+    // Filter rule functions remain the same
     const addFilterRule = (fileIndex) => {
         const newRule = {
             ColumnName: '',
@@ -175,6 +217,7 @@ const ReconciliationFlow = ({
         setConfig(updatedConfig);
     };
 
+    // Reconciliation rule functions remain the same
     const addReconciliationRule = () => {
         const newRule = {
             LeftFileColumn: '',
@@ -327,7 +370,7 @@ const ReconciliationFlow = ({
                                                     </div>
                                                 </div>
 
-                                                <div className="grid grid-cols-3 gap-3 mb-3">
+                                                <div className="grid grid-cols-4 gap-3 mb-3">
                                                     <div>
                                                         <label className="block text-xs font-medium text-gray-700 mb-1">Match Type</label>
                                                         <select
@@ -340,6 +383,7 @@ const ReconciliationFlow = ({
                                                             <option value="contains">Contains</option>
                                                             <option value="starts_with">Starts With</option>
                                                             <option value="ends_with">Ends With</option>
+                                                            <option value="ai_generated">AI Generated</option>
                                                         </select>
                                                     </div>
                                                     <div className="col-span-2">
@@ -352,7 +396,29 @@ const ReconciliationFlow = ({
                                                             placeholder="e.g., \\$?([\\d,]+(?:\\.\\d{2})?)"
                                                         />
                                                     </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-700 mb-1">AI Helper</label>
+                                                        <button
+                                                            onClick={() => openAIRegexGenerator(fileIndex, ruleIndex)}
+                                                            disabled={!rule.SourceColumn}
+                                                            className="w-full flex items-center justify-center space-x-1 px-2 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-xs"
+                                                            title={!rule.SourceColumn ? "Please select a source column first" : "Generate regex with AI"}
+                                                        >
+                                                            <Wand2 size={12} />
+                                                            <span>AI</span>
+                                                        </button>
+                                                    </div>
                                                 </div>
+
+                                                {/* Sample data preview for selected column */}
+                                                {rule.SourceColumn && (
+                                                    <div className="mb-3 p-2 bg-blue-50 rounded text-xs">
+                                                        <span className="font-medium text-blue-800">Sample data from {rule.SourceColumn}: </span>
+                                                        <span className="text-blue-600">
+                                                            {getSampleTextForColumn(fileIndex, rule.SourceColumn) || 'No sample data available'}
+                                                        </span>
+                                                    </div>
+                                                )}
 
                                                 <button
                                                     onClick={() => removeExtractionRule(fileIndex, ruleIndex)}
@@ -510,7 +576,6 @@ const ReconciliationFlow = ({
                                                         className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                                                     >
                                                         <option value="">Select Column</option>
-                                                        {/* Show extracted columns + original columns */}
                                                         {config.Files[0]?.Extract?.map(ext => (
                                                             <option key={ext.ResultColumnName} value={ext.ResultColumnName}>
                                                                 {ext.ResultColumnName} (extracted)
@@ -529,7 +594,6 @@ const ReconciliationFlow = ({
                                                         className="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                                                     >
                                                         <option value="">Select Column</option>
-                                                        {/* Show extracted columns + original columns */}
                                                         {config.Files[1]?.Extract?.map(ext => (
                                                             <option key={ext.ResultColumnName} value={ext.ResultColumnName}>
                                                                 {ext.ResultColumnName} (extracted)
@@ -623,6 +687,7 @@ const ReconciliationFlow = ({
                                                 {file.Extract.map((rule, ruleIndex) => (
                                                     <li key={ruleIndex} className="text-xs">
                                                         Extract "{rule.ResultColumnName}" from "{rule.SourceColumn}" using {rule.MatchType}
+                                                        {rule.MatchType === 'ai_generated' && <span className="text-purple-600 ml-1">✨ AI Generated</span>}
                                                     </li>
                                                 ))}
                                             </ul>
@@ -703,84 +768,96 @@ const ReconciliationFlow = ({
     };
 
     return (
-        <div className="bg-white border border-gray-300 rounded-lg p-6 shadow-lg max-w-4xl mx-auto">
-            {/* Step Progress */}
-            <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                    {steps.map((step, index) => {
-                        const isActive = step.id === currentStep;
-                        const isCompleted = getCurrentStepIndex() > index;
-                        const StepIcon = step.icon;
+        <>
+            <div className="bg-white border border-gray-300 rounded-lg p-6 shadow-lg max-w-4xl mx-auto">
+                {/* Step Progress */}
+                <div className="mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                        {steps.map((step, index) => {
+                            const isActive = step.id === currentStep;
+                            const isCompleted = getCurrentStepIndex() > index;
+                            const StepIcon = step.icon;
 
-                        return (
-                            <div key={step.id} className="flex items-center">
-                                <div className={`
-                                    flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all duration-300
-                                    ${isActive ? 'bg-blue-500 border-blue-500 text-white' : 
-                                      isCompleted ? 'bg-green-500 border-green-500 text-white' : 
-                                      'bg-gray-100 border-gray-300 text-gray-500'}
-                                `}>
-                                    {isCompleted ? <Check size={16} /> : <StepIcon size={16} />}
+                            return (
+                                <div key={step.id} className="flex items-center">
+                                    <div className={`
+                                        flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all duration-300
+                                        ${isActive ? 'bg-blue-500 border-blue-500 text-white' : 
+                                          isCompleted ? 'bg-green-500 border-green-500 text-white' : 
+                                          'bg-gray-100 border-gray-300 text-gray-500'}
+                                    `}>
+                                        {isCompleted ? <Check size={16} /> : <StepIcon size={16} />}
+                                    </div>
+                                    <span className={`ml-2 text-sm font-medium ${isActive ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-gray-500'}`}>
+                                        {step.title}
+                                    </span>
+                                    {index < steps.length - 1 && (
+                                        <ChevronRight size={16} className="mx-2 text-gray-400" />
+                                    )}
                                 </div>
-                                <span className={`ml-2 text-sm font-medium ${isActive ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-gray-500'}`}>
-                                    {step.title}
-                                </span>
-                                {index < steps.length - 1 && (
-                                    <ChevronRight size={16} className="mx-2 text-gray-400" />
-                                )}
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Step Content */}
+                <div className="mb-6 min-h-[400px]">
+                    {renderStepContent()}
+                </div>
+
+                {/* Navigation */}
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                    <button
+                        onClick={onCancel}
+                        className="flex items-center space-x-1 px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                    >
+                        <X size={16} />
+                        <span>Cancel</span>
+                    </button>
+
+                    <div className="flex space-x-2">
+                        {getCurrentStepIndex() > 0 && (
+                            <button
+                                onClick={prevStep}
+                                className="flex items-center space-x-1 px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                            >
+                                <ChevronLeft size={16} />
+                                <span>Previous</span>
+                            </button>
+                        )}
+
+                        {getCurrentStepIndex() < steps.length - 1 ? (
+                            <button
+                                onClick={nextStep}
+                                className="flex items-center space-x-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                            >
+                                <span>Next</span>
+                                <ChevronRight size={16} />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={completeFlow}
+                                disabled={reconciliationRules.length === 0}
+                                className="flex items-center space-x-1 px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                <Check size={16} />
+                                <span>Start Reconciliation</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Step Content */}
-            <div className="mb-6 min-h-[400px]">
-                {renderStepContent()}
-            </div>
-
-            {/* Navigation */}
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                <button
-                    onClick={onCancel}
-                    className="flex items-center space-x-1 px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
-                >
-                    <X size={16} />
-                    <span>Cancel</span>
-                </button>
-
-                <div className="flex space-x-2">
-                    {getCurrentStepIndex() > 0 && (
-                        <button
-                            onClick={prevStep}
-                            className="flex items-center space-x-1 px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
-                        >
-                            <ChevronLeft size={16} />
-                            <span>Previous</span>
-                        </button>
-                    )}
-
-                    {getCurrentStepIndex() < steps.length - 1 ? (
-                        <button
-                            onClick={nextStep}
-                            className="flex items-center space-x-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                        >
-                            <span>Next</span>
-                            <ChevronRight size={16} />
-                        </button>
-                    ) : (
-                        <button
-                            onClick={completeFlow}
-                            disabled={reconciliationRules.length === 0}
-                            className="flex items-center space-x-1 px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        >
-                            <Check size={16} />
-                            <span>Start Reconciliation</span>
-                        </button>
-                    )}
-                </div>
-            </div>
-        </div>
+            {/* AI Regex Generator Modal */}
+            {showAIRegexGenerator && (
+                <AIRegexGenerator
+                    sampleText={currentAIContext.sampleText}
+                    columnName={currentAIContext.columnName}
+                    onRegexGenerated={handleAIRegexGenerated}
+                    onClose={() => setShowAIRegexGenerator(false)}
+                />
+            )}
+        </>
     );
 };
 

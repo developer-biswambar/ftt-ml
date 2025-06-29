@@ -156,7 +156,7 @@ const ChatInterface = ({
                     // For single file processes, start directly
                     handleFlowComplete({
                         process_type: selectedTemplate.category,
-                        user_requirements: currentInput,
+                        luser_requirements: currentInput,
                         files: Object.entries(selectedFiles).map(([key, file]) => ({
                             file_id: file.file_id,
                             role: key

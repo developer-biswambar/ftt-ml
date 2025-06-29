@@ -1,4 +1,4 @@
-# backend/app/main.py - Updated with optimized reconciliation
+# backend/app/main.py - Updated with regex generation routes
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -40,8 +40,8 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app
 app = FastAPI(
     title="Optimized Financial Data Extraction & Reconciliation API",
-    version="4.0.0",
-    description="High-performance AI-powered financial data extraction, comparison, and reconciliation with optimized processing for large datasets"
+    version="4.1.0",
+    description="High-performance AI-powered financial data extraction, comparison, and reconciliation with AI regex generation"
 )
 
 app.add_middleware(
@@ -56,13 +56,14 @@ app.add_middleware(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("Starting Optimized File Processing API")
+    logger.info("Starting Optimized File Processing API with AI Regex Generation")
     temp_dir = os.getenv("TEMP_DIR", "./temp")
     max_file_size = int(os.getenv("MAX_FILE_SIZE", "100"))
 
     logger.info(f"Temp directory: {temp_dir}")
     logger.info(f"Max file size: {max_file_size}MB")
     logger.info("Optimized for large datasets (50k-100k records)")
+    logger.info("AI Regex Generation: ✅ Enabled")
 
     # Ensure temp directory exists
     os.makedirs(temp_dir, exist_ok=True)
@@ -186,7 +187,7 @@ async def get_templates():
 
     return {
         "success": True,
-        "message": "Enhanced templates with optimization features",
+        "message": "Enhanced templates with AI regex generation support",
         "data": templates
     }
 
@@ -198,7 +199,7 @@ async def debug_status():
 
     return {
         "success": True,
-        "message": "Optimized system debug info",
+        "message": "Optimized system debug info with AI regex generation",
         "data": {
             "uploaded_files_count": len(uploaded_files),
             "extractions_count": len(extractions),
@@ -215,7 +216,8 @@ async def debug_status():
                 "streaming_downloads": True,
                 "paginated_results": True,
                 "column_selection": True,
-                "memory_optimization": True
+                "memory_optimization": True,
+                "ai_regex_generation": True
             },
             "performance_limits": {
                 "recommended_max_rows": 100000,
@@ -257,15 +259,17 @@ sys.modules['app_storage'].reconciliations = reconciliations
 # Import and include routers
 try:
     from app.routes.health_routes import router as health_routes
-    from app.routes.reconciliation_routes import router as reconciliation_router  # This will use optimized routes
+    from app.routes.reconciliation_routes import router as reconciliation_router
     from app.routes.viewer_routes import router as viewer_router
     from app.routes.file_routes import router as file_router
+    from app.routes.regex_routes import router as regex_router  # NEW: AI Regex routes
 
     app.include_router(health_routes)
-    app.include_router(reconciliation_router)  # Optimized reconciliation
+    app.include_router(reconciliation_router)
     app.include_router(viewer_router)
     app.include_router(file_router)
-    print("✅ All routes loaded successfully (optimized reconciliation enabled)")
+    app.include_router(regex_router)  # NEW: Include regex routes
+    print("✅ All routes loaded successfully (optimized reconciliation + AI regex generation enabled)")
 except ImportError as e:
     print(f"❌ Failed to load routes: {e}")
 
@@ -289,7 +293,8 @@ async def get_performance_metrics():
                 "pattern_caching",
                 "streaming_io",
                 "batch_processing",
-                "column_selection"
+                "column_selection",
+                "ai_regex_generation"  # NEW feature
             ],
             "recommendations": {
                 "optimal_batch_size": 1000,
@@ -313,6 +318,7 @@ async def startup_event():
     print("   • Streaming downloads")
     print("   • Column selection support")
     print("   • Paginated result retrieval")
+    print("   • AI-powered regex generation")  # NEW feature
     print("🔧 Optimized for: 50k-100k record datasets")
     print("📋 API Docs: http://localhost:8000/docs")
 
@@ -327,4 +333,5 @@ if __name__ == "__main__":
     print("⚡ Performance Optimizations: ✅ Enabled")
     print("🔗 Column Selection: ✅ Enabled")
     print("📊 Large Dataset Support: ✅ 50k-100k records")
+    print("🧙 AI Regex Generation: ✅ Enabled")  # NEW feature
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
