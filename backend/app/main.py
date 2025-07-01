@@ -103,6 +103,14 @@ async def get_templates():
             "fileLabels": ["Primary Transactions", "Comparison Transactions"]
         },
         {
+            "name": "🤖 AI File Generator",
+            "description": "Generate new files from existing data using natural language prompts...",
+            "category": "ai-generation",
+            "filesRequired": 1,
+            "fileLabels": ["Source File"],
+            "user_requirements": "Describe the file you want to generate..."
+        },
+        {
             "name": "📋 ISIN Securities Reconciliation",
             "description": "Extract and match ISIN codes from transaction descriptions for securities reconciliation",
             "user_requirements": "I need to reconcile securities data by extracting ISIN codes from description fields.",

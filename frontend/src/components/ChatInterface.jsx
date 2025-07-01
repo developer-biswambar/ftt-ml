@@ -1,7 +1,8 @@
-// src/components/ChatInterface.jsx - Fixed reconciliation flow triggering
+// src/components/ChatInterface.jsx - Enhanced with File Generator Flow
 import React, { useEffect, useRef, useState } from 'react';
 import { Send, FileText, Settings, CheckCircle, AlertCircle } from 'lucide-react';
 import ReconciliationFlow from './ReconciliationFlow';
+import FileGeneratorFlow from './FileGeneratorFlow';
 
 const TypingIndicator = ({ message }) => {
     return (
@@ -92,8 +93,12 @@ const ChatInterface = ({
 
         onSendMessage('user', `${selectedTemplate?.name || 'Process'} configuration completed. Starting process...`);
 
-        if (onStartReconciliation) {
+        // Only call onStartReconciliation for non-generation processes
+        if (onStartReconciliation && !selectedTemplate?.category.includes('ai-generation')) {
             onStartReconciliation(processConfig);
+        } else if (selectedTemplate?.category.includes('ai-generation')) {
+            // For file generation, the flow handles everything internally
+            onSendMessage('success', '🎉 File generation process completed successfully!');
         }
     };
 
@@ -111,6 +116,13 @@ const ChatInterface = ({
         setTimeout(() => {
             if (selectedTemplate.category.includes('reconciliation')) {
                 setCurrentFlow('reconciliation');
+                setFlowData({
+                    selectedFiles,
+                    selectedTemplate,
+                    step: 'file_selection'
+                });
+            } else if (selectedTemplate.category.includes('ai-generation')) {
+                setCurrentFlow('file_generation');
                 setFlowData({
                     selectedFiles,
                     selectedTemplate,
@@ -139,7 +151,8 @@ const ChatInterface = ({
         const isStartCommand = userInput.toLowerCase().includes('start') ||
                               userInput.toLowerCase().includes('begin') ||
                               userInput.toLowerCase().includes('process') ||
-                              userInput.toLowerCase().includes('reconcil');
+                              userInput.toLowerCase().includes('reconcil') ||
+                              userInput.toLowerCase().includes('generate');
 
         if (isStartCommand) {
             if (selectedTemplate && areAllFilesSelected()) {
@@ -147,7 +160,7 @@ const ChatInterface = ({
                 setCurrentInput('');
 
                 // Start the appropriate flow
-                if (selectedTemplate.category.includes('reconciliation')) {
+                if (selectedTemplate.category.includes('reconciliation') || selectedTemplate.category.includes('ai-generation')) {
                     startReconciliationFlow();
                 } else {
                     // For single file processes, start directly
@@ -250,10 +263,24 @@ const ChatInterface = ({
                     </div>
                 )}
 
-                {/* Process Flow Component */}
+                {/* Process Flow Components */}
                 {currentFlow === 'reconciliation' && (
                     <div className="mb-4">
                         <ReconciliationFlow
+                            files={files}
+                            selectedFiles={selectedFiles}
+                            selectedTemplate={selectedTemplate}
+                            flowData={flowData}
+                            onComplete={handleFlowComplete}
+                            onCancel={handleFlowCancel}
+                            onSendMessage={onSendMessage}
+                        />
+                    </div>
+                )}
+
+                {currentFlow === 'file_generation' && (
+                    <div className="mb-4">
+                        <FileGeneratorFlow
                             files={files}
                             selectedFiles={selectedFiles}
                             selectedTemplate={selectedTemplate}

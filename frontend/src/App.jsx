@@ -1,4 +1,4 @@
-// src/App.jsx - Enhanced with reconciliation flow and AI integration
+// src/App.jsx - Enhanced with file generator integration
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { apiService } from './services/api';
@@ -90,7 +90,7 @@ const MainApp = () => {
 
     // Initial setup
     useEffect(() => {
-        simulateTyping('system', '🎯 Welcome to Financial Data Reconciliation!\n\n📋 **Getting Started:**\n1. Upload two files to compare\n2. Select them in the file selector\n3. Choose a template (try our AI-powered option!)\n4. Configure reconciliation rules\n5. Start the reconciliation process\n\nI\'ll analyze your data and provide detailed matching results with downloadable reports.\n\n💡 **New Features:**\n• 🤖 AI-powered rule generation\n• 👁️ Click the eye icon to view/edit files\n• ⚙️ Manual configuration for full control');
+        simulateTyping('system', '🎯 Welcome to Financial Data Reconciliation!\n\n📋 **Getting Started:**\n1. Upload two files to compare\n2. Select them in the file selector\n3. Choose a template (try our AI-powered option!)\n4. Configure reconciliation rules\n5. Start the reconciliation process\n\nI\'ll analyze your data and provide detailed matching results with downloadable reports.\n\n💡 **New Features:**\n• 🤖 AI-powered rule generation\n• 👁️ Click the eye icon to view/edit files\n• ⚙️ Manual configuration for full control\n• 🔧 AI File Generator for creating new files');
         loadInitialData();
     }, []);
 
@@ -99,6 +99,8 @@ const MainApp = () => {
         if (selectedTemplate && areAllFilesSelected()) {
             if (selectedTemplate.category.includes('reconciliation')) {
                 analyzeColumnCompatibility();
+            } else if (selectedTemplate.category.includes('ai-generation')) {
+                analyzeSingleFileStructure();
             } else {
                 analyzeSingleFileStructure();
             }
@@ -149,10 +151,23 @@ const MainApp = () => {
 
     const loadTemplates = async () => {
         try {
+            const response = await apiService.getReconciliationTemplates();
+            const baseTemplates = response.data || [];
 
-           const enhancedTemplates= await apiService.getReconciliationTemplates();
+            // Add the AI File Generator template
+            const enhancedTemplates = [
+                ...baseTemplates,
+                {
+                    name: "🤖 AI File Generator",
+                    description: "Generate new files from existing data using natural language prompts. Perfect for creating reports, transforming data formats, or extracting specific information.",
+                    category: "ai-generation",
+                    filesRequired: 1,
+                    fileLabels: ["Source File"],
+                    user_requirements: "Describe the file you want to generate. For example: 'create reporting file with jurisdiction always italy, trade_id from Trade_ID, header always XYZ'",
+                }
+            ];
 
-            setTemplates(enhancedTemplates.data);
+            setTemplates(enhancedTemplates);
         } catch (error) {
             console.error('Failed to load templates:', error);
             simulateTyping('error', 'Failed to load process templates');
@@ -319,7 +334,7 @@ Files are compatible for ${selectedTemplate.name.toLowerCase()}. ${selectedTempl
 • Data Types: Mixed (text, numbers, dates detected)
 
 🎯 **Process Ready:**
-Your file is ready for ${selectedTemplate.name.toLowerCase()}. Click Start to begin processing.`;
+Your file is ready for ${selectedTemplate.name.toLowerCase()}. ${selectedTemplate.category.includes('ai-generation') ? 'AI will help you create a new file based on your requirements.' : 'Click Start to begin processing.'}`;
 
                 addMessage('system', analysisText, true);
                 setIsAnalyzingColumns(false);
@@ -343,7 +358,16 @@ Your file is ready for ${selectedTemplate.name.toLowerCase()}. Click Start to be
         addMessage('system', `🚀 Starting ${selectedTemplate.name}...\n\n⏳ This may take 30-60 seconds depending on file size and complexity.`, true);
 
         try {
-            // Build request based on number of files
+            // Handle file generation differently
+            if (selectedTemplate.category.includes('ai-generation')) {
+                // For file generation, we don't call the reconciliation endpoint
+                // The FileGeneratorFlow handles its own API calls
+                addMessage('system', '✅ File generation process initiated!', true);
+                setIsProcessing(false);
+                return;
+            }
+
+            // Build request for reconciliation processes
             const processRequest = {
                 process_type: selectedTemplate.category,
                 process_name: selectedTemplate.name,

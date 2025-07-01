@@ -1,4 +1,4 @@
-// src/services/api.js - Enhanced with regex generation endpoints
+// src/services/api.js - Enhanced with file generator endpoints
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000';
@@ -52,7 +52,63 @@ export const apiService = {
         return response;
     },
 
-    // NEW: AI Regex Generation operations
+    // File Generator operations
+    validatePrompt: async (file, userPrompt, sheetName = null) => {
+        const formData = new FormData();
+        formData.append('source_file', file);
+        formData.append('user_prompt', userPrompt);
+        if (sheetName) formData.append('sheet_name', sheetName);
+
+        const response = await api.post('/file-generator/validate-prompt', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    },
+
+    generateFileFromRules: async (file, userPrompt, sheetName = null) => {
+        const formData = new FormData();
+        formData.append('source_file', file);
+        formData.append('user_prompt', userPrompt);
+        if (sheetName) formData.append('sheet_name', sheetName);
+
+        const response = await api.post('/file-generator/generate', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    },
+
+    getGenerationResults: async (generationId) => {
+        const response = await api.get(`/file-generator/results/${generationId}`);
+        return response.data;
+    },
+
+    downloadGeneratedFile: async (generationId, format = 'csv') => {
+        const response = await api.get(`/file-generator/download/${generationId}?format=${format}`, {
+            responseType: 'blob'
+        });
+        return response;
+    },
+
+    previewGeneratedFile: async (generationId, limit = 10) => {
+        const response = await api.get(`/file-generator/preview/${generationId}?limit=${limit}`);
+        return response.data;
+    },
+
+    listGenerations: async () => {
+        const response = await api.get('/file-generator/list-generations');
+        return response.data;
+    },
+
+    deleteGeneration: async (generationId) => {
+        const response = await api.delete(`/file-generator/results/${generationId}`);
+        return response.data;
+    },
+
+    // AI Regex Generation operations
     generateRegex: async (description, sampleText = '', columnName = '', context = null) => {
         const response = await api.post('/api/regex/generate', {
             description,
