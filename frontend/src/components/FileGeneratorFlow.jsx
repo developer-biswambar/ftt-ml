@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../services/api';
 import { CheckCircle, AlertTriangle, FileText, Download, Eye, Trash2, Settings, Zap } from 'lucide-react';
 
 const FileGeneratorFlow = ({
-    files, 
-    selectedFiles, 
-    selectedTemplate, 
-    flowData, 
-    onComplete, 
-    onCancel, 
-    onSendMessage 
+    files,
+    selectedFiles,
+    selectedTemplate,
+    flowData,
+    onComplete,
+    onCancel,
+    onSendMessage
 }) => {
     const [currentStep, setCurrentStep] = useState('file_selection');
     const [userPrompt, setUserPrompt] = useState('');
@@ -20,17 +20,45 @@ const FileGeneratorFlow = ({
     const [previewData, setPreviewData] = useState(null);
     const [selectedFile, setSelectedFile] = useState(null);
 
+    // Helper function to scroll to bottom of page
+    const scrollToBottom = useCallback(() => {
+        setTimeout(() => {
+            window.scrollTo({
+                top: document.documentElement.scrollHeight,
+                behavior: 'smooth'
+            });
+
+            // Also try to scroll the messages container
+            const messagesContainer = document.querySelector('[class*="overflow-y-auto"]');
+            if (messagesContainer) {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }, 100);
+    }, []);
+
     useEffect(() => {
         // Set initial file selection
         if (selectedFiles.file_0) {
             setSelectedFile(selectedFiles.file_0);
         }
-        
+
         // Set initial prompt from template
         if (selectedTemplate?.user_requirements) {
             setUserPrompt(selectedTemplate.user_requirements);
         }
     }, [selectedFiles, selectedTemplate]);
+
+    // Scroll when step changes
+    useEffect(() => {
+        scrollToBottom();
+    }, [currentStep, scrollToBottom]);
+
+    // Scroll when validation or generation results appear
+    useEffect(() => {
+        if (validationResult || generationResult || previewData) {
+            scrollToBottom();
+        }
+    }, [validationResult, generationResult, previewData, scrollToBottom]);
 
     const handleValidatePrompt = async () => {
         if (!selectedFile || !userPrompt.trim()) {
@@ -44,7 +72,7 @@ const FileGeneratorFlow = ({
         try {
             // Try to get file data first to create a proper File object
             const fileData = await apiService.getFileData(selectedFile.file_id, 1, 5000);
-            
+
             if (!fileData.success) {
                 throw new Error('Could not fetch file data');
             }
@@ -60,18 +88,18 @@ const FileGeneratorFlow = ({
             if (result.success) {
                 const staticCols = result.validation.static_columns;
                 const mappedCols = result.validation.mapped_columns;
-                
+
                 let validationMessage = '✅ **Prompt Validation Successful!**\n\n';
                 validationMessage += `📊 **Available Columns:** ${result.available_columns.join(', ')}\n\n`;
-                
+
                 if (staticCols.length > 0) {
                     validationMessage += `🔧 **Static Columns:**\n${staticCols.map(col => `• ${col.column}: "${col.static_value}"`).join('\n')}\n\n`;
                 }
-                
+
                 if (mappedCols.length > 0) {
                     validationMessage += `🔗 **Mapped Columns:**\n${mappedCols.map(col => `• ${col.output} ← ${col.source}`).join('\n')}\n\n`;
                 }
-                
+
                 validationMessage += '🎯 **Ready to generate!** Click "Generate File" to proceed.';
                 onSendMessage('success', validationMessage);
                 setCurrentStep('generate');
@@ -97,7 +125,7 @@ const FileGeneratorFlow = ({
         try {
             // Get file data and convert to CSV
             const fileData = await apiService.getFileData(selectedFile.file_id, 1, 5000);
-            
+
             if (!fileData.success) {
                 throw new Error('Could not fetch file data');
             }
@@ -122,11 +150,11 @@ const FileGeneratorFlow = ({
                 successMessage += `• Columns Generated: ${summary.columns_generated.join(', ')}\n`;
                 successMessage += `• Processing Time: ${summary.processing_time_seconds}s\n\n`;
                 successMessage += `🔧 **Rules Applied:** ${summary.rules_applied}\n\n`;
-                
+
                 if (result.warnings.length > 0) {
                     successMessage += `⚠️ **Warnings:**\n${result.warnings.map(w => `• ${w}`).join('\n')}\n\n`;
                 }
-                
+
                 successMessage += '📥 Use the download buttons below to get your generated file!';
                 onSendMessage('success', successMessage);
                 setCurrentStep('download');
@@ -143,7 +171,7 @@ const FileGeneratorFlow = ({
     // Helper function to convert data array to CSV string
     const convertDataToCSV = (data, columns) => {
         const headers = columns.join(',');
-        const rows = data.map(row => 
+        const rows = data.map(row =>
             columns.map(col => {
                 const value = row[col];
                 // Handle values that contain commas or quotes
@@ -161,16 +189,16 @@ const FileGeneratorFlow = ({
 
         try {
             onSendMessage('system', `📥 Downloading ${format.toUpperCase()} file...`);
-            
+
             const response = await apiService.downloadGeneratedFile(generationResult.generation_id, format);
-            
+
             // Create download link
             const blob = new Blob([response.data], {
-                type: format === 'excel' 
+                type: format === 'excel'
                     ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     : 'text/csv'
             });
-            
+
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -193,6 +221,12 @@ const FileGeneratorFlow = ({
             summary: generationResult?.summary,
             rules_used: generationResult?.rules_used
         });
+    };
+
+    const handleStepChange = (newStep) => {
+        setCurrentStep(newStep);
+        // Scroll after step change
+        setTimeout(() => scrollToBottom(), 150);
     };
 
     return (
@@ -278,7 +312,7 @@ const FileGeneratorFlow = ({
                     </div>
 
                     <button
-                        onClick={() => setCurrentStep('validate')}
+                        onClick={() => handleStepChange('validate')}
                         disabled={!selectedFile || !userPrompt.trim()}
                         className="w-full py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
                     >
@@ -330,7 +364,7 @@ const FileGeneratorFlow = ({
 
                     <div className="flex space-x-3">
                         <button
-                            onClick={() => setCurrentStep('file_selection')}
+                            onClick={() => handleStepChange('file_selection')}
                             className="flex-1 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200"
                         >
                             Back
@@ -367,7 +401,7 @@ const FileGeneratorFlow = ({
 
                     <div className="flex space-x-3">
                         <button
-                            onClick={() => setCurrentStep('validate')}
+                            onClick={() => handleStepChange('validate')}
                             className="flex-1 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200"
                         >
                             Back

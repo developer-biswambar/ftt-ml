@@ -1,4 +1,4 @@
-// src/components/ChatInterface.jsx - Enhanced with File Generator Flow
+// src/components/ChatInterface.jsx - Fixed auto-scroll for flow components
 import React, { useEffect, useRef, useState } from 'react';
 import { Send, FileText, Settings, CheckCircle, AlertCircle } from 'lucide-react';
 import ReconciliationFlow from './ReconciliationFlow';
@@ -74,6 +74,7 @@ const ChatInterface = ({
     onSendMessage
 }) => {
     const messagesEndRef = useRef(null);
+    const messagesContainerRef = useRef(null);
     const [currentFlow, setCurrentFlow] = useState(null);
     const [flowData, setFlowData] = useState({});
 
@@ -83,9 +84,45 @@ const ChatInterface = ({
         return requiredFiles.every(rf => selectedFiles[rf.key]);
     };
 
+    // Enhanced scroll to bottom function
+    const scrollToBottom = (behavior = 'smooth') => {
+        setTimeout(() => {
+            if (messagesEndRef.current) {
+                messagesEndRef.current.scrollIntoView({
+                    behavior: behavior,
+                    block: 'end',
+                    inline: 'nearest'
+                });
+            }
+        }, 100); // Small delay to ensure DOM has updated
+    };
+
+    // Auto-scroll when messages change
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        scrollToBottom();
     }, [messages, isTyping, typingMessage]);
+
+    // Auto-scroll when flow appears or changes
+    useEffect(() => {
+        if (currentFlow) {
+            // Immediate scroll when flow starts
+            scrollToBottom('auto');
+
+            // Additional scroll after a longer delay to ensure flow is fully rendered
+            setTimeout(() => {
+                scrollToBottom();
+            }, 500);
+        }
+    }, [currentFlow]);
+
+    // Auto-scroll when flow data changes (step changes)
+    useEffect(() => {
+        if (currentFlow && flowData) {
+            setTimeout(() => {
+                scrollToBottom();
+            }, 200);
+        }
+    }, [flowData]);
 
     const handleFlowComplete = (processConfig) => {
         setCurrentFlow(null);
@@ -234,7 +271,7 @@ const ChatInterface = ({
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4">
                 {messages.map((message) => (
                     <MessageComponent key={message.id} message={message} />
                 ))}
