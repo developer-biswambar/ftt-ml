@@ -116,7 +116,7 @@ const MainApp = () => {
         };
     }, [autoRefreshInterval]);
 
-    const simulateTyping = (type, content, delay = 5) => {
+    const simulateTyping = (type, content, delay = 1) => {
         setIsTyping(true);
         setTypingMessage('');
 
