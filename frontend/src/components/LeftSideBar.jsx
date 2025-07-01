@@ -1,4 +1,4 @@
-// src/components/LeftSidebar.jsx - Process-driven sidebar with proper proportions
+// src/components/LeftSidebar.jsx - Fixed layout with better proportions when process is selected
 import React, { useRef } from 'react';
 import { CheckCircle, FileText, RefreshCw, Upload, Eye } from 'lucide-react';
 
@@ -119,286 +119,289 @@ const LeftSidebar = ({
                 </div>
             </div>
 
-            {/* Step 1: Process Templates - 45% of remaining space */}
-            <div className="p-4 border-b border-slate-200 bg-white/30 flex-shrink-0" style={{ height: '45%' }}>
-                <div className="flex items-center space-x-2 mb-3">
-                    <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center">
-                        <span className="text-orange-600 text-sm font-bold">1</span>
+            {/* Dynamic Content Area - Adjust based on whether template is selected */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+                {/* Step 1: Process Templates */}
+                <div className={`p-4 border-b border-slate-200 bg-white/30 ${selectedTemplate ? 'flex-shrink-0' : 'flex-1 max-h-96'}`}>
+                    <div className="flex items-center space-x-2 mb-3">
+                        <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center">
+                            <span className="text-orange-600 text-sm font-bold">1</span>
+                        </div>
+                        <h3 className="text-sm font-semibold text-slate-700">Select Process</h3>
                     </div>
-                    <h3 className="text-sm font-semibold text-slate-700">Select Process</h3>
-                </div>
 
-                {selectedTemplate ? (
-                    <div className="p-2 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-center space-x-2 mb-1">
-                            <CheckCircle size={14} className="text-green-600" />
-                            <span className="text-xs font-medium text-green-800">Process Selected</span>
-                        </div>
-                        <div className="flex items-center space-x-2 mb-1">
-                            <span className="text-sm">{getProcessIcon(selectedTemplate.category)}</span>
-                            <p className="text-xs text-green-700 font-medium">{selectedTemplate.name}</p>
-                        </div>
-                        <p className="text-xs text-green-600 mb-1">
-                            Requires {selectedTemplate.filesRequired} file{selectedTemplate.filesRequired !== 1 ? 's' : ''}
-                        </p>
-                        <button
-                            onClick={() => onTemplateSelect(null)}
-                            className="text-xs text-green-600 hover:text-green-800 underline transition-colors duration-200"
-                        >
-                            Change process
-                        </button>
-                    </div>
-                ) : (
-                    <div className="h-5/6 overflow-y-auto space-y-2">
-                        {templates.map((template, index) => (
-                            <div
-                                key={index}
-                                className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white/70 backdrop-blur-sm hover:bg-white hover:shadow-lg hover:shadow-blue-500/10 hover:border-blue-300 transition-all duration-300 ease-out cursor-pointer hover:scale-[1.02]"
-                                onClick={() => onTemplateSelect(template)}
+                    {selectedTemplate ? (
+                        <div className="p-2 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex items-center space-x-2 mb-1">
+                                <CheckCircle size={14} className="text-green-600" />
+                                <span className="text-xs font-medium text-green-800">Process Selected</span>
+                            </div>
+                            <div className="flex items-center space-x-2 mb-1">
+                                <span className="text-sm">{getProcessIcon(selectedTemplate.category)}</span>
+                                <p className="text-xs text-green-700 font-medium">{selectedTemplate.name}</p>
+                            </div>
+                            <p className="text-xs text-green-600 mb-1">
+                                Requires {selectedTemplate.filesRequired} file{selectedTemplate.filesRequired !== 1 ? 's' : ''}
+                            </p>
+                            <button
+                                onClick={() => onTemplateSelect(null)}
+                                className="text-xs text-green-600 hover:text-green-800 underline transition-colors duration-200"
                             >
-                                <div className="p-3">
-                                    <div className="flex items-start space-x-3">
-                                        <div className={`flex-shrink-0 w-8 h-8 bg-gradient-to-br ${getProcessColor(template.category, index)} rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                                            <span className="text-white text-lg">{getProcessIcon(template.category)}</span>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="font-semibold text-sm text-slate-800 group-hover:text-blue-800 transition-colors duration-200 leading-tight">
-                                                {template.name}
-                                            </h4>
-                                            <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">
-                                                {template.description}
-                                            </p>
-                                            <div className="flex items-center justify-between mt-2">
-                                                <span className="text-xs text-blue-600 font-medium">
-                                                    {template.filesRequired} file{template.filesRequired !== 1 ? 's' : ''} required
-                                                </span>
-                                                {template.category?.includes('ai') && (
-                                                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-                                                        AI
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg"></div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* File Management Section - 45% of remaining space */}
-            <div className="flex-shrink-0" style={{ height: '45%' }}>
-                {/* Step 2: File Upload */}
-                <div className="p-3 border-b border-slate-200 bg-white/50">
-                    <div className="flex items-center space-x-2 mb-2">
-                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                            <span className="text-green-600 text-xs font-bold">2</span>
+                                Change process
+                            </button>
                         </div>
-                        <h3 className="text-sm font-semibold text-slate-700">Upload Files</h3>
-                    </div>
-
-                    <button
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploadProgress}
-                        className="w-full group relative overflow-hidden"
-                    >
-                        <div className={`
-                            w-full p-2 border-2 border-dashed rounded-lg transition-all duration-300 ease-out
-                            ${uploadProgress
-                                ? 'border-blue-400 bg-blue-50'
-                                : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 hover:shadow-md hover:scale-[1.02]'
-                            }
-                        `}>
-                            <div className="flex items-center space-x-2">
-                                {uploadProgress ? (
-                                    <>
-                                        <div className="relative">
-                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-blue-600"></div>
-                                        </div>
-                                        <span className="text-xs font-medium text-blue-700">Uploading...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                                            <Upload className="text-white" size={12} />
-                                        </div>
-                                        <div className="text-left">
-                                            <span className="text-sm font-medium text-slate-700 group-hover:text-blue-700 transition-colors block">
-                                                Upload CSV/Excel
-                                            </span>
-                                            <p className="text-xs text-slate-500">Click to browse files</p>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </button>
-
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".csv,.xlsx,.xls"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                    />
-                </div>
-
-                {/* Available Files Library */}
-                <div className="p-3 border-b border-slate-200 bg-white/30">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                            <div className="w-4 h-4 bg-indigo-100 rounded-full flex items-center justify-center">
-                                <span className="text-indigo-600 text-xs font-bold">📂</span>
-                            </div>
-                            <h3 className="text-sm font-semibold text-slate-700">File Library</h3>
-                        </div>
-                        <button
-                            onClick={onRefreshFiles}
-                            className="p-1 rounded-lg bg-white/70 hover:bg-white hover:shadow-md transition-all duration-200 group"
-                            title="Refresh file list"
-                        >
-                            <RefreshCw size={12} className="text-slate-600 group-hover:text-blue-600 group-hover:rotate-180 transition-all duration-300" />
-                        </button>
-                    </div>
-
-                    <div className="space-y-2 max-h-28 overflow-y-auto">
-                        {files.length === 0 ? (
-                            <div className="text-center py-4">
-                                <FileText size={24} className="mx-auto text-slate-300 mb-2" />
-                                <p className="text-xs text-slate-500">No files uploaded yet</p>
-                                <p className="text-xs text-slate-400 mt-1">Upload files above to get started</p>
-                            </div>
-                        ) : (
-                            files.map((file) => (
+                    ) : (
+                        <div className="h-full max-h-80 overflow-y-auto space-y-2">
+                            {templates.map((template, index) => (
                                 <div
-                                    key={file.file_id}
-                                    className="group p-2 bg-white/70 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-white hover:shadow-sm transition-all duration-200"
+                                    key={index}
+                                    className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white/70 backdrop-blur-sm hover:bg-white hover:shadow-lg hover:shadow-blue-500/10 hover:border-blue-300 transition-all duration-300 ease-out cursor-pointer hover:scale-[1.02]"
+                                    onClick={() => onTemplateSelect(template)}
                                 >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-medium text-slate-800 truncate" title={file.filename}>
-                                                {file.filename}
-                                            </p>
-                                            <p className="text-xs text-slate-500">
-                                                {file.total_rows?.toLocaleString()} rows • {file.columns?.length} cols
-                                            </p>
+                                    <div className="p-3">
+                                        <div className="flex items-start space-x-3">
+                                            <div className={`flex-shrink-0 w-8 h-8 bg-gradient-to-br ${getProcessColor(template.category, index)} rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                                                <span className="text-white text-lg">{getProcessIcon(template.category)}</span>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-semibold text-sm text-slate-800 group-hover:text-blue-800 transition-colors duration-200 leading-tight">
+                                                    {template.name}
+                                                </h4>
+                                                <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">
+                                                    {template.description}
+                                                </p>
+                                                <div className="flex items-center justify-between mt-2">
+                                                    <span className="text-xs text-blue-600 font-medium">
+                                                        {template.filesRequired} file{template.filesRequired !== 1 ? 's' : ''} required
+                                                    </span>
+                                                    {template.category?.includes('ai') && (
+                                                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                                                            AI
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                openFileViewer(file.file_id);
-                                            }}
-                                            className="opacity-0 group-hover:opacity-100 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-all duration-200"
-                                            title="View/Edit File"
-                                        >
-                                            <Eye size={14} />
-                                        </button>
                                     </div>
+
+                                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg"></div>
                                 </div>
-                            ))
-                        )}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
-                {/* Step 3: File Selection for Process */}
-                {selectedTemplate && (
-                    <div className="p-3 border-b border-slate-200 bg-white/30">
-                        <div className="flex items-center space-x-2 mb-3">
-                            <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
-                                <span className="text-blue-600 text-sm font-bold">3</span>
+                {/* File Management Section - Always takes remaining space */}
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    {/* Step 2: File Upload - Fixed height */}
+                    <div className="p-3 border-b border-slate-200 bg-white/50 flex-shrink-0">
+                        <div className="flex items-center space-x-2 mb-2">
+                            <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                                <span className="text-green-600 text-xs font-bold">2</span>
                             </div>
-                            <h3 className="text-sm font-semibold text-slate-700">Select Files for Process</h3>
-                            <div className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                status.complete 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                                {status.selected}/{status.required}
-                            </div>
+                            <h3 className="text-sm font-semibold text-slate-700">Upload Files</h3>
                         </div>
 
-                        <div className="space-y-2 max-h-24 overflow-y-auto">
-                            {requiredFiles.map((requirement, index) => {
-                                const colors = [
-                                    { bg: 'bg-emerald-100', text: 'text-emerald-600', hover: 'hover:text-emerald-800 hover:bg-emerald-50', check: 'text-emerald-500' },
-                                    { bg: 'bg-purple-100', text: 'text-purple-600', hover: 'hover:text-purple-800 hover:bg-purple-50', check: 'text-purple-500' },
-                                    { bg: 'bg-blue-100', text: 'text-blue-600', hover: 'hover:text-blue-800 hover:bg-blue-50', check: 'text-blue-500' },
-                                    { bg: 'bg-orange-100', text: 'text-orange-600', hover: 'hover:text-orange-800 hover:bg-orange-50', check: 'text-orange-500' },
-                                    { bg: 'bg-teal-100', text: 'text-teal-600', hover: 'hover:text-teal-800 hover:bg-teal-50', check: 'text-teal-500' }
-                                ];
-                                const color = colors[index % colors.length];
-
-                                return (
-                                    <div key={requirement.key} className="group">
-                                        <label className="flex items-center space-x-2 text-xs font-medium text-slate-600 mb-1">
-                                            <div className={`w-4 h-4 rounded-full flex items-center justify-center ${color.bg}`}>
-                                                <span className={`text-xs font-bold ${color.text}`}>
-                                                    {String.fromCharCode(65 + index)}
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploadProgress}
+                            className="w-full group relative overflow-hidden"
+                        >
+                            <div className={`
+                                w-full p-2 border-2 border-dashed rounded-lg transition-all duration-300 ease-out
+                                ${uploadProgress
+                                    ? 'border-blue-400 bg-blue-50'
+                                    : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 hover:shadow-md hover:scale-[1.02]'
+                                }
+                            `}>
+                                <div className="flex items-center space-x-2">
+                                    {uploadProgress ? (
+                                        <>
+                                            <div className="relative">
+                                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-blue-600"></div>
+                                            </div>
+                                            <span className="text-xs font-medium text-blue-700">Uploading...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                                <Upload className="text-white" size={12} />
+                                            </div>
+                                            <div className="text-left">
+                                                <span className="text-sm font-medium text-slate-700 group-hover:text-blue-700 transition-colors block">
+                                                    Upload CSV/Excel
                                                 </span>
+                                                <p className="text-xs text-slate-500">Click to browse files</p>
                                             </div>
-                                            <span>{requirement.label}:</span>
-                                        </label>
-                                        <div className="flex space-x-1">
-                                            <div className="relative flex-1">
-                                                <select
-                                                    value={selectedFiles[requirement.key]?.file_id || ''}
-                                                    onChange={(e) => {
-                                                        const file = files.find(f => f.file_id === e.target.value);
-                                                        handleFileSelection(requirement.key, file);
-                                                    }}
-                                                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-slate-300 hover:shadow-sm"
-                                                >
-                                                    <option value="">Choose {requirement.label}</option>
-                                                    {files.map(file => (
-                                                        <option key={file.file_id} value={file.file_id}>
-                                                            {file.filename} ({file.total_rows?.toLocaleString()} rows)
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                {selectedFiles[requirement.key] && (
-                                                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                                                        <CheckCircle size={12} className={color.check} />
-                                                    </div>
-                                                )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </button>
+
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".csv,.xlsx,.xls"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                        />
+                    </div>
+
+                    {/* Available Files Library - Gets equal space with upload section */}
+                    <div className="flex-1 p-3 border-b border-slate-200 bg-white/30 flex flex-col min-h-0 overflow-hidden">
+                        <div className="flex items-center justify-between mb-2 flex-shrink-0">
+                            <div className="flex items-center space-x-2">
+                                <div className="w-4 h-4 bg-indigo-100 rounded-full flex items-center justify-center">
+                                    <span className="text-indigo-600 text-xs font-bold">📂</span>
+                                </div>
+                                <h3 className="text-sm font-semibold text-slate-700">File Library</h3>
+                            </div>
+                            <button
+                                onClick={onRefreshFiles}
+                                className="p-1 rounded-lg bg-white/70 hover:bg-white hover:shadow-md transition-all duration-200 group"
+                                title="Refresh file list"
+                            >
+                                <RefreshCw size={12} className="text-slate-600 group-hover:text-blue-600 group-hover:rotate-180 transition-all duration-300" />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
+                            {files.length === 0 ? (
+                                <div className="text-center py-4">
+                                    <FileText size={24} className="mx-auto text-slate-300 mb-2" />
+                                    <p className="text-xs text-slate-500">No files uploaded yet</p>
+                                    <p className="text-xs text-slate-400 mt-1">Upload files above to get started</p>
+                                </div>
+                            ) : (
+                                files.map((file) => (
+                                    <div
+                                        key={file.file_id}
+                                        className="group p-2 bg-white/70 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-white hover:shadow-sm transition-all duration-200"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-medium text-slate-800 truncate" title={file.filename}>
+                                                    {file.filename}
+                                                </p>
+                                                <p className="text-xs text-slate-500">
+                                                    {file.total_rows?.toLocaleString()} rows • {file.columns?.length} cols
+                                                </p>
                                             </div>
-                                            {selectedFiles[requirement.key] && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        openFileViewer(selectedFiles[requirement.key].file_id);
-                                                    }}
-                                                    className={`p-2 rounded transition-all duration-200 ${color.text} ${color.hover}`}
-                                                    title={`View ${requirement.label}`}
-                                                >
-                                                    <Eye size={12} />
-                                                </button>
-                                            )}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    openFileViewer(file.file_id);
+                                                }}
+                                                className="opacity-0 group-hover:opacity-100 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-all duration-200"
+                                                title="View/Edit File"
+                                            >
+                                                <Eye size={14} />
+                                            </button>
                                         </div>
                                     </div>
-                                );
-                            })}
+                                ))
+                            )}
                         </div>
-
-                        {/* Selection Status */}
-                        {status.complete && (
-                            <div className="mt-2 p-2 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-lg border border-emerald-200">
-                                <div className="flex items-center justify-center space-x-2">
-                                    <CheckCircle size={16} className="text-emerald-500" />
-                                    <span className="text-sm font-medium text-emerald-800">All files selected</span>
-                                </div>
-                                <p className="text-xs text-center text-slate-600 mt-1">Ready to configure process</p>
-                            </div>
-                        )}
                     </div>
-                )}
+
+                    {/* Step 3: File Selection for Process - Only show when template selected */}
+                    {selectedTemplate && (
+                        <div className="p-3 border-b border-slate-200 bg-white/30 flex-shrink-0">
+                            <div className="flex items-center space-x-2 mb-3">
+                                <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <span className="text-blue-600 text-sm font-bold">3</span>
+                                </div>
+                                <h3 className="text-sm font-semibold text-slate-700">Select Files for Process</h3>
+                                <div className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                    status.complete 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                    {status.selected}/{status.required}
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 max-h-32 overflow-y-auto">
+                                {requiredFiles.map((requirement, index) => {
+                                    const colors = [
+                                        { bg: 'bg-emerald-100', text: 'text-emerald-600', hover: 'hover:text-emerald-800 hover:bg-emerald-50', check: 'text-emerald-500' },
+                                        { bg: 'bg-purple-100', text: 'text-purple-600', hover: 'hover:text-purple-800 hover:bg-purple-50', check: 'text-purple-500' },
+                                        { bg: 'bg-blue-100', text: 'text-blue-600', hover: 'hover:text-blue-800 hover:bg-blue-50', check: 'text-blue-500' },
+                                        { bg: 'bg-orange-100', text: 'text-orange-600', hover: 'hover:text-orange-800 hover:bg-orange-50', check: 'text-orange-500' },
+                                        { bg: 'bg-teal-100', text: 'text-teal-600', hover: 'hover:text-teal-800 hover:bg-teal-50', check: 'text-teal-500' }
+                                    ];
+                                    const color = colors[index % colors.length];
+
+                                    return (
+                                        <div key={requirement.key} className="group">
+                                            <label className="flex items-center space-x-2 text-xs font-medium text-slate-600 mb-1">
+                                                <div className={`w-4 h-4 rounded-full flex items-center justify-center ${color.bg}`}>
+                                                    <span className={`text-xs font-bold ${color.text}`}>
+                                                        {String.fromCharCode(65 + index)}
+                                                    </span>
+                                                </div>
+                                                <span>{requirement.label}:</span>
+                                            </label>
+                                            <div className="flex space-x-1">
+                                                <div className="relative flex-1">
+                                                    <select
+                                                        value={selectedFiles[requirement.key]?.file_id || ''}
+                                                        onChange={(e) => {
+                                                            const file = files.find(f => f.file_id === e.target.value);
+                                                            handleFileSelection(requirement.key, file);
+                                                        }}
+                                                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-slate-300 hover:shadow-sm"
+                                                    >
+                                                        <option value="">Choose {requirement.label}</option>
+                                                        {files.map(file => (
+                                                            <option key={file.file_id} value={file.file_id}>
+                                                                {file.filename} ({file.total_rows?.toLocaleString()} rows)
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    {selectedFiles[requirement.key] && (
+                                                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                                                            <CheckCircle size={12} className={color.check} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {selectedFiles[requirement.key] && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            openFileViewer(selectedFiles[requirement.key].file_id);
+                                                        }}
+                                                        className={`p-2 rounded transition-all duration-200 ${color.text} ${color.hover}`}
+                                                        title={`View ${requirement.label}`}
+                                                    >
+                                                        <Eye size={12} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Selection Status */}
+                            {status.complete && (
+                                <div className="mt-2 p-2 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-lg border border-emerald-200">
+                                    <div className="flex items-center justify-center space-x-2">
+                                        <CheckCircle size={16} className="text-emerald-500" />
+                                        <span className="text-sm font-medium text-emerald-800">All files selected</span>
+                                    </div>
+                                    <p className="text-xs text-center text-slate-600 mt-1">Ready to configure process</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Process Status - 10% Fixed */}
+            {/* Process Status - Fixed height */}
             <div className="h-16 p-2 flex items-center justify-center bg-white/20 flex-shrink-0">
                 {!selectedTemplate ? (
                     <div className="text-slate-500 text-center">
