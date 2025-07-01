@@ -262,13 +262,16 @@ try:
     from app.routes.reconciliation_routes import router as reconciliation_router
     from app.routes.viewer_routes import router as viewer_router
     from app.routes.file_routes import router as file_router
-    from app.routes.regex_routes import router as regex_router  # NEW: AI Regex routes
+    from app.routes.regex_routes import router as regex_router
+    from app.routes.adv_reconciliation_routes import router as adv_reconciliation_router
 
     app.include_router(health_routes)
     app.include_router(reconciliation_router)
     app.include_router(viewer_router)
     app.include_router(file_router)
     app.include_router(regex_router)  # NEW: Include regex routes
+
+    app.include_router(adv_reconciliation_router)
     print("✅ All routes loaded successfully (optimized reconciliation + AI regex generation enabled)")
 except ImportError as e:
     print(f"❌ Failed to load routes: {e}")
