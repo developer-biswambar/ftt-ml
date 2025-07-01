@@ -308,7 +308,7 @@ const LeftSidebar = ({
 
                     {/* Step 3: File Selection for Process - Only show when template selected */}
                     {selectedTemplate && (
-                        <div className="p-3 border-b border-slate-200 bg-white/30 flex-shrink-0">
+                        <div className="flex-1 p-3 border-b border-slate-200 bg-white/30 flex flex-col min-h-0 overflow-hidden">
                             <div className="flex items-center space-x-2 mb-3">
                                 <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
                                     <span className="text-blue-600 text-sm font-bold">3</span>
@@ -323,7 +323,7 @@ const LeftSidebar = ({
                                 </div>
                             </div>
 
-                            <div className="space-y-2 max-h-32 overflow-y-auto">
+                            <div className="flex-1 space-y-2 min-h-0 overflow-y-auto">
                                 {requiredFiles.map((requirement, index) => {
                                     const colors = [
                                         { bg: 'bg-emerald-100', text: 'text-emerald-600', hover: 'hover:text-emerald-800 hover:bg-emerald-50', check: 'text-emerald-500' },
@@ -388,7 +388,7 @@ const LeftSidebar = ({
 
                             {/* Selection Status */}
                             {status.complete && (
-                                <div className="mt-2 p-2 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-lg border border-emerald-200">
+                                <div className="mt-2 p-2 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-lg border border-emerald-200 flex-shrink-0">
                                     <div className="flex items-center justify-center space-x-2">
                                         <CheckCircle size={16} className="text-emerald-500" />
                                         <span className="text-sm font-medium text-emerald-800">All files selected</span>
