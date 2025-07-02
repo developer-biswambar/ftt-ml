@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../services/api';
-import { CheckCircle, AlertTriangle, FileText, Download, Eye, Trash2, Settings, Zap } from 'lucide-react';
+import { CheckCircle, AlertTriangle, FileText, Download, Eye, Trash2, Settings, Zap, Copy, Layers } from 'lucide-react';
 
 const FileGeneratorFlow = ({
     files,
@@ -19,6 +19,46 @@ const FileGeneratorFlow = ({
     const [generationResult, setGenerationResult] = useState(null);
     const [previewData, setPreviewData] = useState(null);
     const [selectedFile, setSelectedFile] = useState(null);
+    const [showAdvancedPrompts, setShowAdvancedPrompts] = useState(false);
+
+    // Predefined prompts for common row multiplication scenarios
+    const advancedPrompts = [
+        {
+            title: "Split Amount in Half",
+            description: "Create 2 rows: half amount in each row",
+            prompt: "generate 2 rows for each source row, half amount in first row, other half amount in second row, copy all other fields"
+        },
+        {
+            title: "Amount Split (Full & Zero)",
+            description: "Create 2 rows: full amount in first, zero in second",
+            prompt: "generate 2 rows for each source row, amount {amount_column} in first row and amount 0 in second row, copy trade_id from {id_column}"
+        },
+        {
+            title: "Percentage Split (70/30)",
+            description: "Create 2 rows with 70% and 30% split",
+            prompt: "generate 2 rows for each source row, 70% amount in first row, 30% amount in second row, copy all other fields"
+        },
+        {
+            title: "Duplicate with Status Variants",
+            description: "Create 2 rows per source: one 'active', one 'inactive'",
+            prompt: "generate 2 rows for each source row, copy all columns, add status column with 'active' in first row and 'inactive' in second row"
+        },
+        {
+            title: "Type Variants (A, B, C)",
+            description: "Create 3 rows with different types",
+            prompt: "generate 3 rows for each source row, type 'A' in first row, type 'B' in second row, type 'C' in third row"
+        },
+        {
+            title: "Buy/Sell Pair",
+            description: "Create buy and sell transactions",
+            prompt: "generate 2 rows for each source row, side 'BUY' in first row and side 'SELL' in second row, copy all other fields"
+        },
+        {
+            title: "Quarter Split (25% each)",
+            description: "Split into 4 equal parts",
+            prompt: "generate 4 rows for each source row, 25% amount in each row, copy all other fields"
+        }
+    ];
 
     // Helper function to scroll to bottom of page
     const scrollToBottom = useCallback(() => {
@@ -60,6 +100,43 @@ const FileGeneratorFlow = ({
         }
     }, [validationResult, generationResult, previewData, scrollToBottom]);
 
+    const handlePromptSelect = (promptTemplate) => {
+        // Try to substitute column names if available
+        let finalPrompt = promptTemplate.prompt;
+
+        if (selectedFile && selectedFile.columns) {
+            const columns = selectedFile.columns;
+
+            // Common substitutions
+            const amountColumns = columns.filter(col =>
+                col.toLowerCase().includes('amount') ||
+                col.toLowerCase().includes('value') ||
+                col.toLowerCase().includes('price')
+            );
+
+            const idColumns = columns.filter(col =>
+                col.toLowerCase().includes('id') ||
+                col.toLowerCase().includes('trade') ||
+                col.toLowerCase().includes('ref')
+            );
+
+            if (amountColumns.length > 0) {
+                finalPrompt = finalPrompt.replace('{amount_column}', amountColumns[0]);
+            }
+
+            if (idColumns.length > 0) {
+                finalPrompt = finalPrompt.replace('{id_column}', idColumns[0]);
+            }
+
+            // Remove any remaining placeholders
+            finalPrompt = finalPrompt.replace(/\{[^}]+\}/g, '[COLUMN_NAME]');
+        }
+
+        setUserPrompt(finalPrompt);
+        setShowAdvancedPrompts(false);
+        onSendMessage('system', `🎯 Selected template: ${promptTemplate.title}`);
+    };
+
     const handleValidatePrompt = async () => {
         if (!selectedFile || !userPrompt.trim()) {
             onSendMessage('error', '❌ Please select a file and enter a prompt first.');
@@ -88,9 +165,16 @@ const FileGeneratorFlow = ({
             if (result.success) {
                 const staticCols = result.validation.static_columns;
                 const mappedCols = result.validation.mapped_columns;
+                const conditionalCols = result.validation.conditional_columns;
+                const rowMultiplication = result.validation.row_multiplication;
 
                 let validationMessage = '✅ **Prompt Validation Successful!**\n\n';
                 validationMessage += `📊 **Available Columns:** ${result.available_columns.join(', ')}\n\n`;
+
+                // Row multiplication info
+                if (rowMultiplication && rowMultiplication.enabled) {
+                    validationMessage += `🔄 **Row Multiplication:** ${rowMultiplication.count}x (${rowMultiplication.description})\n\n`;
+                }
 
                 if (staticCols.length > 0) {
                     validationMessage += `🔧 **Static Columns:**\n${staticCols.map(col => `• ${col.column}: "${col.static_value}"`).join('\n')}\n\n`;
@@ -98,6 +182,18 @@ const FileGeneratorFlow = ({
 
                 if (mappedCols.length > 0) {
                     validationMessage += `🔗 **Mapped Columns:**\n${mappedCols.map(col => `• ${col.output} ← ${col.source}`).join('\n')}\n\n`;
+                }
+
+                if (conditionalCols.length > 0) {
+                    validationMessage += `🎯 **Conditional Columns:**\n`;
+                    conditionalCols.forEach(col => {
+                        validationMessage += `• ${col.column}:\n`;
+                        col.conditions.forEach(cond => {
+                            const conditionDesc = cond.condition.condition || `Row ${cond.condition.row_index}`;
+                            validationMessage += `  - ${conditionDesc}: "${cond.value}"\n`;
+                        });
+                    });
+                    validationMessage += '\n';
                 }
 
                 validationMessage += '🎯 **Ready to generate!** Click "Generate File" to proceed.';
@@ -139,7 +235,7 @@ const FileGeneratorFlow = ({
 
             if (result.success) {
                 // Get preview data
-                const preview = await apiService.previewGeneratedFile(result.generation_id, 5);
+                const preview = await apiService.previewGeneratedFile(result.generation_id, 8);
                 setPreviewData(preview);
 
                 const summary = result.summary;
@@ -147,6 +243,11 @@ const FileGeneratorFlow = ({
                 successMessage += `📊 **Summary:**\n`;
                 successMessage += `• Input Records: ${summary.total_input_records.toLocaleString()}\n`;
                 successMessage += `• Output Records: ${summary.total_output_records.toLocaleString()}\n`;
+
+                if (summary.row_multiplication_factor > 1) {
+                    successMessage += `• Row Multiplication: ${summary.row_multiplication_factor}x\n`;
+                }
+
                 successMessage += `• Columns Generated: ${summary.columns_generated.join(', ')}\n`;
                 successMessage += `• Processing Time: ${summary.processing_time_seconds}s\n\n`;
                 successMessage += `🔧 **Rules Applied:** ${summary.rules_applied}\n\n`;
@@ -235,6 +336,12 @@ const FileGeneratorFlow = ({
                 <div className="flex items-center space-x-2">
                     <Zap className="text-purple-600" size={20} />
                     <h3 className="text-lg font-semibold text-gray-800">AI File Generator</h3>
+                    {validationResult?.validation?.row_multiplication?.enabled && (
+                        <div className="flex items-center space-x-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                            <Layers size={12} />
+                            <span>{validationResult.validation.row_multiplication.count}x Multiplication</span>
+                        </div>
+                    )}
                 </div>
                 <button
                     onClick={onCancel}
@@ -297,18 +404,49 @@ const FileGeneratorFlow = ({
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Transformation Prompt:
-                        </label>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                                Transformation Prompt:
+                            </label>
+                            <button
+                                onClick={() => setShowAdvancedPrompts(!showAdvancedPrompts)}
+                                className="flex items-center space-x-1 text-purple-600 hover:text-purple-800 text-sm"
+                            >
+                                <Layers size={14} />
+                                <span>Templates</span>
+                            </button>
+                        </div>
+
+                        {showAdvancedPrompts && (
+                            <div className="mb-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                                <h4 className="text-sm font-medium text-purple-900 mb-2">Row Multiplication Templates:</h4>
+                                <div className="space-y-2">
+                                    {advancedPrompts.map((template, idx) => (
+                                        <div key={idx} className="p-2 bg-white rounded border border-purple-200 hover:bg-purple-50 cursor-pointer transition-colors" onClick={() => handlePromptSelect(template)}>
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-sm font-medium text-purple-900">{template.title}</div>
+                                                    <div className="text-xs text-purple-700">{template.description}</div>
+                                                </div>
+                                                <Copy size={12} className="text-purple-600" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <textarea
                             value={userPrompt}
                             onChange={(e) => setUserPrompt(e.target.value)}
-                            placeholder="Describe what you want to generate... e.g., 'create reporting file with jurisdiction always italy, trade_id from Trade_ID, header always XYZ'"
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none"
+                            placeholder="Describe what you want to generate... e.g., 'generate 2 rows for each source row, amount 100 in first row and amount 0 in second row, copy trade_id from Trade_ID'"
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-32 resize-none"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
-                            💡 Be specific about column mappings and static values
-                        </p>
+                        <div className="text-xs text-gray-500 mt-1 space-y-1">
+                            <div>💡 <strong>Row Multiplication:</strong> Use phrases like "generate X rows", "create 2 rows for each", "duplicate each row"</div>
+                            <div>🎯 <strong>Conditional Values:</strong> Specify different values per row: "amount 100 in first row, amount 0 in second"</div>
+                            <div>🔗 <strong>Column Mapping:</strong> Map source to output: "copy trade_id from Trade_ID"</div>
+                        </div>
                     </div>
 
                     <button
@@ -354,9 +492,16 @@ const FileGeneratorFlow = ({
                                 </span>
                             </div>
                             {validationResult.success && (
-                                <div className="text-sm text-green-700">
+                                <div className="text-sm text-green-700 space-y-1">
+                                    {validationResult.validation.row_multiplication?.enabled && (
+                                        <div className="flex items-center space-x-2 bg-green-100 p-2 rounded">
+                                            <Layers size={14} />
+                                            <span><strong>Row Multiplication:</strong> {validationResult.validation.row_multiplication.count}x</span>
+                                        </div>
+                                    )}
                                     <div>Static Columns: {validationResult.validation.static_columns.length}</div>
                                     <div>Mapped Columns: {validationResult.validation.mapped_columns.length}</div>
+                                    <div>Conditional Columns: {validationResult.validation.conditional_columns.length}</div>
                                 </div>
                             )}
                         </div>
@@ -397,6 +542,12 @@ const FileGeneratorFlow = ({
                         <p className="text-sm text-green-700">
                             Your prompt has been validated and rules are ready for generation.
                         </p>
+                        {validationResult?.validation?.row_multiplication?.enabled && (
+                            <div className="mt-2 flex items-center space-x-2 text-sm text-green-800">
+                                <Layers size={14} />
+                                <span>Will generate {validationResult.validation.row_multiplication.count} rows per source row</span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex space-x-3">
@@ -429,12 +580,23 @@ const FileGeneratorFlow = ({
 
             {currentStep === 'download' && (
                 <div className="space-y-4">
-                    {/* Preview */}
+                    {/* Enhanced Preview */}
                     {previewData && (
                         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                            <h4 className="font-medium text-blue-900 mb-2">Preview Generated File</h4>
+                            <div className="flex items-center justify-between mb-2">
+                                <h4 className="font-medium text-blue-900">Preview Generated File</h4>
+                                {previewData.row_multiplication && previewData.row_multiplication.enabled && (
+                                    <div className="flex items-center space-x-1 bg-blue-200 text-blue-900 px-2 py-1 rounded-full text-xs">
+                                        <Layers size={12} />
+                                        <span>{previewData.row_multiplication.count}x Multiplied</span>
+                                    </div>
+                                )}
+                            </div>
                             <div className="text-sm text-blue-800 mb-3">
                                 Showing {previewData.showing_records} of {previewData.total_records.toLocaleString()} records
+                                {previewData.row_multiplication?.enabled && (
+                                    <span> (expanded from {Math.floor(previewData.total_records / previewData.row_multiplication.count).toLocaleString()} source rows)</span>
+                                )}
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs border-collapse">
@@ -448,8 +610,8 @@ const FileGeneratorFlow = ({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {previewData.preview_data.slice(0, 3).map((row, idx) => (
-                                            <tr key={idx} className="bg-white">
+                                        {previewData.preview_data.slice(0, 5).map((row, idx) => (
+                                            <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-blue-25'}`}>
                                                 {previewData.columns.map(col => (
                                                     <td key={col} className="border border-blue-200 px-2 py-1 text-blue-800">
                                                         {row[col] || ''}

@@ -17,18 +17,41 @@ import re
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-# Pydantic models for request/response
+# Enhanced Pydantic models for request/response
+class RowCondition(BaseModel):
+    """Defines conditions for which row this value applies to"""
+    row_index: Optional[int] = None  # 0-based index (0 for first duplicate, 1 for second, etc.)
+    condition: Optional[str] = None  # e.g., "first", "second", "last", "odd", "even"
+
+
+class ConditionalValue(BaseModel):
+    """Defines different values for different rows when multiplying"""
+    condition: RowCondition
+    value: Union[str, int, float, None]
+
+
 class ColumnMapping(BaseModel):
     output_column: str
     source_column: Optional[str] = None  # None for static values
     static_value: Optional[str] = None
     transformation: Optional[str] = None  # For any data transformations
+    # New fields for row multiplication
+    conditional_values: Optional[List[ConditionalValue]] = None  # Different values per row
+
+
+class RowMultiplication(BaseModel):
+    """Defines how many rows to generate per source row"""
+    enabled: bool = False
+    count: int = 1  # Number of rows to generate per source row
+    description: Optional[str] = None
 
 
 class GenerationRule(BaseModel):
     output_filename: str
     columns: List[ColumnMapping]
     description: str
+    # New field for row multiplication
+    row_multiplication: Optional[RowMultiplication] = RowMultiplication()
 
 
 class GenerationSummary(BaseModel):
@@ -37,6 +60,8 @@ class GenerationSummary(BaseModel):
     columns_generated: List[str]
     processing_time_seconds: float
     rules_applied: str
+    # New field
+    row_multiplication_factor: int = 1
 
 
 class GenerationResponse(BaseModel):
@@ -83,32 +108,66 @@ class RuleBasedFileGenerator:
 
             Available columns in the source file: {', '.join(available_columns)}
 
+            The user may request:
+            1. Simple column mapping (source column → output column)
+            2. Static values (always the same value)
+            3. ROW MULTIPLICATION: Generate multiple rows from each source row
+            4. CONDITIONAL VALUES: Different values in the same column for different generated rows
+            5. MATHEMATICAL OPERATIONS: Calculate values like half, percentage, etc.
+
             Based on the user's prompt, create a JSON response with the following structure:
             {{
                 "output_filename": "descriptive_filename.csv",
+                "row_multiplication": {{
+                    "enabled": false,
+                    "count": 1,
+                    "description": "explanation if multiplication is used"
+                }},
                 "columns": [
                     {{
                         "output_column": "column_name_in_output",
                         "source_column": "source_column_name_or_null",
                         "static_value": "static_value_or_null",
-                        "transformation": "description_of_any_transformation_or_null"
+                        "transformation": "description_of_any_transformation_or_null",
+                        "conditional_values": [
+                            {{
+                                "condition": {{"row_index": 0, "condition": "first"}},
+                                "value": "value_for_first_row_or_mathematical_expression"
+                            }},
+                            {{
+                                "condition": {{"row_index": 1, "condition": "second"}},
+                                "value": "value_for_second_row_or_mathematical_expression"
+                            }}
+                        ]
                     }}
                 ],
                 "description": "Brief description of what this transformation does"
             }}
 
-            CRITICAL Rules:
-            1. For STATIC VALUES: set "source_column" to null and provide the exact "static_value"
-               Example: "jurisdiction is always italy" → {{"source_column": null, "static_value": "italy"}}
-            2. For MAPPED COLUMNS: set "source_column" to the source field and "static_value" to null
-               Example: "trade_id from Trade_ID" → {{"source_column": "Trade_ID", "static_value": null}}
-            3. Pay attention to phrases like "always", "is always", "fixed", "constant"
-            4. Only use columns that exist in the available columns list
-            5. Be precise about static values - use exactly what the user specifies
+            CRITICAL Rules for ROW MULTIPLICATION:
+            1. Look for phrases like "generate X rows", "create multiple rows", "duplicate each row", "2 rows for each", etc.
+            2. If user wants multiple rows, set row_multiplication.enabled = true and count = X
+            3. For CONDITIONAL VALUES, use conditional_values array instead of static_value
+            4. Row indices start at 0 (first duplicate = 0, second = 1, etc.)
+            5. Condition can be "first", "second", "third", "last", "odd", "even", or use row_index
 
-            Example for "jurisdiction is always italy, header is always 'XYZ'":
-            - jurisdiction: {{"source_column": null, "static_value": "italy"}}
-            - header: {{"source_column": null, "static_value": "XYZ"}}
+            CRITICAL Rules for MATHEMATICAL OPERATIONS:
+            1. For "half value", "half amount", "divide by 2", use: "half" or "original/2"
+            2. For percentages like "50%", use: "50%" 
+            3. For other math like "amount * 0.3", use: "original * 0.3"
+            4. The system will automatically find the source numeric column for calculations
+            5. Use "original", "source", or "value" to refer to the source column value
+
+            Examples:
+            - "generate 2 rows for each source row, amount 100 in first row, amount 0 in second"
+            - "create 2 rows per source, half value in first row, other half in second row"
+            - "duplicate each row twice, 70% amount in first, 30% amount in second"
+            - "generate 3 rows for each source, original amount in first, half in second, quarter in third"
+
+            For STATIC VALUES: set "source_column" to null and provide "static_value"
+            For MAPPED COLUMNS: set "source_column" to the source field and "static_value" to null
+            For CONDITIONAL VALUES: use "conditional_values" array and set both "source_column" and "static_value" to null
+            For MATHEMATICAL CONDITIONS: use expressions like "half", "50%", "original/2", "original * 0.5" in the value field
 
             Respond ONLY with valid JSON, no additional text.
             """
@@ -154,63 +213,232 @@ class RuleBasedFileGenerator:
                     f"Available columns: {', '.join(available_columns)}"
                 )
 
+        # Validate row multiplication rules
+        if rules.row_multiplication and rules.row_multiplication.enabled:
+            if rules.row_multiplication.count < 1:
+                errors.append("Row multiplication count must be at least 1")
+            if rules.row_multiplication.count > 100:
+                errors.append("Row multiplication count cannot exceed 100 (to prevent memory issues)")
+
         return errors
 
+    def get_conditional_value(self, column_mapping: ColumnMapping, row_index: int, total_rows: int,
+                              source_row_data: dict = None) -> Any:
+        """Get the appropriate value for a column based on row conditions"""
+        if not column_mapping.conditional_values:
+            return None
+
+        for conditional_value in column_mapping.conditional_values:
+            condition = conditional_value.condition
+
+            # Check row_index condition
+            if condition.row_index is not None and condition.row_index == row_index:
+                return self.process_conditional_value(conditional_value.value, source_row_data, column_mapping)
+
+            # Check string condition
+            if condition.condition:
+                cond = condition.condition.lower()
+                if cond == "first" and row_index == 0:
+                    return self.process_conditional_value(conditional_value.value, source_row_data, column_mapping)
+                elif cond == "second" and row_index == 1:
+                    return self.process_conditional_value(conditional_value.value, source_row_data, column_mapping)
+                elif cond == "third" and row_index == 2:
+                    return self.process_conditional_value(conditional_value.value, source_row_data, column_mapping)
+                elif cond == "last" and row_index == total_rows - 1:
+                    return self.process_conditional_value(conditional_value.value, source_row_data, column_mapping)
+                elif cond == "odd" and row_index % 2 == 1:
+                    return self.process_conditional_value(conditional_value.value, source_row_data, column_mapping)
+                elif cond == "even" and row_index % 2 == 0:
+                    return self.process_conditional_value(conditional_value.value, source_row_data, column_mapping)
+
+        return None
+
+    def process_conditional_value(self, value, source_row_data: dict, column_mapping: ColumnMapping) -> Any:
+        """Process conditional values with mathematical operations support"""
+        if value is None or source_row_data is None:
+            return value
+
+        # Convert value to string for processing
+        value_str = str(value).lower().strip()
+
+        # Handle mathematical expressions
+        if any(keyword in value_str for keyword in ['half', '/2', '* 0.5', 'divide by 2']):
+            # Try to find the source column value for calculation
+            source_value = None
+            if column_mapping.source_column and column_mapping.source_column in source_row_data:
+                source_value = source_row_data[column_mapping.source_column]
+
+            # If no explicit source column, try to find a numeric column
+            if source_value is None:
+                for col_name, col_value in source_row_data.items():
+                    if self.is_numeric_value(col_value):
+                        source_value = col_value
+                        break
+
+            if source_value is not None and self.is_numeric_value(source_value):
+                try:
+                    numeric_value = float(source_value)
+                    if 'half' in value_str or '/2' in value_str or 'divide by 2' in value_str:
+                        return numeric_value / 2
+                    elif '* 0.5' in value_str:
+                        return numeric_value * 0.5
+                except (ValueError, TypeError):
+                    self.warnings.append(f"Could not convert '{source_value}' to numeric for mathematical operation")
+
+        # Handle percentage operations
+        elif '%' in value_str or 'percent' in value_str:
+            # Extract percentage value
+            import re
+            percent_match = re.search(r'(\d+(?:\.\d+)?)\s*%', value_str)
+            if percent_match:
+                percentage = float(percent_match.group(1)) / 100
+
+                # Find source value
+                source_value = None
+                if column_mapping.source_column and column_mapping.source_column in source_row_data:
+                    source_value = source_row_data[column_mapping.source_column]
+
+                if source_value is None:
+                    for col_name, col_value in source_row_data.items():
+                        if self.is_numeric_value(col_value):
+                            source_value = col_value
+                            break
+
+                if source_value is not None and self.is_numeric_value(source_value):
+                    try:
+                        return float(source_value) * percentage
+                    except (ValueError, TypeError):
+                        pass
+
+        # Handle other mathematical operations
+        elif any(op in value_str for op in ['*', '/', '+', '-']):
+            # Try to evaluate simple mathematical expressions with source value
+            source_value = None
+            if column_mapping.source_column and column_mapping.source_column in source_row_data:
+                source_value = source_row_data[column_mapping.source_column]
+
+            if source_value is not None and self.is_numeric_value(source_value):
+                try:
+                    # Replace common terms with actual values
+                    expression = value_str
+                    expression = expression.replace('original', str(source_value))
+                    expression = expression.replace('source', str(source_value))
+                    expression = expression.replace('value', str(source_value))
+
+                    # Simple safety check - only allow basic math operations
+                    if all(c in '0123456789+-*/.() ' for c in expression):
+                        try:
+                            return eval(expression)
+                        except:
+                            pass
+                except (ValueError, TypeError):
+                    pass
+
+        # Return original value if no mathematical operation detected
+        return value
+
+    def is_numeric_value(self, value) -> bool:
+        """Check if a value can be converted to a number"""
+        if value is None or pd.isna(value):
+            return False
+        try:
+            float(value)
+            return True
+        except (ValueError, TypeError):
+            return False
+
     def apply_transformation_rules(self, df: pd.DataFrame, rules: GenerationRule) -> pd.DataFrame:
-        """Apply transformation rules to create new DataFrame"""
-        output_df = pd.DataFrame()
+        """Apply transformation rules to create new DataFrame with row multiplication support"""
+        output_rows = []
 
-        # Ensure we have the same number of rows as input
-        num_rows = len(df)
+        # Determine how many rows to generate per source row
+        multiplication_factor = 1
+        if rules.row_multiplication and rules.row_multiplication.enabled:
+            multiplication_factor = rules.row_multiplication.count
 
-        for column_mapping in rules.columns:
-            if column_mapping.static_value is not None:
-                # Static value column - ensure it's not empty string and repeat for all rows
-                static_val = column_mapping.static_value
-                if static_val == "":
-                    static_val = None
-                output_df[column_mapping.output_column] = [static_val] * num_rows
-                print(
-                    f"Applied static value '{static_val}' to column '{column_mapping.output_column}' for {num_rows} rows")
-            elif column_mapping.source_column:
-                # Mapped column
-                if column_mapping.transformation:
-                    # Apply transformation if specified
-                    output_df[column_mapping.output_column] = self.apply_column_transformation(
-                        df[column_mapping.source_column],
-                        column_mapping.transformation
-                    )
-                else:
-                    # Direct mapping
-                    output_df[column_mapping.output_column] = df[column_mapping.source_column]
-                print(f"Mapped column '{column_mapping.source_column}' to '{column_mapping.output_column}'")
-            else:
-                self.warnings.append(
-                    f"Column '{column_mapping.output_column}' has no source or static value defined"
-                )
-                print(f"WARNING: No mapping for column '{column_mapping.output_column}'")
+        # Process each source row
+        for source_idx, source_row in df.iterrows():
+            # Convert source row to dict for easier access
+            source_row_dict = source_row.to_dict()
 
+            # Generate multiple rows for this source row
+            for row_copy_idx in range(multiplication_factor):
+                output_row = {}
+
+                # Process each column mapping
+                for column_mapping in rules.columns:
+                    column_name = column_mapping.output_column
+
+                    # Handle conditional values (for row multiplication)
+                    if column_mapping.conditional_values:
+                        value = self.get_conditional_value(column_mapping, row_copy_idx, multiplication_factor,
+                                                           source_row_dict)
+                        if value is not None:
+                            output_row[column_name] = value
+                        else:
+                            # If no conditional value matches, use default logic
+                            if column_mapping.source_column:
+                                output_row[column_name] = source_row[column_mapping.source_column]
+                            elif column_mapping.static_value is not None:
+                                output_row[column_name] = column_mapping.static_value
+                            else:
+                                output_row[column_name] = None
+
+                    # Handle static values
+                    elif column_mapping.static_value is not None:
+                        output_row[column_name] = column_mapping.static_value
+
+                    # Handle source column mapping
+                    elif column_mapping.source_column:
+                        if column_mapping.transformation:
+                            # Apply transformation
+                            value = source_row[column_mapping.source_column]
+                            transformed_value = self.apply_single_value_transformation(value,
+                                                                                       column_mapping.transformation)
+                            output_row[column_name] = transformed_value
+                        else:
+                            # Direct mapping
+                            output_row[column_name] = source_row[column_mapping.source_column]
+
+                    else:
+                        output_row[column_name] = None
+                        self.warnings.append(
+                            f"Column '{column_name}' has no source, static value, or conditional values defined"
+                        )
+
+                output_rows.append(output_row)
+
+        output_df = pd.DataFrame(output_rows)
+
+        print(f"Generated {len(output_df)} rows from {len(df)} source rows (factor: {multiplication_factor})")
         return output_df
 
-    def apply_column_transformation(self, series: pd.Series, transformation: str) -> pd.Series:
-        """Apply simple transformations to a pandas Series"""
+    def apply_single_value_transformation(self, value, transformation: str):
+        """Apply transformation to a single value"""
+        if pd.isna(value):
+            return value
+
         transformation = transformation.lower().strip()
 
         try:
             if "uppercase" in transformation or "upper" in transformation:
-                return series.astype(str).str.upper()
+                return str(value).upper()
             elif "lowercase" in transformation or "lower" in transformation:
-                return series.astype(str).str.lower()
+                return str(value).lower()
             elif "title" in transformation or "capitalize" in transformation:
-                return series.astype(str).str.title()
+                return str(value).title()
             elif "strip" in transformation or "trim" in transformation:
-                return series.astype(str).str.strip()
+                return str(value).strip()
             else:
                 self.warnings.append(f"Unknown transformation: {transformation}. Applying no transformation.")
-                return series
+                return value
         except Exception as e:
             self.warnings.append(f"Error applying transformation '{transformation}': {str(e)}")
-            return series
+            return value
+
+    def apply_column_transformation(self, series: pd.Series, transformation: str) -> pd.Series:
+        """Apply simple transformations to a pandas Series"""
+        return series.apply(lambda x: self.apply_single_value_transformation(x, transformation))
 
 
 # Store generation results temporarily
@@ -234,7 +462,8 @@ async def validate_prompt_parsing(
         # Parse user prompt with OpenAI
         rules = generator.parse_prompt_with_openai(user_prompt, available_columns)
 
-        return {
+        # Enhanced validation response
+        validation_response = {
             "success": True,
             "user_prompt": user_prompt,
             "available_columns": available_columns,
@@ -253,9 +482,25 @@ async def validate_prompt_parsing(
                         "source": col.source_column
                     }
                     for col in rules.columns if col.source_column is not None
-                ]
+                ],
+                "conditional_columns": [
+                    {
+                        "column": col.output_column,
+                        "conditions": [
+                            {
+                                "condition": cv.condition.dict(),
+                                "value": cv.value
+                            }
+                            for cv in col.conditional_values
+                        ]
+                    }
+                    for col in rules.columns if col.conditional_values
+                ],
+                "row_multiplication": rules.row_multiplication.dict() if rules.row_multiplication else None
             }
         }
+
+        return validation_response
 
     except Exception as e:
         return {
@@ -304,21 +549,9 @@ async def generate_file_from_rules(
                 }
             )
 
-        # Apply transformation rules
+        # Apply transformation rules (now with row multiplication support)
         print(f"Applying rules: {rules.dict()}")
         output_df = generator.apply_transformation_rules(df, rules)
-
-        # Debug: Check if static values were applied correctly
-        for column_mapping in rules.columns:
-            if column_mapping.static_value is not None:
-                if column_mapping.output_column in output_df.columns:
-                    unique_vals = output_df[column_mapping.output_column].unique()
-                    print(f"Column '{column_mapping.output_column}': unique values = {unique_vals}")
-                    if len(unique_vals) == 1 and unique_vals[0] != column_mapping.static_value:
-                        generator.warnings.append(
-                            f"Static value mismatch for '{column_mapping.output_column}': "
-                            f"expected '{column_mapping.static_value}', got '{unique_vals[0]}'"
-                        )
 
         # Generate unique ID for this generation
         generation_id = str(uuid.uuid4())
@@ -333,13 +566,17 @@ async def generate_file_from_rules(
 
         # Calculate summary
         processing_time = (datetime.now() - start_time).total_seconds()
+        multiplication_factor = 1
+        if rules.row_multiplication and rules.row_multiplication.enabled:
+            multiplication_factor = rules.row_multiplication.count
 
         summary = GenerationSummary(
             total_input_records=len(df),
             total_output_records=len(output_df),
             columns_generated=output_df.columns.tolist(),
             processing_time_seconds=round(processing_time, 3),
-            rules_applied=rules.description
+            rules_applied=rules.description,
+            row_multiplication_factor=multiplication_factor
         )
 
         return GenerationResponse(
@@ -404,24 +641,32 @@ async def download_generated_file(
             # Add rules sheet for reference
             rules_data = []
             for col_mapping in rules.columns:
-                rules_data.append({
+                rule_info = {
                     'Output Column': col_mapping.output_column,
                     'Source Column': col_mapping.source_column or 'N/A',
                     'Static Value': col_mapping.static_value or 'N/A',
-                    'Transformation': col_mapping.transformation or 'None'
-                })
+                    'Transformation': col_mapping.transformation or 'None',
+                    'Has Conditional Values': 'Yes' if col_mapping.conditional_values else 'No'
+                }
+
+                if col_mapping.conditional_values:
+                    for i, cv in enumerate(col_mapping.conditional_values):
+                        rule_info[f'Condition {i + 1}'] = f"{cv.condition.dict()} = {cv.value}"
+
+                rules_data.append(rule_info)
 
             rules_df = pd.DataFrame(rules_data)
             rules_df.to_excel(writer, sheet_name='Rules Applied', index=False)
 
             # Add metadata sheet
             metadata = {
-                'Property': ['Description', 'Generated On', 'Source File', 'Total Records'],
+                'Property': ['Description', 'Generated On', 'Source File', 'Total Records', 'Row Multiplication'],
                 'Value': [
                     rules.description,
                     results['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
                     results['source_filename'],
-                    len(output_df)
+                    len(output_df),
+                    f"{rules.row_multiplication.count}x" if rules.row_multiplication and rules.row_multiplication.enabled else "None"
                 ]
             }
             pd.DataFrame(metadata).to_excel(writer, sheet_name='Metadata', index=False)
@@ -465,7 +710,9 @@ async def preview_generated_file(generation_id: str, limit: int = 10):
         'total_records': len(output_df),
         'columns': output_df.columns.tolist(),
         'showing_records': len(preview_df),
-        'rules_description': results['rules'].description
+        'rules_description': results['rules'].description,
+        'row_multiplication': results['rules'].row_multiplication.dict() if results[
+            'rules'].row_multiplication else None
     }
 
 
@@ -484,12 +731,19 @@ async def list_generations():
     """List all stored generation results"""
     generations = []
     for gen_id, data in generation_storage.items():
+        multiplication_info = ""
+        if data['rules'].row_multiplication and data['rules'].row_multiplication.enabled:
+            multiplication_info = f" ({data['rules'].row_multiplication.count}x multiplication)"
+
         generations.append({
             'generation_id': gen_id,
-            'rules_description': data['rules'].description,
+            'rules_description': data['rules'].description + multiplication_info,
             'output_filename': data['rules'].output_filename,
             'source_filename': data['source_filename'],
             'record_count': len(data['output_data']),
+            'row_multiplication_factor': data['rules'].row_multiplication.count if data['rules'].row_multiplication and
+                                                                                   data[
+                                                                                       'rules'].row_multiplication.enabled else 1,
             'timestamp': data['timestamp'].isoformat()
         })
 
