@@ -434,7 +434,7 @@ export const apiService = {
     },
 
     startReconciliation: async (reconciliationRequest) => {
-        const response = await api.post('/reconciliation/process', reconciliationRequest);
+        const response = await api.post('/reconciliation/process/', reconciliationRequest);
         return response.data;
     },
 

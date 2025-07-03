@@ -1,16 +1,20 @@
 import io
 import json
 import uuid
+import logging
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 import pandas as pd
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.models.recon_models import ReconciliationResponse, ReconciliationSummary, OptimizedRulesConfig
 from app.services.reconciliation_service import OptimizedFileProcessor, optimized_reconciliation_storage
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/reconciliation", tags=["reconciliation"])
@@ -23,7 +27,97 @@ class ReconciliationRequest(BaseModel):
     output_format: Optional[str] = "standard"  # standard, summary, detailed
 
 
-@router.post("/process", response_model=ReconciliationResponse)
+class FileReference(BaseModel):
+    """File reference for JSON-based reconciliation"""
+    file_id: str
+    role: str  # file_0, file_1
+    label: str
+
+
+class ReconciliationConfig(BaseModel):
+    """Reconciliation configuration from JSON input"""
+    Files: List[Dict[str, Any]]
+    ReconciliationRules: List[Dict[str, Any]]
+    selected_columns_file_a: Optional[List[str]] = None
+    selected_columns_file_b: Optional[List[str]] = None
+    user_requirements: Optional[str] = None
+    files: Optional[List[FileReference]] = None
+
+
+class JSONReconciliationRequest(BaseModel):
+    """JSON-based reconciliation request"""
+    process_type: str
+    process_name: str
+    user_requirements: str
+    files: List[FileReference]
+    reconciliation_config: ReconciliationConfig
+
+
+async def get_file_by_id(file_id: str) -> UploadFile:
+    """
+    Retrieve file by ID from your file storage service
+    Uses the existing uploaded_files storage from storage_service
+    """
+    # Import here to avoid circular imports
+    from app.services.storage_service import uploaded_files
+
+    if file_id not in uploaded_files:
+        raise HTTPException(status_code=404, detail=f"File with ID {file_id} not found")
+
+    try:
+        file_data = uploaded_files[file_id]
+        file_info = file_data["info"]
+        df = file_data["data"]
+
+        # Convert DataFrame back to file-like object
+        filename = file_info["filename"]
+
+        if filename.lower().endswith('.csv'):
+            # Convert DataFrame to CSV bytes
+            csv_buffer = io.StringIO()
+            df.to_csv(csv_buffer, index=False)
+            csv_content = csv_buffer.getvalue().encode('utf-8')
+            file_content = io.BytesIO(csv_content)
+        elif filename.lower().endswith(('.xlsx', '.xls')):
+            # Convert DataFrame to Excel bytes
+            excel_buffer = io.BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name='Sheet1')
+            excel_buffer.seek(0)
+            file_content = excel_buffer
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported file format: {filename}")
+
+        # Create UploadFile-like object
+        class FileFromStorage:
+            def __init__(self, content: io.BytesIO, filename: str):
+                self.file = content
+                self.filename = filename
+                self.content_type = self._get_content_type(filename)
+
+            def _get_content_type(self, filename: str) -> str:
+                if filename.lower().endswith('.csv'):
+                    return 'text/csv'
+                elif filename.lower().endswith('.xlsx'):
+                    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                elif filename.lower().endswith('.xls'):
+                    return 'application/vnd.ms-excel'
+                return 'application/octet-stream'
+
+            async def read(self):
+                return self.file.read()
+
+            def seek(self, position: int):
+                return self.file.seek(position)
+
+        return FileFromStorage(file_content, filename)
+
+    except Exception as e:
+        logger.error(f"Error retrieving file {file_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve file: {str(e)}")
+
+
+@router.post("/process/postman", response_model=ReconciliationResponse)
 async def process_reconciliation_optimized(
         fileA: UploadFile = File(...),
         fileB: UploadFile = File(...),
@@ -32,7 +126,7 @@ async def process_reconciliation_optimized(
         selected_columns_file_b: Optional[str] = Form(None),
         output_format: Optional[str] = Form("standard")
 ):
-    """Process file reconciliation with optimized performance and column selection"""
+    """Process file reconciliation with optimized performance and column selection - File Upload Version"""
     start_time = datetime.now()
     processor = OptimizedFileProcessor()
 
@@ -60,114 +154,8 @@ async def process_reconciliation_optimized(
             except json.JSONDecodeError:
                 columns_b = [col.strip() for col in selected_columns_file_b.split(',')]
 
-        # Validate we have rules for both files
-        if len(rules_config.Files) != 2:
-            raise HTTPException(status_code=400, detail="Rules must contain exactly 2 file configurations")
-
-        # Read files with optimized settings
-        file_rule_a = next((f for f in rules_config.Files if f.Name == "FileA"), None)
-        file_rule_b = next((f for f in rules_config.Files if f.Name == "FileB"), None)
-
-        if not file_rule_a or not file_rule_b:
-            raise HTTPException(status_code=400, detail="Rules must contain configurations for 'FileA' and 'FileB'")
-
-        # Read files
-        df_a = processor.read_file(fileA, getattr(file_rule_a, 'SheetName', None))
-        df_b = processor.read_file(fileB, getattr(file_rule_b, 'SheetName', None))
-
-        print(f"Read files: FileA {len(df_a)} rows, FileB {len(df_b)} rows")
-
-        # Validate rules against columns
-        errors_a = processor.validate_rules_against_columns(df_a, file_rule_a)
-        errors_b = processor.validate_rules_against_columns(df_b, file_rule_b)
-
-        if errors_a or errors_b:
-            processor.errors.extend(errors_a + errors_b)
-            raise HTTPException(status_code=400, detail={"errors": processor.errors})
-
-        # Process FileA with optimized extraction - Handle optional Extract
-        if hasattr(file_rule_a, 'Extract') and file_rule_a.Extract:
-            print("Processing FileA extractions...")
-            for extract_rule in file_rule_a.Extract:
-                df_a[extract_rule.ResultColumnName] = processor.extract_patterns_vectorized(df_a, extract_rule)
-
-        # Apply FileA filters - Handle optional Filter
-        if hasattr(file_rule_a, 'Filter') and file_rule_a.Filter:
-            print("Applying FileA filters...")
-            df_a = processor.apply_filters_optimized(df_a, file_rule_a.Filter)
-
-        # Process FileB with optimized extraction - Handle optional Extract
-        if hasattr(file_rule_b, 'Extract') and file_rule_b.Extract:
-            print("Processing FileB extractions...")
-            for extract_rule in file_rule_b.Extract:
-                df_b[extract_rule.ResultColumnName] = processor.extract_patterns_vectorized(df_b, extract_rule)
-
-        # Apply FileB filters - Handle optional Filter
-        if hasattr(file_rule_b, 'Filter') and file_rule_b.Filter:
-            print("Applying FileB filters...")
-            df_b = processor.apply_filters_optimized(df_b, file_rule_b.Filter)
-
-        print(f"After processing: FileA {len(df_a)} rows, FileB {len(df_b)} rows")
-
-        # Validate reconciliation columns exist
-        recon_errors = []
-        for rule in rules_config.ReconciliationRules:
-            if rule.LeftFileColumn not in df_a.columns:
-                recon_errors.append(
-                    f"Reconciliation column '{rule.LeftFileColumn}' not found in FileA after extraction")
-            if rule.RightFileColumn not in df_b.columns:
-                recon_errors.append(
-                    f"Reconciliation column '{rule.RightFileColumn}' not found in FileB after extraction")
-
-        if recon_errors:
-            processor.errors.extend(recon_errors)
-            raise HTTPException(status_code=400, detail={"errors": processor.errors})
-
-        # Perform optimized reconciliation
-        print("Starting optimized reconciliation...")
-        reconciliation_results = processor.reconcile_files_optimized(
-            df_a, df_b, rules_config.ReconciliationRules,
-            columns_a, columns_b
-        )
-
-        # Generate reconciliation ID
-        recon_id = str(uuid.uuid4())
-
-        # Store results with optimized storage
-        storage_success = optimized_reconciliation_storage.store_results(recon_id, reconciliation_results)
-        if not storage_success:
-            processor.warnings.append("Failed to store results in optimized storage, using fallback")
-
-        # Calculate summary
-        processing_time = (datetime.now() - start_time).total_seconds()
-        total_a = len(df_a)
-        total_b = len(df_b)
-        matched = len(reconciliation_results['matched'])
-
-        # Handle division by zero for match percentage
-        if max(total_a, total_b) > 0:
-            match_percentage = round((matched / max(total_a, total_b)) * 100, 2)
-        else:
-            match_percentage = 0.0
-
-        summary = ReconciliationSummary(
-            total_records_file_a=total_a,
-            total_records_file_b=total_b,
-            matched_records=matched,
-            unmatched_file_a=len(reconciliation_results['unmatched_file_a']),
-            unmatched_file_b=len(reconciliation_results['unmatched_file_b']),
-            match_percentage=match_percentage,
-            processing_time_seconds=round(processing_time, 3)
-        )
-
-        print(f"Reconciliation completed in {processing_time:.2f}s - {matched} matches found")
-
-        return ReconciliationResponse(
-            success=True,
-            summary=summary,
-            reconciliation_id=recon_id,
-            errors=processor.errors,
-            warnings=processor.warnings
+        return await _process_reconciliation_core(
+            processor, rules_config, fileA, fileB, columns_a, columns_b, output_format, start_time
         )
 
     except HTTPException:
@@ -175,6 +163,187 @@ async def process_reconciliation_optimized(
     except Exception as e:
         print(f"Reconciliation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+
+
+@router.post("/process/", response_model=ReconciliationResponse)
+async def process_reconciliation_json(
+        request: JSONReconciliationRequest
+):
+    """Process file reconciliation with JSON input - File ID Version"""
+    start_time = datetime.now()
+    processor = OptimizedFileProcessor()
+
+    try:
+        # Validate request
+        if request.process_type != "reconciliation":
+            raise HTTPException(status_code=400, detail="Invalid process_type. Expected 'reconciliation'")
+
+        if len(request.files) != 2:
+            raise HTTPException(status_code=400, detail="Exactly 2 files are required for reconciliation")
+
+        # Sort files by role to ensure consistent mapping
+        files_sorted = sorted(request.files, key=lambda x: x.role)
+        file_0 = next((f for f in files_sorted if f.role == "file_0"), None)
+        file_1 = next((f for f in files_sorted if f.role == "file_1"), None)
+
+        if not file_0 or not file_1:
+            raise HTTPException(status_code=400, detail="Files must have roles 'file_0' and 'file_1'")
+
+        # Retrieve files by ID
+        try:
+            fileA = await get_file_by_id(file_0.file_id)
+            fileB = await get_file_by_id(file_1.file_id)
+        except NotImplementedError:
+            raise HTTPException(status_code=501,
+                                detail="File retrieval service not implemented. Please implement get_file_by_id function.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"Failed to retrieve files: {str(e)}")
+
+        # Convert reconciliation config to OptimizedRulesConfig
+        rules_dict = {
+            "Files": request.reconciliation_config.Files,
+            "ReconciliationRules": request.reconciliation_config.ReconciliationRules
+        }
+        rules_config = OptimizedRulesConfig.parse_obj(rules_dict)
+
+        # Extract column selections
+        columns_a = request.reconciliation_config.selected_columns_file_a
+        columns_b = request.reconciliation_config.selected_columns_file_b
+
+        return await _process_reconciliation_core(
+            processor, rules_config, fileA, fileB, columns_a, columns_b, "standard", start_time
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"JSON Reconciliation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+
+
+async def _process_reconciliation_core(
+        processor: OptimizedFileProcessor,
+        rules_config: OptimizedRulesConfig,
+        fileA: UploadFile,
+        fileB: UploadFile,
+        columns_a: Optional[List[str]],
+        columns_b: Optional[List[str]],
+        output_format: str,
+        start_time: datetime
+) -> ReconciliationResponse:
+    """Core reconciliation processing logic shared between endpoints"""
+
+    # Validate we have rules for both files
+    if len(rules_config.Files) != 2:
+        raise HTTPException(status_code=400, detail="Rules must contain exactly 2 file configurations")
+
+    # Read files with optimized settings
+    file_rule_a = next((f for f in rules_config.Files if f.Name == "FileA"), None)
+    file_rule_b = next((f for f in rules_config.Files if f.Name == "FileB"), None)
+
+    if not file_rule_a or not file_rule_b:
+        raise HTTPException(status_code=400, detail="Rules must contain configurations for 'FileA' and 'FileB'")
+
+    # Read files
+    df_a = processor.read_file(fileA, getattr(file_rule_a, 'SheetName', None))
+    df_b = processor.read_file(fileB, getattr(file_rule_b, 'SheetName', None))
+
+    print(f"Read files: FileA {len(df_a)} rows, FileB {len(df_b)} rows")
+
+    # Validate rules against columns
+    errors_a = processor.validate_rules_against_columns(df_a, file_rule_a)
+    errors_b = processor.validate_rules_against_columns(df_b, file_rule_b)
+
+    if errors_a or errors_b:
+        processor.errors.extend(errors_a + errors_b)
+        raise HTTPException(status_code=400, detail={"errors": processor.errors})
+
+    # Process FileA with optimized extraction - Handle optional Extract
+    if hasattr(file_rule_a, 'Extract') and file_rule_a.Extract:
+        print("Processing FileA extractions...")
+        for extract_rule in file_rule_a.Extract:
+            df_a[extract_rule.ResultColumnName] = processor.extract_patterns_vectorized(df_a, extract_rule)
+
+    # Apply FileA filters - Handle optional Filter
+    if hasattr(file_rule_a, 'Filter') and file_rule_a.Filter:
+        print("Applying FileA filters...")
+        df_a = processor.apply_filters_optimized(df_a, file_rule_a.Filter)
+
+    # Process FileB with optimized extraction - Handle optional Extract
+    if hasattr(file_rule_b, 'Extract') and file_rule_b.Extract:
+        print("Processing FileB extractions...")
+        for extract_rule in file_rule_b.Extract:
+            df_b[extract_rule.ResultColumnName] = processor.extract_patterns_vectorized(df_b, extract_rule)
+
+    # Apply FileB filters - Handle optional Filter
+    if hasattr(file_rule_b, 'Filter') and file_rule_b.Filter:
+        print("Applying FileB filters...")
+        df_b = processor.apply_filters_optimized(df_b, file_rule_b.Filter)
+
+    print(f"After processing: FileA {len(df_a)} rows, FileB {len(df_b)} rows")
+
+    # Validate reconciliation columns exist
+    recon_errors = []
+    for rule in rules_config.ReconciliationRules:
+        if rule.LeftFileColumn not in df_a.columns:
+            recon_errors.append(
+                f"Reconciliation column '{rule.LeftFileColumn}' not found in FileA after extraction")
+        if rule.RightFileColumn not in df_b.columns:
+            recon_errors.append(
+                f"Reconciliation column '{rule.RightFileColumn}' not found in FileB after extraction")
+
+    if recon_errors:
+        processor.errors.extend(recon_errors)
+        raise HTTPException(status_code=400, detail={"errors": processor.errors})
+
+    # Perform optimized reconciliation
+    print("Starting optimized reconciliation...")
+    reconciliation_results = processor.reconcile_files_optimized(
+        df_a, df_b, rules_config.ReconciliationRules,
+        columns_a, columns_b
+    )
+
+    # Generate reconciliation ID
+    recon_id = str(uuid.uuid4())
+
+    # Store results with optimized storage
+    storage_success = optimized_reconciliation_storage.store_results(recon_id, reconciliation_results)
+    if not storage_success:
+        processor.warnings.append("Failed to store results in optimized storage, using fallback")
+
+    # Calculate summary
+    processing_time = (datetime.now() - start_time).total_seconds()
+    total_a = len(df_a)
+    total_b = len(df_b)
+    matched = len(reconciliation_results['matched'])
+
+    # Handle division by zero for match percentage
+    if max(total_a, total_b) > 0:
+        match_percentage = round((matched / max(total_a, total_b)) * 100, 2)
+    else:
+        match_percentage = 0.0
+
+    summary = ReconciliationSummary(
+        total_records_file_a=total_a,
+        total_records_file_b=total_b,
+        matched_records=matched,
+        unmatched_file_a=len(reconciliation_results['unmatched_file_a']),
+        unmatched_file_b=len(reconciliation_results['unmatched_file_b']),
+        match_percentage=match_percentage,
+        processing_time_seconds=round(processing_time, 3)
+    )
+
+    print(f"Reconciliation completed in {processing_time:.2f}s - {matched} matches found")
+
+    return ReconciliationResponse(
+        success=True,
+        summary=summary,
+        reconciliation_id=recon_id,
+        errors=processor.errors,
+        warnings=processor.warnings
+    )
 
 
 @router.get("/results/{reconciliation_id}")
@@ -390,6 +559,8 @@ async def reconciliation_health_check():
             "column_selection",
             "paginated_results",
             "streaming_downloads",
-            "batch_processing"
+            "batch_processing",
+            "json_input_support",
+            "file_id_retrieval"
         ]
     }

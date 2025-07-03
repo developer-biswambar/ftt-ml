@@ -84,19 +84,19 @@ const ReconciliationFlow = ({
     const getMandatoryColumns = (fileIndex) => {
         const mandatoryColumns = new Set();
         
-        // Add extracted columns
-        const extractedColumns = config.Files[fileIndex]?.Extract?.map(rule => rule.ResultColumnName).filter(Boolean) || [];
-        extractedColumns.forEach(col => mandatoryColumns.add(col));
-        
-        // Add reconciliation rule columns
+        // Add extracted columns - only if they have complete, non-empty names
+        const extractedColumns = config.Files[fileIndex]?.Extract?.map(rule => rule.ResultColumnName).filter(name => name && name.trim().length > 0) || [];
+        extractedColumns.forEach(col => mandatoryColumns.add(col.trim()));
+
+        // Add reconciliation rule columns - only if they have complete, non-empty names
         reconciliationRules.forEach(rule => {
-            if (fileIndex === 0 && rule.LeftFileColumn) {
-                mandatoryColumns.add(rule.LeftFileColumn);
-            } else if (fileIndex === 1 && rule.RightFileColumn) {
-                mandatoryColumns.add(rule.RightFileColumn);
+            if (fileIndex === 0 && rule.LeftFileColumn && rule.LeftFileColumn.trim().length > 0) {
+                mandatoryColumns.add(rule.LeftFileColumn.trim());
+            } else if (fileIndex === 1 && rule.RightFileColumn && rule.RightFileColumn.trim().length > 0) {
+                mandatoryColumns.add(rule.RightFileColumn.trim());
             }
         });
-        
+
         return Array.from(mandatoryColumns);
     };
 
@@ -149,9 +149,13 @@ const ReconciliationFlow = ({
         const updateSelectedColumns = (fileIndex) => {
             const mandatoryColumns = getMandatoryColumns(fileIndex);
             const currentSelected = fileIndex === 0 ? selectedColumnsFileA : selectedColumnsFileB;
-            
-            const updatedSelection = [...new Set([...currentSelected, ...mandatoryColumns])];
-            
+
+            // Only include mandatory columns that are not empty/undefined
+            const validMandatoryColumns = mandatoryColumns.filter(col => col && col.trim().length > 0);
+
+            // Merge current selection with valid mandatory columns, removing duplicates
+            const updatedSelection = [...new Set([...currentSelected, ...validMandatoryColumns])];
+
             if (fileIndex === 0) {
                 setSelectedColumnsFileA(updatedSelection);
             } else {
@@ -159,8 +163,13 @@ const ReconciliationFlow = ({
             }
         };
 
-        updateSelectedColumns(0);
-        updateSelectedColumns(1);
+        // Add a small delay to prevent multiple rapid updates during typing
+        const timeoutId = setTimeout(() => {
+            updateSelectedColumns(0);
+            updateSelectedColumns(1);
+        }, 100);
+
+        return () => clearTimeout(timeoutId);
     }, [config, reconciliationRules]);
 
     const nextStep = () => {
@@ -205,14 +214,14 @@ const ReconciliationFlow = ({
         }
 
         if (fileIndex === 0) {
-            setSelectedColumnsFileA(prev => 
-                prev.includes(columnName) 
+            setSelectedColumnsFileA(prev =>
+                prev.includes(columnName)
                     ? prev.filter(col => col !== columnName)
                     : [...prev, columnName]
             );
         } else {
-            setSelectedColumnsFileB(prev => 
-                prev.includes(columnName) 
+            setSelectedColumnsFileB(prev =>
+                prev.includes(columnName)
                     ? prev.filter(col => col !== columnName)
                     : [...prev, columnName]
             );
@@ -264,6 +273,21 @@ const ReconciliationFlow = ({
             updatedConfig.Files[fileIndex].Extract[ruleIndex][field] = value;
         }
         setConfig(updatedConfig);
+
+        // Only auto-add to selected columns if it's a complete column name (not partial input)
+        if (field === 'ResultColumnName' && value && value.trim().length > 2) {
+            // Add a small delay to prevent adding partial names during typing
+            setTimeout(() => {
+                const finalValue = updatedConfig.Files[fileIndex].Extract[ruleIndex].ResultColumnName;
+                if (finalValue && finalValue.trim().length > 2) {
+                    if (fileIndex === 0 && !selectedColumnsFileA.includes(finalValue)) {
+                        setSelectedColumnsFileA(prev => [...prev, finalValue]);
+                    } else if (fileIndex === 1 && !selectedColumnsFileB.includes(finalValue)) {
+                        setSelectedColumnsFileB(prev => [...prev, finalValue]);
+                    }
+                }
+            }, 300);
+        }
     };
 
     const removeExtractionRule = (fileIndex, ruleIndex) => {
