@@ -1,10 +1,9 @@
 import io
-import uuid
 import json
+import uuid
 from datetime import datetime
 from typing import Optional, List
 
-import numpy as np
 import pandas as pd
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import StreamingResponse

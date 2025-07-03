@@ -1,21 +1,21 @@
 // src/components/LeftSidebar.jsx - Fixed layout with better proportions when process is selected
-import React, { useRef } from 'react';
-import { CheckCircle, FileText, RefreshCw, Upload, Eye } from 'lucide-react';
+import React, {useRef} from 'react';
+import {CheckCircle, Eye, FileText, RefreshCw, Upload} from 'lucide-react';
 
 const LeftSidebar = ({
-    files,
-    templates,
-    selectedFiles,
-    setSelectedFiles,
-    selectedTemplate,
-    requiredFiles,
-    currentInput,
-    uploadProgress,
-    onFileUpload,
-    onTemplateSelect,
-    onRefreshFiles,
-    width = 320
-}) => {
+                         files,
+                         templates,
+                         selectedFiles,
+                         setSelectedFiles,
+                         selectedTemplate,
+                         requiredFiles,
+                         currentInput,
+                         uploadProgress,
+                         onFileUpload,
+                         onTemplateSelect,
+                         onRefreshFiles,
+                         width = 320
+                     }) => {
     const fileInputRef = useRef(null);
 
     const openFileViewer = (fileId) => {
@@ -47,7 +47,7 @@ const LeftSidebar = ({
 
     const getFileSelectionStatus = () => {
         if (!selectedTemplate) {
-            return { complete: false, selected: 0, required: 0 };
+            return {complete: false, selected: 0, required: 0};
         }
 
         const selected = requiredFiles.filter(rf => selectedFiles[rf.key]).length;
@@ -104,13 +104,14 @@ const LeftSidebar = ({
     return (
         <div
             className="w-80 bg-gradient-to-br from-slate-50 to-blue-50 border-r border-slate-200 flex flex-col shadow-lg h-screen"
-            style={{ width: `${width}px` }}
+            style={{width: `${width}px`}}
         >
             {/* Header */}
             <div className="p-4 border-b border-slate-200 bg-white/80 backdrop-blur-sm flex-shrink-0">
                 <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                        <FileText className="text-white" size={16} />
+                    <div
+                        className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <FileText className="text-white" size={16}/>
                     </div>
                     <div>
                         <h2 className="text-base font-bold text-slate-800">Setup & Configuration</h2>
@@ -122,7 +123,8 @@ const LeftSidebar = ({
             {/* Dynamic Content Area - Adjust based on whether template is selected */}
             <div className="flex-1 overflow-hidden flex flex-col">
                 {/* Step 1: Process Templates */}
-                <div className={`p-4 border-b border-slate-200 bg-white/30 ${selectedTemplate ? 'flex-shrink-0' : 'flex-1 max-h-96'}`}>
+                <div
+                    className={`p-4 border-b border-slate-200 bg-white/30 ${selectedTemplate ? 'flex-shrink-0' : 'flex-1 max-h-96'}`}>
                     <div className="flex items-center space-x-2 mb-3">
                         <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center">
                             <span className="text-orange-600 text-sm font-bold">1</span>
@@ -133,7 +135,7 @@ const LeftSidebar = ({
                     {selectedTemplate ? (
                         <div className="p-2 bg-green-50 border border-green-200 rounded-lg">
                             <div className="flex items-center space-x-2 mb-1">
-                                <CheckCircle size={14} className="text-green-600" />
+                                <CheckCircle size={14} className="text-green-600"/>
                                 <span className="text-xs font-medium text-green-800">Process Selected</span>
                             </div>
                             <div className="flex items-center space-x-2 mb-1">
@@ -160,8 +162,10 @@ const LeftSidebar = ({
                                 >
                                     <div className="p-3">
                                         <div className="flex items-start space-x-3">
-                                            <div className={`flex-shrink-0 w-8 h-8 bg-gradient-to-br ${getProcessColor(template.category, index)} rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                                                <span className="text-white text-lg">{getProcessIcon(template.category)}</span>
+                                            <div
+                                                className={`flex-shrink-0 w-8 h-8 bg-gradient-to-br ${getProcessColor(template.category, index)} rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                                                <span
+                                                    className="text-white text-lg">{getProcessIcon(template.category)}</span>
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <h4 className="font-semibold text-sm text-slate-800 group-hover:text-blue-800 transition-colors duration-200 leading-tight">
@@ -175,7 +179,8 @@ const LeftSidebar = ({
                                                         {template.filesRequired} file{template.filesRequired !== 1 ? 's' : ''} required
                                                     </span>
                                                     {template.category?.includes('ai') && (
-                                                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                                                        <span
+                                                            className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
                                                             AI
                                                         </span>
                                                     )}
@@ -184,7 +189,8 @@ const LeftSidebar = ({
                                         </div>
                                     </div>
 
-                                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg"></div>
+                                    <div
+                                        className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg"></div>
                                 </div>
                             ))}
                         </div>
@@ -210,25 +216,28 @@ const LeftSidebar = ({
                             <div className={`
                                 w-full p-2 border-2 border-dashed rounded-lg transition-all duration-300 ease-out
                                 ${uploadProgress
-                                    ? 'border-blue-400 bg-blue-50'
-                                    : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 hover:shadow-md hover:scale-[1.02]'
-                                }
+                                ? 'border-blue-400 bg-blue-50'
+                                : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 hover:shadow-md hover:scale-[1.02]'
+                            }
                             `}>
                                 <div className="flex items-center space-x-2">
                                     {uploadProgress ? (
                                         <>
                                             <div className="relative">
-                                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-blue-600"></div>
+                                                <div
+                                                    className="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-blue-600"></div>
                                             </div>
                                             <span className="text-xs font-medium text-blue-700">Uploading...</span>
                                         </>
                                     ) : (
                                         <>
-                                            <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                                                <Upload className="text-white" size={12} />
+                                            <div
+                                                className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                                <Upload className="text-white" size={12}/>
                                             </div>
                                             <div className="text-left">
-                                                <span className="text-sm font-medium text-slate-700 group-hover:text-blue-700 transition-colors block">
+                                                <span
+                                                    className="text-sm font-medium text-slate-700 group-hover:text-blue-700 transition-colors block">
                                                     Upload CSV/Excel
                                                 </span>
                                                 <p className="text-xs text-slate-500">Click to browse files</p>
@@ -249,7 +258,8 @@ const LeftSidebar = ({
                     </div>
 
                     {/* Available Files Library - Gets equal space with upload section */}
-                    <div className="flex-1 p-3 border-b border-slate-200 bg-white/30 flex flex-col min-h-0 overflow-hidden">
+                    <div
+                        className="flex-1 p-3 border-b border-slate-200 bg-white/30 flex flex-col min-h-0 overflow-hidden">
                         <div className="flex items-center justify-between mb-2 flex-shrink-0">
                             <div className="flex items-center space-x-2">
                                 <div className="w-4 h-4 bg-indigo-100 rounded-full flex items-center justify-center">
@@ -262,14 +272,15 @@ const LeftSidebar = ({
                                 className="p-1 rounded-lg bg-white/70 hover:bg-white hover:shadow-md transition-all duration-200 group"
                                 title="Refresh file list"
                             >
-                                <RefreshCw size={12} className="text-slate-600 group-hover:text-blue-600 group-hover:rotate-180 transition-all duration-300" />
+                                <RefreshCw size={12}
+                                           className="text-slate-600 group-hover:text-blue-600 group-hover:rotate-180 transition-all duration-300"/>
                             </button>
                         </div>
 
                         <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
                             {files.length === 0 ? (
                                 <div className="text-center py-4">
-                                    <FileText size={24} className="mx-auto text-slate-300 mb-2" />
+                                    <FileText size={24} className="mx-auto text-slate-300 mb-2"/>
                                     <p className="text-xs text-slate-500">No files uploaded yet</p>
                                     <p className="text-xs text-slate-400 mt-1">Upload files above to get started</p>
                                 </div>
@@ -281,11 +292,13 @@ const LeftSidebar = ({
                                     >
                                         <div className="flex items-center justify-between">
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-medium text-slate-800 truncate" title={file.filename}>
+                                                <p className="text-xs font-medium text-slate-800 truncate"
+                                                   title={file.filename}>
                                                     {file.filename}
                                                 </p>
                                                 <p className="text-xs text-slate-500">
-                                                    {file.total_rows?.toLocaleString()} rows • {file.columns?.length} cols
+                                                    {file.total_rows?.toLocaleString()} rows
+                                                    • {file.columns?.length} cols
                                                 </p>
                                             </div>
                                             <button
@@ -297,7 +310,7 @@ const LeftSidebar = ({
                                                 className="opacity-0 group-hover:opacity-100 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-all duration-200"
                                                 title="View/Edit File"
                                             >
-                                                <Eye size={14} />
+                                                <Eye size={14}/>
                                             </button>
                                         </div>
                                     </div>
@@ -308,15 +321,16 @@ const LeftSidebar = ({
 
                     {/* Step 3: File Selection for Process - Only show when template selected */}
                     {selectedTemplate && (
-                        <div className="flex-1 p-3 border-b border-slate-200 bg-white/30 flex flex-col min-h-0 overflow-hidden">
+                        <div
+                            className="flex-1 p-3 border-b border-slate-200 bg-white/30 flex flex-col min-h-0 overflow-hidden">
                             <div className="flex items-center space-x-2 mb-3">
                                 <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
                                     <span className="text-blue-600 text-sm font-bold">3</span>
                                 </div>
                                 <h3 className="text-sm font-semibold text-slate-700">Select Files for Process</h3>
                                 <div className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                    status.complete 
-                                        ? 'bg-green-100 text-green-800' 
+                                    status.complete
+                                        ? 'bg-green-100 text-green-800'
                                         : 'bg-yellow-100 text-yellow-800'
                                 }`}>
                                     {status.selected}/{status.required}
@@ -326,18 +340,45 @@ const LeftSidebar = ({
                             <div className="flex-1 space-y-2 min-h-0 overflow-y-auto">
                                 {requiredFiles.map((requirement, index) => {
                                     const colors = [
-                                        { bg: 'bg-emerald-100', text: 'text-emerald-600', hover: 'hover:text-emerald-800 hover:bg-emerald-50', check: 'text-emerald-500' },
-                                        { bg: 'bg-purple-100', text: 'text-purple-600', hover: 'hover:text-purple-800 hover:bg-purple-50', check: 'text-purple-500' },
-                                        { bg: 'bg-blue-100', text: 'text-blue-600', hover: 'hover:text-blue-800 hover:bg-blue-50', check: 'text-blue-500' },
-                                        { bg: 'bg-orange-100', text: 'text-orange-600', hover: 'hover:text-orange-800 hover:bg-orange-50', check: 'text-orange-500' },
-                                        { bg: 'bg-teal-100', text: 'text-teal-600', hover: 'hover:text-teal-800 hover:bg-teal-50', check: 'text-teal-500' }
+                                        {
+                                            bg: 'bg-emerald-100',
+                                            text: 'text-emerald-600',
+                                            hover: 'hover:text-emerald-800 hover:bg-emerald-50',
+                                            check: 'text-emerald-500'
+                                        },
+                                        {
+                                            bg: 'bg-purple-100',
+                                            text: 'text-purple-600',
+                                            hover: 'hover:text-purple-800 hover:bg-purple-50',
+                                            check: 'text-purple-500'
+                                        },
+                                        {
+                                            bg: 'bg-blue-100',
+                                            text: 'text-blue-600',
+                                            hover: 'hover:text-blue-800 hover:bg-blue-50',
+                                            check: 'text-blue-500'
+                                        },
+                                        {
+                                            bg: 'bg-orange-100',
+                                            text: 'text-orange-600',
+                                            hover: 'hover:text-orange-800 hover:bg-orange-50',
+                                            check: 'text-orange-500'
+                                        },
+                                        {
+                                            bg: 'bg-teal-100',
+                                            text: 'text-teal-600',
+                                            hover: 'hover:text-teal-800 hover:bg-teal-50',
+                                            check: 'text-teal-500'
+                                        }
                                     ];
                                     const color = colors[index % colors.length];
 
                                     return (
                                         <div key={requirement.key} className="group">
-                                            <label className="flex items-center space-x-2 text-xs font-medium text-slate-600 mb-1">
-                                                <div className={`w-4 h-4 rounded-full flex items-center justify-center ${color.bg}`}>
+                                            <label
+                                                className="flex items-center space-x-2 text-xs font-medium text-slate-600 mb-1">
+                                                <div
+                                                    className={`w-4 h-4 rounded-full flex items-center justify-center ${color.bg}`}>
                                                     <span className={`text-xs font-bold ${color.text}`}>
                                                         {String.fromCharCode(65 + index)}
                                                     </span>
@@ -362,8 +403,9 @@ const LeftSidebar = ({
                                                         ))}
                                                     </select>
                                                     {selectedFiles[requirement.key] && (
-                                                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                                                            <CheckCircle size={12} className={color.check} />
+                                                        <div
+                                                            className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                                                            <CheckCircle size={12} className={color.check}/>
                                                         </div>
                                                     )}
                                                 </div>
@@ -377,7 +419,7 @@ const LeftSidebar = ({
                                                         className={`p-2 rounded transition-all duration-200 ${color.text} ${color.hover}`}
                                                         title={`View ${requirement.label}`}
                                                     >
-                                                        <Eye size={12} />
+                                                        <Eye size={12}/>
                                                     </button>
                                                 )}
                                             </div>
@@ -388,12 +430,14 @@ const LeftSidebar = ({
 
                             {/* Selection Status */}
                             {status.complete && (
-                                <div className="mt-2 p-2 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-lg border border-emerald-200 flex-shrink-0">
+                                <div
+                                    className="mt-2 p-2 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-lg border border-emerald-200 flex-shrink-0">
                                     <div className="flex items-center justify-center space-x-2">
-                                        <CheckCircle size={16} className="text-emerald-500" />
+                                        <CheckCircle size={16} className="text-emerald-500"/>
                                         <span className="text-sm font-medium text-emerald-800">All files selected</span>
                                     </div>
-                                    <p className="text-xs text-center text-slate-600 mt-1">Ready to configure process</p>
+                                    <p className="text-xs text-center text-slate-600 mt-1">Ready to configure
+                                        process</p>
                                 </div>
                             )}
                         </div>
@@ -405,21 +449,24 @@ const LeftSidebar = ({
             <div className="h-16 p-2 flex items-center justify-center bg-white/20 flex-shrink-0">
                 {!selectedTemplate ? (
                     <div className="text-slate-500 text-center">
-                        <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                        <div
+                            className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-1">
                             <span className="text-sm">🚀</span>
                         </div>
                         <p className="text-xs font-medium">Choose a Process</p>
                     </div>
                 ) : !status.complete ? (
                     <div className="text-yellow-600 text-center">
-                        <div className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                        <div
+                            className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-1">
                             <span className="text-sm">📁</span>
                         </div>
                         <p className="text-xs font-medium">Select Required Files</p>
                     </div>
                 ) : (
                     <div className="text-green-600 text-center">
-                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                        <div
+                            className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-1">
                             <span className="text-sm">✅</span>
                         </div>
                         <p className="text-xs font-medium">Ready to Start</p>

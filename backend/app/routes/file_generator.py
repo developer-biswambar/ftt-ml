@@ -1,17 +1,17 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
-from fastapi.responses import JSONResponse, StreamingResponse
-from typing import Dict, List, Any, Optional, Union
-import pandas as pd
-import numpy as np
-import json
 import io
+import json
 import os
-from datetime import datetime
-import uuid
-from pydantic import BaseModel, Field
-import openai
-from openai import OpenAI
 import re
+import uuid
+from datetime import datetime
+from typing import List, Any, Optional, Union
+
+import numpy as np
+import pandas as pd
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi.responses import StreamingResponse
+from openai import OpenAI
+from pydantic import BaseModel
 
 # Initialize OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))

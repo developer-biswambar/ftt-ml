@@ -1,550 +1,623 @@
 {
-	"info": {
-		"_postman_id": "d30e4585-e68c-40ae-aff1-4d923877ba7c",
-		"name": "Optimized Reconciliation API",
-		"description": "Enhanced collection for testing the optimized reconciliation API with column selection, performance improvements, and advanced features for large datasets (50k-100k records)",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "46038962"
-	},
-	"item": [
-		{
-			"name": "1. Health & Status",
-			"item": [
-				{
-					"name": "Health Check",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test(\"Service is healthy\", function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData.status).to.eql('healthy');",
-									"});",
-									"",
-									"pm.test(\"Has optimization features\", function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData.features).to.include('hash_based_matching');",
-									"    pm.expect(jsonData.features).to.include('vectorized_extraction');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/reconciliation/health",
-							"host": ["{{base_url}}"],
-							"path": ["reconciliation", "health"]
-						}
-					}
-				},
-				{
-					"name": "Performance Metrics",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/performance/metrics",
-							"host": ["{{base_url}}"],
-							"path": ["performance", "metrics"]
-						}
-					}
-				},
-				{
-					"name": "Enhanced Debug Status",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/debug/status",
-							"host": ["{{base_url}}"],
-							"path": ["debug", "status"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "2. Basic Reconciliation",
-			"item": [
-				{
-					"name": "Process with Column Selection",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test(\"Response has reconciliation ID\", function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('reconciliation_id');",
-									"    pm.environment.set(\"reconciliation_id\", jsonData.reconciliation_id);",
-									"});",
-									"",
-									"pm.test(\"Success is true\", function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData.success).to.eql(true);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "fileA",
-									"type": "file",
-									"src": []
-								},
-								{
-									"key": "fileB",
-									"type": "file",
-									"src": []
-								},
-								{
-									"key": "rules",
-									"value": "{\n  \"Files\": [\n    {\n      \"Name\": \"FileA\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Description\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"\n          ]\n        }\n      ],\n      \"Filter\": [\n        {\n          \"ColumnName\": \"Status\",\n          \"MatchType\": \"equals\",\n          \"Value\": \"Settled\"\n        }\n      ]\n    },\n    {\n      \"Name\": \"FileB\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Details\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"\n          ]\n        }\n      ]\n    }\n  ],\n  \"ReconciliationRules\": [\n    {\n      \"LeftFileColumn\": \"Isin\",\n      \"RightFileColumn\": \"Isin\",\n      \"MatchType\": \"equals\"\n    },\n    {\n      \"LeftFileColumn\": \"Amount\",\n      \"RightFileColumn\": \"Amount\",\n      \"MatchType\": \"tolerance\",\n      \"ToleranceValue\": 50\n    }\n  ]\n}",
-									"type": "text"
-								},
-								{
-									"key": "selected_columns_file_a",
-									"value": "[\"Description\", \"Amount\", \"Status\"]",
-									"type": "text"
-								},
-								{
-									"key": "selected_columns_file_b",
-									"value": "[\"Details\", \"Amount\", \"Trade_Date\"]",
-									"type": "text"
-								}
-							]
-						},
-						"url": {
-							"raw": "{{base_url}}/reconciliation/process",
-							"host": ["{{base_url}}"],
-							"path": ["reconciliation", "process"]
-						}
-					}
-				},
-				{
-					"name": "Large Dataset Reconciliation",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test(\"Processing time is reasonable\", function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData.summary.processing_time_seconds).to.be.below(30);",
-									"});",
-									"",
-									"pm.environment.set(\"large_reconciliation_id\", jsonData.reconciliation_id);"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "fileA",
-									"type": "file",
-									"src": []
-								},
-								{
-									"key": "fileB",
-									"type": "file",
-									"src": []
-								},
-								{
-									"key": "rules",
-									"value": "{\n  \"Files\": [\n    {\n      \"Name\": \"FileA\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"SecurityId\",\n          \"SourceColumn\": \"TradeDescription\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\",\n            \"\\\\b[A-Z]{3}[0-9]{6}\\\\b\"\n          ]\n        }\n      ]\n    },\n    {\n      \"Name\": \"FileB\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"SecurityId\",\n          \"SourceColumn\": \"SecurityDetails\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"]\n        }\n      ]\n    }\n  ],\n  \"ReconciliationRules\": [\n    {\n      \"LeftFileColumn\": \"SecurityId\",\n      \"RightFileColumn\": \"SecurityId\",\n      \"MatchType\": \"equals\"\n    }\n  ]\n}",
-									"type": "text"
-								},
-								{
-									"key": "selected_columns_file_a",
-									"value": "[\"TradeId\", \"SecurityId\", \"Amount\"]",
-									"type": "text"
-								},
-								{
-									"key": "selected_columns_file_b",
-									"value": "[\"TransactionRef\", \"SecurityId\", \"Value\"]",
-									"type": "text"
-								}
-							]
-						},
-						"url": {
-							"raw": "{{base_url}}/reconciliation/process",
-							"host": ["{{base_url}}"],
-							"path": ["reconciliation", "process"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "3. Results Retrieval",
-			"item": [
-				{
-					"name": "Get Paginated Results - All",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test(\"Has pagination info\", function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('pagination');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/reconciliation/results/{{reconciliation_id}}?result_type=all&page=1&page_size=1000",
-							"host": ["{{base_url}}"],
-							"path": ["reconciliation", "results", "{{reconciliation_id}}"],
-							"query": [
-								{
-									"key": "result_type",
-									"value": "all"
-								},
-								{
-									"key": "page",
-									"value": "1"
-								},
-								{
-									"key": "page_size",
-									"value": "1000"
-								}
-							]
-						}
-					}
-				},
-				{
-					"name": "Get Matched Records Only",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/reconciliation/results/{{reconciliation_id}}?result_type=matched&page=1&page_size=500",
-							"host": ["{{base_url}}"],
-							"path": ["reconciliation", "results", "{{reconciliation_id}}"],
-							"query": [
-								{
-									"key": "result_type",
-									"value": "matched"
-								},
-								{
-									"key": "page",
-									"value": "1"
-								},
-								{
-									"key": "page_size",
-									"value": "500"
-								}
-							]
-						}
-					}
-				},
-				{
-					"name": "Get Quick Summary",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test(\"Has summary data\", function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData.summary).to.have.property('match_percentage');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/reconciliation/results/{{reconciliation_id}}/summary",
-							"host": ["{{base_url}}"],
-							"path": ["reconciliation", "results", "{{reconciliation_id}}", "summary"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "4. Downloads",
-			"item": [
-				{
-					"name": "Download Excel - All Results",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test(\"Content-Type is Excel\", function () {",
-									"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\");",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/reconciliation/download/{{reconciliation_id}}?format=excel&result_type=all&compress=true",
-							"host": ["{{base_url}}"],
-							"path": ["reconciliation", "download", "{{reconciliation_id}}"],
-							"query": [
-								{
-									"key": "format",
-									"value": "excel"
-								},
-								{
-									"key": "result_type",
-									"value": "all"
-								},
-								{
-									"key": "compress",
-									"value": "true"
-								}
-							]
-						}
-					}
-				},
-				{
-					"name": "Download CSV - Matched Only",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/reconciliation/download/{{reconciliation_id}}?format=csv&result_type=matched",
-							"host": ["{{base_url}}"],
-							"path": ["reconciliation", "download", "{{reconciliation_id}}"],
-							"query": [
-								{
-									"key": "format",
-									"value": "csv"
-								},
-								{
-									"key": "result_type",
-									"value": "matched"
-								}
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "5. Error Handling",
-			"item": [
-				{
-					"name": "Invalid Column Names",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 400\", function () {",
-									"    pm.response.to.have.status(400);",
-									"});",
-									"",
-									"pm.test(\"Error message mentions missing column\", function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(JSON.stringify(jsonData)).to.include(\"not found\");",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "fileA",
-									"type": "file",
-									"src": []
-								},
-								{
-									"key": "fileB",
-									"type": "file",
-									"src": []
-								},
-								{
-									"key": "rules",
-									"value": "{\n  \"Files\": [\n    {\n      \"Name\": \"FileA\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"ISIN\",\n          \"SourceColumn\": \"NonExistentColumn\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"]\n        }\n      ]\n    },\n    {\n      \"Name\": \"FileB\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"ISIN\",\n          \"SourceColumn\": \"Details\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"]\n        }\n      ]\n    }\n  ],\n  \"ReconciliationRules\": [\n    {\n      \"LeftFileColumn\": \"ISIN\",\n      \"RightFileColumn\": \"ISIN\",\n      \"MatchType\": \"equals\"\n    }\n  ]\n}",
-									"type": "text"
-								}
-							]
-						},
-						"url": {
-							"raw": "{{base_url}}/reconciliation/process",
-							"host": ["{{base_url}}"],
-							"path": ["reconciliation", "process"]
-						}
-					}
-				},
-				{
-					"name": "Invalid Reconciliation ID",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 404\", function () {",
-									"    pm.response.to.have.status(404);",
-									"});",
-									"",
-									"pm.test(\"Error message mentions not found\", function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData.detail).to.include(\"not found\");",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/reconciliation/results/invalid-id-12345",
-							"host": ["{{base_url}}"],
-							"path": ["reconciliation", "results", "invalid-id-12345"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "6. Management Operations",
-			"item": [
-				{
-					"name": "Delete Reconciliation Results",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test(\"Deletion successful\", function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData.success).to.eql(true);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/reconciliation/results/{{reconciliation_id}}",
-							"host": ["{{base_url}}"],
-							"path": ["reconciliation", "results", "{{reconciliation_id}}"]
-						}
-					}
-				}
-			]
-		}
-	],
-	"event": [
-		{
-			"listen": "prerequest",
-			"script": {
-				"type": "text/javascript",
-				"exec": [
-					"pm.environment.set('request_start_time', new Date().getTime());"
-				]
-			}
-		},
-		{
-			"listen": "test",
-			"script": {
-				"type": "text/javascript",
-				"exec": [
-					"const startTime = pm.environment.get('request_start_time');",
-					"if (startTime) {",
-					"    const duration = new Date().getTime() - parseInt(startTime);",
-					"    console.log(`Request completed in ${duration}ms`);",
-					"}"
-				]
-			}
-		}
-	],
-	"variable": [
-		{
-			"key": "base_url",
-			"value": "http://localhost:8000",
-			"type": "string"
-		},
-		{
-			"key": "reconciliation_id",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "large_reconciliation_id",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "api_version",
-			"value": "4.0.0",
-			"type": "string"
-		}
-	]
+  "info": {
+    "_postman_id": "d30e4585-e68c-40ae-aff1-4d923877ba7c",
+    "name": "Optimized Reconciliation API",
+    "description": "Enhanced collection for testing the optimized reconciliation API with column selection, performance improvements, and advanced features for large datasets (50k-100k records)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "46038962"
+  },
+  "item": [
+    {
+      "name": "1. Health & Status",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Service is healthy\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql('healthy');",
+                  "});",
+                  "",
+                  "pm.test(\"Has optimization features\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.features).to.include('hash_based_matching');",
+                  "    pm.expect(jsonData.features).to.include('vectorized_extraction');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reconciliation/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconciliation",
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Performance Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/performance/metrics",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "performance",
+                "metrics"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Enhanced Debug Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/debug/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "debug",
+                "status"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Basic Reconciliation",
+      "item": [
+        {
+          "name": "Process with Column Selection",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has reconciliation ID\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('reconciliation_id');",
+                  "    pm.environment.set(\"reconciliation_id\", jsonData.reconciliation_id);",
+                  "});",
+                  "",
+                  "pm.test(\"Success is true\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "fileA",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "fileB",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "rules",
+                  "value": "{\n  \"Files\": [\n    {\n      \"Name\": \"FileA\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Description\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"\n          ]\n        }\n      ],\n      \"Filter\": [\n        {\n          \"ColumnName\": \"Status\",\n          \"MatchType\": \"equals\",\n          \"Value\": \"Settled\"\n        }\n      ]\n    },\n    {\n      \"Name\": \"FileB\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"Isin\",\n          \"SourceColumn\": \"Details\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"\n          ]\n        }\n      ]\n    }\n  ],\n  \"ReconciliationRules\": [\n    {\n      \"LeftFileColumn\": \"Isin\",\n      \"RightFileColumn\": \"Isin\",\n      \"MatchType\": \"equals\"\n    },\n    {\n      \"LeftFileColumn\": \"Amount\",\n      \"RightFileColumn\": \"Amount\",\n      \"MatchType\": \"tolerance\",\n      \"ToleranceValue\": 50\n    }\n  ]\n}",
+                  "type": "text"
+                },
+                {
+                  "key": "selected_columns_file_a",
+                  "value": "[\"Description\", \"Amount\", \"Status\"]",
+                  "type": "text"
+                },
+                {
+                  "key": "selected_columns_file_b",
+                  "value": "[\"Details\", \"Amount\", \"Trade_Date\"]",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/reconciliation/process",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconciliation",
+                "process"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Large Dataset Reconciliation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Processing time is reasonable\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.summary.processing_time_seconds).to.be.below(30);",
+                  "});",
+                  "",
+                  "pm.environment.set(\"large_reconciliation_id\", jsonData.reconciliation_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "fileA",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "fileB",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "rules",
+                  "value": "{\n  \"Files\": [\n    {\n      \"Name\": \"FileA\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"SecurityId\",\n          \"SourceColumn\": \"TradeDescription\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\n            \"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\",\n            \"\\\\b[A-Z]{3}[0-9]{6}\\\\b\"\n          ]\n        }\n      ]\n    },\n    {\n      \"Name\": \"FileB\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"SecurityId\",\n          \"SourceColumn\": \"SecurityDetails\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"]\n        }\n      ]\n    }\n  ],\n  \"ReconciliationRules\": [\n    {\n      \"LeftFileColumn\": \"SecurityId\",\n      \"RightFileColumn\": \"SecurityId\",\n      \"MatchType\": \"equals\"\n    }\n  ]\n}",
+                  "type": "text"
+                },
+                {
+                  "key": "selected_columns_file_a",
+                  "value": "[\"TradeId\", \"SecurityId\", \"Amount\"]",
+                  "type": "text"
+                },
+                {
+                  "key": "selected_columns_file_b",
+                  "value": "[\"TransactionRef\", \"SecurityId\", \"Value\"]",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/reconciliation/process",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconciliation",
+                "process"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Results Retrieval",
+      "item": [
+        {
+          "name": "Get Paginated Results - All",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Has pagination info\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('pagination');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reconciliation/results/{{reconciliation_id}}?result_type=all&page=1&page_size=1000",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconciliation",
+                "results",
+                "{{reconciliation_id}}"
+              ],
+              "query": [
+                {
+                  "key": "result_type",
+                  "value": "all"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "1000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Matched Records Only",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reconciliation/results/{{reconciliation_id}}?result_type=matched&page=1&page_size=500",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconciliation",
+                "results",
+                "{{reconciliation_id}}"
+              ],
+              "query": [
+                {
+                  "key": "result_type",
+                  "value": "matched"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "500"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Quick Summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Has summary data\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.summary).to.have.property('match_percentage');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reconciliation/results/{{reconciliation_id}}/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconciliation",
+                "results",
+                "{{reconciliation_id}}",
+                "summary"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Downloads",
+      "item": [
+        {
+          "name": "Download Excel - All Results",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Content-Type is Excel\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reconciliation/download/{{reconciliation_id}}?format=excel&result_type=all&compress=true",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconciliation",
+                "download",
+                "{{reconciliation_id}}"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "excel"
+                },
+                {
+                  "key": "result_type",
+                  "value": "all"
+                },
+                {
+                  "key": "compress",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Download CSV - Matched Only",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reconciliation/download/{{reconciliation_id}}?format=csv&result_type=matched",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconciliation",
+                "download",
+                "{{reconciliation_id}}"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "csv"
+                },
+                {
+                  "key": "result_type",
+                  "value": "matched"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Error Handling",
+      "item": [
+        {
+          "name": "Invalid Column Names",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error message mentions missing column\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(JSON.stringify(jsonData)).to.include(\"not found\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "fileA",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "fileB",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "rules",
+                  "value": "{\n  \"Files\": [\n    {\n      \"Name\": \"FileA\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"ISIN\",\n          \"SourceColumn\": \"NonExistentColumn\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"]\n        }\n      ]\n    },\n    {\n      \"Name\": \"FileB\",\n      \"Extract\": [\n        {\n          \"ResultColumnName\": \"ISIN\",\n          \"SourceColumn\": \"Details\",\n          \"MatchType\": \"regex\",\n          \"Patterns\": [\"\\\\b[A-Z]{2}[A-Z0-9]{9}[0-9]\\\\b\"]\n        }\n      ]\n    }\n  ],\n  \"ReconciliationRules\": [\n    {\n      \"LeftFileColumn\": \"ISIN\",\n      \"RightFileColumn\": \"ISIN\",\n      \"MatchType\": \"equals\"\n    }\n  ]\n}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/reconciliation/process",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconciliation",
+                "process"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Invalid Reconciliation ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Error message mentions not found\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.detail).to.include(\"not found\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reconciliation/results/invalid-id-12345",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconciliation",
+                "results",
+                "invalid-id-12345"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Management Operations",
+      "item": [
+        {
+          "name": "Delete Reconciliation Results",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Deletion successful\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reconciliation/results/{{reconciliation_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconciliation",
+                "results",
+                "{{reconciliation_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.environment.set('request_start_time', new Date().getTime());"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const startTime = pm.environment.get('request_start_time');",
+          "if (startTime) {",
+          "    const duration = new Date().getTime() - parseInt(startTime);",
+          "    console.log(`Request completed in ${duration}ms`);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "reconciliation_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "large_reconciliation_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "api_version",
+      "value": "4.0.0",
+      "type": "string"
+    }
+  ]
 }

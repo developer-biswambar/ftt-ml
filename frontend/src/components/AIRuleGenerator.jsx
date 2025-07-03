@@ -1,8 +1,8 @@
 // src/components/AIRuleGenerator.jsx - Simulates OpenAI rule generation
-import React, { useState } from 'react';
-import { Wand2, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import React, {useState} from 'react';
+import {AlertCircle, CheckCircle, Loader, Wand2} from 'lucide-react';
 
-const AIRuleGenerator = ({ selectedFiles, onRulesGenerated, onCancel }) => {
+const AIRuleGenerator = ({selectedFiles, onRulesGenerated, onCancel}) => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [userRequirements, setUserRequirements] = useState('');
     const [generatedRules, setGeneratedRules] = useState(null);
@@ -103,12 +103,14 @@ const AIRuleGenerator = ({ selectedFiles, onRulesGenerated, onCancel }) => {
     return (
         <div className="bg-white border border-purple-300 rounded-lg p-6 shadow-lg max-w-4xl mx-auto">
             <div className="flex items-center space-x-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
-                    <Wand2 className="text-white" size={20} />
+                <div
+                    className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                    <Wand2 className="text-white" size={20}/>
                 </div>
                 <div>
                     <h3 className="text-xl font-semibold text-gray-800">AI Rule Generation</h3>
-                    <p className="text-sm text-gray-600">Describe your reconciliation needs and let AI generate the rules</p>
+                    <p className="text-sm text-gray-600">Describe your reconciliation needs and let AI generate the
+                        rules</p>
                 </div>
             </div>
 
@@ -158,7 +160,7 @@ const AIRuleGenerator = ({ selectedFiles, onRulesGenerated, onCancel }) => {
 
                     {error && (
                         <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
-                            <AlertCircle size={16} />
+                            <AlertCircle size={16}/>
                             <span className="text-sm">{error}</span>
                         </div>
                     )}
@@ -178,12 +180,12 @@ const AIRuleGenerator = ({ selectedFiles, onRulesGenerated, onCancel }) => {
                         >
                             {isGenerating ? (
                                 <>
-                                    <Loader size={16} className="animate-spin" />
+                                    <Loader size={16} className="animate-spin"/>
                                     <span>Generating Rules...</span>
                                 </>
                             ) : (
                                 <>
-                                    <Wand2 size={16} />
+                                    <Wand2 size={16}/>
                                     <span>Generate Rules</span>
                                 </>
                             )}
@@ -195,7 +197,7 @@ const AIRuleGenerator = ({ selectedFiles, onRulesGenerated, onCancel }) => {
                     {/* Generated Rules Display */}
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                         <div className="flex items-center space-x-2 mb-3">
-                            <CheckCircle size={16} className="text-green-600" />
+                            <CheckCircle size={16} className="text-green-600"/>
                             <h4 className="font-medium text-green-800">Rules Generated Successfully!</h4>
                         </div>
 
@@ -209,7 +211,8 @@ const AIRuleGenerator = ({ selectedFiles, onRulesGenerated, onCancel }) => {
                                             <span className="font-medium">{file.Name}:</span>
                                             {file.Extract.map((rule, ruleIndex) => (
                                                 <div key={ruleIndex} className="ml-4">
-                                                    • Extract "{rule.ResultColumnName}" from "{rule.SourceColumn}" using {rule.MatchType}
+                                                    • Extract "{rule.ResultColumnName}" from "{rule.SourceColumn}"
+                                                    using {rule.MatchType}
                                                 </div>
                                             ))}
                                         </div>
@@ -238,7 +241,8 @@ const AIRuleGenerator = ({ selectedFiles, onRulesGenerated, onCancel }) => {
                                 <div className="text-sm text-gray-600 space-y-1">
                                     {generatedRules.ReconciliationRules.map((rule, index) => (
                                         <div key={index} className="ml-4">
-                                            • Match "{rule.LeftFileColumn}" with "{rule.RightFileColumn}" using {rule.MatchType}
+                                            • Match "{rule.LeftFileColumn}" with "{rule.RightFileColumn}"
+                                            using {rule.MatchType}
                                             {rule.ToleranceValue && ` (tolerance: ${rule.ToleranceValue})`}
                                         </div>
                                     ))}
@@ -266,7 +270,7 @@ const AIRuleGenerator = ({ selectedFiles, onRulesGenerated, onCancel }) => {
                                 onClick={acceptRules}
                                 className="flex items-center space-x-2 px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                             >
-                                <CheckCircle size={16} />
+                                <CheckCircle size={16}/>
                                 <span>Use These Rules</span>
                             </button>
                         </div>

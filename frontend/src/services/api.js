@@ -50,7 +50,7 @@ export const apiService = {
     },
 
     updateFileData: async (fileId, data) => {
-        const response = await api.put(`/files/${fileId}/data`, { data });
+        const response = await api.put(`/files/${fileId}/data`, {data});
         return response.data;
     },
 

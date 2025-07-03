@@ -1,10 +1,10 @@
 // src/components/ChatInterface.jsx - Fixed auto-scroll for flow components
-import React, { useEffect, useRef, useState } from 'react';
-import { Send, FileText, Settings, CheckCircle, AlertCircle } from 'lucide-react';
+import React, {useEffect, useRef, useState} from 'react';
+import {AlertCircle, CheckCircle, Send, Settings} from 'lucide-react';
 import ReconciliationFlow from './ReconciliationFlow';
 import FileGeneratorFlow from './FileGeneratorFlow';
 
-const TypingIndicator = ({ message }) => {
+const TypingIndicator = ({message}) => {
     return (
         <div className="bg-gray-100 text-gray-800 mr-auto max-w-2xl p-4 rounded-lg mb-4">
             <div className="flex items-center space-x-2 mb-2">
@@ -27,7 +27,7 @@ const TypingIndicator = ({ message }) => {
     );
 };
 
-const MessageComponent = ({ message }) => {
+const MessageComponent = ({message}) => {
     const getMessageStyle = () => {
         switch (message.type) {
             case 'user':
@@ -59,20 +59,20 @@ const MessageComponent = ({ message }) => {
 };
 
 const ChatInterface = ({
-    messages,
-    currentInput,
-    setCurrentInput,
-    isProcessing,
-    isAnalyzingColumns,
-    selectedFiles,
-    selectedTemplate,
-    requiredFiles,
-    onStartReconciliation,
-    isTyping,
-    typingMessage,
-    files,
-    onSendMessage
-}) => {
+                           messages,
+                           currentInput,
+                           setCurrentInput,
+                           isProcessing,
+                           isAnalyzingColumns,
+                           selectedFiles,
+                           selectedTemplate,
+                           requiredFiles,
+                           onStartReconciliation,
+                           isTyping,
+                           typingMessage,
+                           files,
+                           onSendMessage
+                       }) => {
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
     const [currentFlow, setCurrentFlow] = useState(null);
@@ -186,10 +186,10 @@ const ChatInterface = ({
 
         // Check if user is trying to start a process
         const isStartCommand = userInput.toLowerCase().includes('start') ||
-                              userInput.toLowerCase().includes('begin') ||
-                              userInput.toLowerCase().includes('process') ||
-                              userInput.toLowerCase().includes('reconcil') ||
-                              userInput.toLowerCase().includes('generate');
+            userInput.toLowerCase().includes('begin') ||
+            userInput.toLowerCase().includes('process') ||
+            userInput.toLowerCase().includes('reconcil') ||
+            userInput.toLowerCase().includes('generate');
 
         if (isStartCommand) {
             if (selectedTemplate && areAllFilesSelected()) {
@@ -226,7 +226,7 @@ const ChatInterface = ({
 
     const getReadyStatus = () => {
         if (!selectedTemplate) {
-            return { ready: false, message: "No process selected" };
+            return {ready: false, message: "No process selected"};
         }
         if (!areAllFilesSelected()) {
             const selected = Object.keys(selectedFiles).length;
@@ -236,7 +236,7 @@ const ChatInterface = ({
                 message: `${selected}/${required} files selected`
             };
         }
-        return { ready: true, message: "Ready to start" };
+        return {ready: true, message: "Ready to start"};
     };
 
     const status = getReadyStatus();
@@ -262,7 +262,7 @@ const ChatInterface = ({
 
                         {currentFlow && (
                             <div className="flex items-center space-x-2 bg-purple-50 px-3 py-1 rounded-lg">
-                                <Settings size={16} className="text-purple-600 animate-spin" />
+                                <Settings size={16} className="text-purple-600 animate-spin"/>
                                 <span className="text-sm text-purple-800 font-medium">Configuring Process</span>
                             </div>
                         )}
@@ -273,15 +273,16 @@ const ChatInterface = ({
             {/* Messages */}
             <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4">
                 {messages.map((message) => (
-                    <MessageComponent key={message.id} message={message} />
+                    <MessageComponent key={message.id} message={message}/>
                 ))}
 
                 {/* Typing Indicator */}
-                {isTyping && <TypingIndicator message={typingMessage} />}
+                {isTyping && <TypingIndicator message={typingMessage}/>}
 
                 {/* Processing Indicators */}
                 {isProcessing && !isTyping && (
-                    <div className="flex items-center space-x-3 text-blue-600 bg-blue-50 p-4 rounded-lg mr-auto max-w-md transform transition-all duration-300 ease-out animate-fadeIn">
+                    <div
+                        className="flex items-center space-x-3 text-blue-600 bg-blue-50 p-4 rounded-lg mr-auto max-w-md transform transition-all duration-300 ease-out animate-fadeIn">
                         <div className="relative">
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
                             <div className="absolute inset-0 rounded-full border-2 border-blue-200 animate-ping"></div>
@@ -291,10 +292,12 @@ const ChatInterface = ({
                 )}
 
                 {isAnalyzingColumns && !isTyping && (
-                    <div className="flex items-center space-x-3 text-purple-600 bg-purple-50 p-4 rounded-lg mr-auto max-w-md transform transition-all duration-300 ease-out animate-fadeIn">
+                    <div
+                        className="flex items-center space-x-3 text-purple-600 bg-purple-50 p-4 rounded-lg mr-auto max-w-md transform transition-all duration-300 ease-out animate-fadeIn">
                         <div className="relative">
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
-                            <div className="absolute inset-0 rounded-full border-2 border-purple-200 animate-ping"></div>
+                            <div
+                                className="absolute inset-0 rounded-full border-2 border-purple-200 animate-ping"></div>
                         </div>
                         <span className="text-sm">Analyzing data structure...</span>
                     </div>
@@ -329,14 +332,15 @@ const ChatInterface = ({
                     </div>
                 )}
 
-                <div ref={messagesEndRef} />
+                <div ref={messagesEndRef}/>
             </div>
 
             {/* Input Area */}
             <div className="p-4 border-t border-gray-200 bg-white">
                 {/* Show current template requirements */}
                 {currentInput && !currentFlow && (
-                    <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg transform transition-all duration-300 ease-out animate-fadeIn">
+                    <div
+                        className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg transform transition-all duration-300 ease-out animate-fadeIn">
                         <div className="text-sm text-blue-800">
                             <strong>📋 Process Requirements:</strong>
                         </div>
@@ -356,7 +360,7 @@ const ChatInterface = ({
                 {currentFlow && (
                     <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                         <div className="flex items-center space-x-2">
-                            <Settings size={16} className="text-yellow-600" />
+                            <Settings size={16} className="text-yellow-600"/>
                             <span className="text-sm text-yellow-800 font-medium">
                                 Process configuration in progress...
                             </span>
@@ -370,16 +374,16 @@ const ChatInterface = ({
                 {/* Process Status Banner */}
                 {!currentFlow && (
                     <div className={`mb-3 p-3 rounded-lg border ${
-                        status.ready 
-                            ? 'bg-green-50 border-green-200' 
+                        status.ready
+                            ? 'bg-green-50 border-green-200'
                             : 'bg-yellow-50 border-yellow-200'
                     }`}>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
                                 {status.ready ? (
-                                    <CheckCircle size={16} className="text-green-600" />
+                                    <CheckCircle size={16} className="text-green-600"/>
                                 ) : (
-                                    <AlertCircle size={16} className="text-yellow-600" />
+                                    <AlertCircle size={16} className="text-yellow-600"/>
                                 )}
                                 <span className={`text-sm font-medium ${
                                     status.ready ? 'text-green-800' : 'text-yellow-800'
@@ -410,7 +414,8 @@ const ChatInterface = ({
                             {currentInput ? (
                                 <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
                                     <div className="text-sm text-gray-600">
-                                        📋 Requirements loaded from template. Use the "Clear requirements" button above to modify.
+                                        📋 Requirements loaded from template. Use the "Clear requirements" button above
+                                        to modify.
                                     </div>
                                 </div>
                             ) : (
@@ -434,7 +439,7 @@ const ChatInterface = ({
                             disabled={isProcessing || !status.ready || (!currentInput.trim() && !selectedTemplate)}
                             className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-all duration-200 hover:scale-105 disabled:hover:scale-100"
                         >
-                            <Send size={18} />
+                            <Send size={18}/>
                             <span>Start</span>
                         </button>
                     </div>

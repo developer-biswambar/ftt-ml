@@ -5,6 +5,6 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
     plugins: [react()],
     build: {
-    sourcemap: true  // not needed for dev, but just FYI
-  }
+        sourcemap: true  // not needed for dev, but just FYI
+    }
 })

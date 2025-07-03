@@ -1,16 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { apiService } from '../services/api';
-import { CheckCircle, AlertTriangle, FileText, Download, Eye, Trash2, Settings, Zap, Copy, Layers } from 'lucide-react';
+import React, {useCallback, useEffect, useState} from 'react';
+import {apiService} from '../services/api';
+import {AlertTriangle, CheckCircle, Copy, Download, Layers, Zap} from 'lucide-react';
 
 const FileGeneratorFlow = ({
-    files,
-    selectedFiles,
-    selectedTemplate,
-    flowData,
-    onComplete,
-    onCancel,
-    onSendMessage
-}) => {
+                               files,
+                               selectedFiles,
+                               selectedTemplate,
+                               flowData,
+                               onComplete,
+                               onCancel,
+                               onSendMessage
+                           }) => {
     const [currentStep, setCurrentStep] = useState('file_selection');
     const [userPrompt, setUserPrompt] = useState('');
     const [validationResult, setValidationResult] = useState(null);
@@ -156,8 +156,8 @@ const FileGeneratorFlow = ({
 
             // Convert the data back to CSV format
             const csvContent = convertDataToCSV(fileData.data.rows, fileData.data.columns);
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const file = new File([blob], selectedFile.filename, { type: 'text/csv' });
+            const blob = new Blob([csvContent], {type: 'text/csv'});
+            const file = new File([blob], selectedFile.filename, {type: 'text/csv'});
 
             const result = await apiService.validatePrompt(file, userPrompt);
             setValidationResult(result);
@@ -227,8 +227,8 @@ const FileGeneratorFlow = ({
             }
 
             const csvContent = convertDataToCSV(fileData.data.rows, fileData.data.columns);
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const file = new File([blob], selectedFile.filename, { type: 'text/csv' });
+            const blob = new Blob([csvContent], {type: 'text/csv'});
+            const file = new File([blob], selectedFile.filename, {type: 'text/csv'});
 
             const result = await apiService.generateFileFromRules(file, userPrompt);
             setGenerationResult(result);
@@ -334,11 +334,12 @@ const FileGeneratorFlow = ({
         <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 shadow-sm">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-2">
-                    <Zap className="text-purple-600" size={20} />
+                    <Zap className="text-purple-600" size={20}/>
                     <h3 className="text-lg font-semibold text-gray-800">AI File Generator</h3>
                     {validationResult?.validation?.row_multiplication?.enabled && (
-                        <div className="flex items-center space-x-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                            <Layers size={12} />
+                        <div
+                            className="flex items-center space-x-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                            <Layers size={12}/>
                             <span>{validationResult.validation.row_multiplication.count}x Multiplication</span>
                         </div>
                     )}
@@ -353,26 +354,35 @@ const FileGeneratorFlow = ({
 
             {/* Progress Steps */}
             <div className="flex items-center justify-between mb-6">
-                <div className={`flex items-center space-x-2 ${currentStep === 'file_selection' ? 'text-blue-600' : currentStep === 'validate' || currentStep === 'generate' || currentStep === 'download' ? 'text-green-600' : 'text-gray-400'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'file_selection' ? 'bg-blue-100' : currentStep === 'validate' || currentStep === 'generate' || currentStep === 'download' ? 'bg-green-100' : 'bg-gray-100'}`}>
-                        {currentStep === 'validate' || currentStep === 'generate' || currentStep === 'download' ? <CheckCircle size={16} /> : '1'}
+                <div
+                    className={`flex items-center space-x-2 ${currentStep === 'file_selection' ? 'text-blue-600' : currentStep === 'validate' || currentStep === 'generate' || currentStep === 'download' ? 'text-green-600' : 'text-gray-400'}`}>
+                    <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'file_selection' ? 'bg-blue-100' : currentStep === 'validate' || currentStep === 'generate' || currentStep === 'download' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                        {currentStep === 'validate' || currentStep === 'generate' || currentStep === 'download' ?
+                            <CheckCircle size={16}/> : '1'}
                     </div>
                     <span className="text-sm font-medium">Select File</span>
                 </div>
-                <div className={`flex items-center space-x-2 ${currentStep === 'validate' ? 'text-blue-600' : currentStep === 'generate' || currentStep === 'download' ? 'text-green-600' : 'text-gray-400'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'validate' ? 'bg-blue-100' : currentStep === 'generate' || currentStep === 'download' ? 'bg-green-100' : 'bg-gray-100'}`}>
-                        {currentStep === 'generate' || currentStep === 'download' ? <CheckCircle size={16} /> : '2'}
+                <div
+                    className={`flex items-center space-x-2 ${currentStep === 'validate' ? 'text-blue-600' : currentStep === 'generate' || currentStep === 'download' ? 'text-green-600' : 'text-gray-400'}`}>
+                    <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'validate' ? 'bg-blue-100' : currentStep === 'generate' || currentStep === 'download' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                        {currentStep === 'generate' || currentStep === 'download' ? <CheckCircle size={16}/> : '2'}
                     </div>
                     <span className="text-sm font-medium">Validate Rules</span>
                 </div>
-                <div className={`flex items-center space-x-2 ${currentStep === 'generate' ? 'text-blue-600' : currentStep === 'download' ? 'text-green-600' : 'text-gray-400'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'generate' ? 'bg-blue-100' : currentStep === 'download' ? 'bg-green-100' : 'bg-gray-100'}`}>
-                        {currentStep === 'download' ? <CheckCircle size={16} /> : '3'}
+                <div
+                    className={`flex items-center space-x-2 ${currentStep === 'generate' ? 'text-blue-600' : currentStep === 'download' ? 'text-green-600' : 'text-gray-400'}`}>
+                    <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'generate' ? 'bg-blue-100' : currentStep === 'download' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                        {currentStep === 'download' ? <CheckCircle size={16}/> : '3'}
                     </div>
                     <span className="text-sm font-medium">Generate File</span>
                 </div>
-                <div className={`flex items-center space-x-2 ${currentStep === 'download' ? 'text-blue-600' : 'text-gray-400'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'download' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                <div
+                    className={`flex items-center space-x-2 ${currentStep === 'download' ? 'text-blue-600' : 'text-gray-400'}`}>
+                    <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'download' ? 'bg-blue-100' : 'bg-gray-100'}`}>
                         4
                     </div>
                     <span className="text-sm font-medium">Download</span>
@@ -412,23 +422,28 @@ const FileGeneratorFlow = ({
                                 onClick={() => setShowAdvancedPrompts(!showAdvancedPrompts)}
                                 className="flex items-center space-x-1 text-purple-600 hover:text-purple-800 text-sm"
                             >
-                                <Layers size={14} />
+                                <Layers size={14}/>
                                 <span>Templates</span>
                             </button>
                         </div>
 
                         {showAdvancedPrompts && (
                             <div className="mb-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
-                                <h4 className="text-sm font-medium text-purple-900 mb-2">Row Multiplication Templates:</h4>
+                                <h4 className="text-sm font-medium text-purple-900 mb-2">Row Multiplication
+                                    Templates:</h4>
                                 <div className="space-y-2">
                                     {advancedPrompts.map((template, idx) => (
-                                        <div key={idx} className="p-2 bg-white rounded border border-purple-200 hover:bg-purple-50 cursor-pointer transition-colors" onClick={() => handlePromptSelect(template)}>
+                                        <div key={idx}
+                                             className="p-2 bg-white rounded border border-purple-200 hover:bg-purple-50 cursor-pointer transition-colors"
+                                             onClick={() => handlePromptSelect(template)}>
                                             <div className="flex items-center justify-between">
                                                 <div>
-                                                    <div className="text-sm font-medium text-purple-900">{template.title}</div>
-                                                    <div className="text-xs text-purple-700">{template.description}</div>
+                                                    <div
+                                                        className="text-sm font-medium text-purple-900">{template.title}</div>
+                                                    <div
+                                                        className="text-xs text-purple-700">{template.description}</div>
                                                 </div>
-                                                <Copy size={12} className="text-purple-600" />
+                                                <Copy size={12} className="text-purple-600"/>
                                             </div>
                                         </div>
                                     ))}
@@ -443,9 +458,14 @@ const FileGeneratorFlow = ({
                             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-32 resize-none"
                         />
                         <div className="text-xs text-gray-500 mt-1 space-y-1">
-                            <div>💡 <strong>Row Multiplication:</strong> Use phrases like "generate X rows", "create 2 rows for each", "duplicate each row"</div>
-                            <div>🎯 <strong>Conditional Values:</strong> Specify different values per row: "amount 100 in first row, amount 0 in second"</div>
-                            <div>🔗 <strong>Column Mapping:</strong> Map source to output: "copy trade_id from Trade_ID"</div>
+                            <div>💡 <strong>Row Multiplication:</strong> Use phrases like "generate X rows", "create 2
+                                rows for each", "duplicate each row"
+                            </div>
+                            <div>🎯 <strong>Conditional Values:</strong> Specify different values per row: "amount 100 in
+                                first row, amount 0 in second"
+                            </div>
+                            <div>🔗 <strong>Column Mapping:</strong> Map source to output: "copy trade_id from Trade_ID"
+                            </div>
                         </div>
                     </div>
 
@@ -480,14 +500,16 @@ const FileGeneratorFlow = ({
                     </div>
 
                     {validationResult && (
-                        <div className={`p-4 rounded-lg ${validationResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} border`}>
+                        <div
+                            className={`p-4 rounded-lg ${validationResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} border`}>
                             <div className="flex items-center space-x-2 mb-2">
                                 {validationResult.success ? (
-                                    <CheckCircle className="text-green-600" size={16} />
+                                    <CheckCircle className="text-green-600" size={16}/>
                                 ) : (
-                                    <AlertTriangle className="text-red-600" size={16} />
+                                    <AlertTriangle className="text-red-600" size={16}/>
                                 )}
-                                <span className={`font-medium ${validationResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                                <span
+                                    className={`font-medium ${validationResult.success ? 'text-green-800' : 'text-red-800'}`}>
                                     {validationResult.success ? 'Validation Successful' : 'Validation Failed'}
                                 </span>
                             </div>
@@ -495,13 +517,14 @@ const FileGeneratorFlow = ({
                                 <div className="text-sm text-green-700 space-y-1">
                                     {validationResult.validation.row_multiplication?.enabled && (
                                         <div className="flex items-center space-x-2 bg-green-100 p-2 rounded">
-                                            <Layers size={14} />
+                                            <Layers size={14}/>
                                             <span><strong>Row Multiplication:</strong> {validationResult.validation.row_multiplication.count}x</span>
                                         </div>
                                     )}
                                     <div>Static Columns: {validationResult.validation.static_columns.length}</div>
                                     <div>Mapped Columns: {validationResult.validation.mapped_columns.length}</div>
-                                    <div>Conditional Columns: {validationResult.validation.conditional_columns.length}</div>
+                                    <div>Conditional
+                                        Columns: {validationResult.validation.conditional_columns.length}</div>
                                 </div>
                             )}
                         </div>
@@ -536,7 +559,7 @@ const FileGeneratorFlow = ({
                 <div className="space-y-4">
                     <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                         <div className="flex items-center space-x-2 mb-2">
-                            <CheckCircle className="text-green-600" size={16} />
+                            <CheckCircle className="text-green-600" size={16}/>
                             <span className="font-medium text-green-800">Validation Complete</span>
                         </div>
                         <p className="text-sm text-green-700">
@@ -544,7 +567,7 @@ const FileGeneratorFlow = ({
                         </p>
                         {validationResult?.validation?.row_multiplication?.enabled && (
                             <div className="mt-2 flex items-center space-x-2 text-sm text-green-800">
-                                <Layers size={14} />
+                                <Layers size={14}/>
                                 <span>Will generate {validationResult.validation.row_multiplication.count} rows per source row</span>
                             </div>
                         )}
@@ -569,7 +592,7 @@ const FileGeneratorFlow = ({
                                 </>
                             ) : (
                                 <>
-                                    <Zap size={16} />
+                                    <Zap size={16}/>
                                     <span>Generate File</span>
                                 </>
                             )}
@@ -586,8 +609,9 @@ const FileGeneratorFlow = ({
                             <div className="flex items-center justify-between mb-2">
                                 <h4 className="font-medium text-blue-900">Preview Generated File</h4>
                                 {previewData.row_multiplication && previewData.row_multiplication.enabled && (
-                                    <div className="flex items-center space-x-1 bg-blue-200 text-blue-900 px-2 py-1 rounded-full text-xs">
-                                        <Layers size={12} />
+                                    <div
+                                        className="flex items-center space-x-1 bg-blue-200 text-blue-900 px-2 py-1 rounded-full text-xs">
+                                        <Layers size={12}/>
                                         <span>{previewData.row_multiplication.count}x Multiplied</span>
                                     </div>
                                 )}
@@ -601,24 +625,26 @@ const FileGeneratorFlow = ({
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs border-collapse">
                                     <thead>
-                                        <tr className="bg-blue-100">
-                                            {previewData.columns.map(col => (
-                                                <th key={col} className="border border-blue-200 px-2 py-1 text-left font-medium text-blue-900">
-                                                    {col}
-                                                </th>
-                                            ))}
-                                        </tr>
+                                    <tr className="bg-blue-100">
+                                        {previewData.columns.map(col => (
+                                            <th key={col}
+                                                className="border border-blue-200 px-2 py-1 text-left font-medium text-blue-900">
+                                                {col}
+                                            </th>
+                                        ))}
+                                    </tr>
                                     </thead>
                                     <tbody>
-                                        {previewData.preview_data.slice(0, 5).map((row, idx) => (
-                                            <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-blue-25'}`}>
-                                                {previewData.columns.map(col => (
-                                                    <td key={col} className="border border-blue-200 px-2 py-1 text-blue-800">
-                                                        {row[col] || ''}
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        ))}
+                                    {previewData.preview_data.slice(0, 5).map((row, idx) => (
+                                        <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-blue-25'}`}>
+                                            {previewData.columns.map(col => (
+                                                <td key={col}
+                                                    className="border border-blue-200 px-2 py-1 text-blue-800">
+                                                    {row[col] || ''}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
                                     </tbody>
                                 </table>
                             </div>
@@ -631,14 +657,14 @@ const FileGeneratorFlow = ({
                             onClick={() => handleDownload('csv')}
                             className="flex items-center justify-center space-x-2 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-200"
                         >
-                            <Download size={16} />
+                            <Download size={16}/>
                             <span>Download CSV</span>
                         </button>
                         <button
                             onClick={() => handleDownload('excel')}
                             className="flex items-center justify-center space-x-2 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200"
                         >
-                            <Download size={16} />
+                            <Download size={16}/>
                             <span>Download Excel</span>
                         </button>
                     </div>

@@ -1,6 +1,6 @@
 // src/components/AIRegexGenerator.jsx - Updated to use backend API
-import React, {useState, useEffect} from 'react';
-import {Wand2, Loader2, Copy, Check, AlertCircle, Lightbulb, RefreshCw} from 'lucide-react';
+import React, {useEffect, useState} from 'react';
+import {AlertCircle, Check, Copy, Lightbulb, Loader2, RefreshCw, Wand2} from 'lucide-react';
 import apiService from '../services/api';
 
 const AIRegexGenerator = ({onRegexGenerated, onClose, sampleText = '', columnName = ''}) => {

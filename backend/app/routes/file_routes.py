@@ -1,14 +1,13 @@
 # backend/app/routes/file_routes.py - Optimized for large files using dotenv
+import io
 import logging
 import os
 import uuid
 from datetime import datetime
-import io
 
 import pandas as pd
-from fastapi import FastAPI, UploadFile, File, HTTPException, APIRouter, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from fastapi import UploadFile, File, HTTPException, APIRouter, BackgroundTasks
 
 # Load environment variables
 load_dotenv()

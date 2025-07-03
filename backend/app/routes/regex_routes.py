@@ -1,15 +1,13 @@
 # backend/app/routes/regex_routes.py - AI-powered regex generation routes
+import json
 import logging
 import os
 import re
-import json
 from typing import Dict, List, Optional
-from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
-import openai
+from fastapi import APIRouter, HTTPException
 from openai import OpenAI
+from pydantic import BaseModel, Field
 
 # Configure logging
 logger = logging.getLogger(__name__)

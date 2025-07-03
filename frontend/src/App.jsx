@@ -1,7 +1,7 @@
 // src/App.jsx - Enhanced with file generator integration
-import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { apiService } from './services/api';
+import React, {useEffect, useState} from 'react';
+import {BrowserRouter as Router, Route, Routes} from 'react-router-dom';
+import {apiService} from './services/api';
 import LeftSidebar from './components/LeftSidebar';
 import ChatInterface from './components/ChatInterface';
 import RightSidebar from './components/RightSideBar';
@@ -527,7 +527,8 @@ Use the download buttons in the "Processed Reconciliations" panel to get detaile
                 onMouseDown={() => setIsResizing('left')}
             >
                 <div className="absolute inset-0 w-2 -translate-x-0.5"></div>
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-8 bg-gray-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                <div
+                    className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-8 bg-gray-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
             </div>
 
             <ChatInterface
@@ -551,7 +552,8 @@ Use the download buttons in the "Processed Reconciliations" panel to get detaile
                 onMouseDown={() => setIsResizing('right')}
             >
                 <div className="absolute inset-0 w-2 -translate-x-0.5"></div>
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-8 bg-gray-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                <div
+                    className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-8 bg-gray-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
             </div>
 
             <RightSidebar
@@ -569,8 +571,8 @@ const App = () => {
     return (
         <Router>
             <Routes>
-                <Route path="/" element={<MainApp />} />
-                <Route path="/viewer/:fileId" element={<ViewerPage />} />
+                <Route path="/" element={<MainApp/>}/>
+                <Route path="/viewer/:fileId" element={<ViewerPage/>}/>
             </Routes>
         </Router>
     );

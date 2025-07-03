@@ -6,9 +6,9 @@ from datetime import datetime
 from typing import Dict, Any, List
 
 import pandas as pd
+from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel
-from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
@@ -165,7 +165,8 @@ async def update_file_data(file_id: str, request: UpdateFileDataRequest):
         file_info["columns"] = list(df.columns)
         file_info["last_modified"] = datetime.utcnow().isoformat()
 
-        logger.info(f"Updated file {file_info.get('filename', file_id)} with {len(df)} rows and {len(df.columns)} columns")
+        logger.info(
+            f"Updated file {file_info.get('filename', file_id)} with {len(df)} rows and {len(df.columns)} columns")
 
         return {
             "success": True,

@@ -7,8 +7,8 @@ from typing import Dict, List, Optional, Tuple
 
 import aiofiles
 import pandas as pd
-from fastapi import UploadFile, HTTPException
 from dotenv import load_dotenv
+from fastapi import UploadFile, HTTPException
 
 # Load environment variables
 load_dotenv()

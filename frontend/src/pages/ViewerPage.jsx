@@ -1,12 +1,12 @@
 // src/pages/ViewerPage.jsx - Full page viewer component with enhanced title handling
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import React, {useEffect, useState} from 'react';
+import {useParams} from 'react-router-dom';
 import DataViewer from '../components/DataViewer';
-import { AlertCircle } from 'lucide-react';
-import { apiService } from '../services/api';
+import {AlertCircle} from 'lucide-react';
+import {apiService} from '../services/api';
 
 const ViewerPage = () => {
-    const { fileId } = useParams();
+    const {fileId} = useParams();
     const [error, setError] = useState(null);
     const [fileName, setFileName] = useState('');
 
@@ -45,7 +45,7 @@ const ViewerPage = () => {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
                 <div className="text-center max-w-md mx-auto p-8">
-                    <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+                    <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4"/>
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">Error Loading File</h1>
                     <p className="text-gray-600 mb-4">{error}</p>
                     <div className="space-y-2">
@@ -67,7 +67,7 @@ const ViewerPage = () => {
         );
     }
 
-    return <DataViewer fileId={fileId} />;
+    return <DataViewer fileId={fileId}/>;
 };
 
 export default ViewerPage;

@@ -1,5 +1,5 @@
 // src/hooks/useAIRegex.js - Updated to use backend API
-import { useState, useCallback } from 'react';
+import {useCallback, useState} from 'react';
 import apiService from '../services/api';
 
 export const useAIRegex = () => {
@@ -21,7 +21,7 @@ export const useAIRegex = () => {
                 description.trim(),
                 sampleText.trim(),
                 columnName.trim(),
-                { source: 'useAIRegex_hook' }
+                {source: 'useAIRegex_hook'}
             );
 
             if (result.success) {
@@ -76,9 +76,9 @@ export const useAIRegex = () => {
     const validateRegex = useCallback((regex) => {
         try {
             new RegExp(regex);
-            return { isValid: true, error: null };
+            return {isValid: true, error: null};
         } catch (err) {
-            return { isValid: false, error: err.message };
+            return {isValid: false, error: err.message};
         }
     }, []);
 
