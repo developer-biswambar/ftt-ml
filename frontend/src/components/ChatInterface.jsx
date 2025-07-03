@@ -1,4 +1,4 @@
-// src/components/ChatInterface.jsx - Enhanced with result display options
+// src/components/ChatInterface.jsx - Enhanced with tabular result display
 import React, {useEffect, useRef, useState} from 'react';
 import {AlertCircle, CheckCircle, Send, Settings, Eye, Download} from 'lucide-react';
 import ReconciliationFlow from './ReconciliationFlow';
@@ -40,11 +40,40 @@ const MessageComponent = ({message, onDisplayDetailedResults}) => {
                 return 'bg-green-100 text-green-800 mr-auto max-w-lg border-l-4 border-green-500';
             case 'result':
                 return 'bg-blue-50 text-blue-900 mr-auto max-w-3xl border border-blue-200';
+            case 'table':
+                return 'bg-white mr-auto max-w-5xl border border-gray-300 shadow-sm';
             case 'question':
                 return 'bg-yellow-50 text-yellow-900 mr-auto max-w-2xl border border-yellow-200';
             default:
                 return 'bg-gray-100 text-gray-800 mr-auto max-w-2xl';
         }
+    };
+
+    const getColorClasses = (color) => {
+        const colorMap = {
+            green: {
+                header: 'bg-green-100',
+                headerText: 'text-green-800',
+                border: 'border-green-200',
+                evenRow: 'bg-green-25',
+                cellText: 'text-green-800'
+            },
+            orange: {
+                header: 'bg-orange-100',
+                headerText: 'text-orange-800',
+                border: 'border-orange-200',
+                evenRow: 'bg-orange-25',
+                cellText: 'text-orange-800'
+            },
+            purple: {
+                header: 'bg-purple-100',
+                headerText: 'text-purple-800',
+                border: 'border-purple-200',
+                evenRow: 'bg-purple-25',
+                cellText: 'text-purple-800'
+            }
+        };
+        return colorMap[color] || colorMap.green;
     };
 
     // Check if this is a result message that can show detailed results
@@ -53,7 +82,58 @@ const MessageComponent = ({message, onDisplayDetailedResults}) => {
     return (
         <div
             className={`p-4 rounded-lg mb-4 ${getMessageStyle()} transform transition-all duration-300 ease-out animate-fadeIn`}>
-            <div className="text-sm whitespace-pre-line leading-relaxed">{message.content}</div>
+
+            {/* Regular content for non-table messages */}
+            {message.type !== 'table' && (
+                <div className="text-sm whitespace-pre-line leading-relaxed">{message.content}</div>
+            )}
+
+            {/* Table content for table messages */}
+            {message.type === 'table' && message.tableData && (
+                <div>
+                    <div className="text-sm font-medium mb-3 text-gray-800">{message.content}</div>
+
+                    {message.tableData.data.length > 0 ? (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs border-collapse">
+                                <thead>
+                                    <tr className={getColorClasses(message.tableData.color).header}>
+                                        {message.tableData.columns.map(col => (
+                                            <th key={col}
+                                                className={`border ${getColorClasses(message.tableData.color).border} px-2 py-1 text-left font-medium ${getColorClasses(message.tableData.color).headerText}`}>
+                                                {col}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {message.tableData.data.map((row, idx) => (
+                                        <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : getColorClasses(message.tableData.color).evenRow}`}>
+                                            {message.tableData.columns.map(col => (
+                                                <td key={col}
+                                                    className={`border ${getColorClasses(message.tableData.color).border} px-2 py-1 ${getColorClasses(message.tableData.color).cellText}`}>
+                                                    {row[col] !== null && row[col] !== undefined ? String(row[col]) : ''}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                            {/* Show count if there are more records */}
+                            {message.tableData.totalCount > message.tableData.data.length && (
+                                <div className="mt-2 text-xs text-gray-600 text-center">
+                                    Showing {message.tableData.data.length} of {message.tableData.totalCount} records
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="text-xs text-gray-500 text-center py-4">
+                            No records found in this category
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Action buttons for result messages */}
             {isResultMessage && onDisplayDetailedResults && (

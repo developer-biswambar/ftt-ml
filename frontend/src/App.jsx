@@ -526,55 +526,75 @@ Use the download buttons in the "Results" panel → to get detailed reports, or 
     };
 
     const displayDetailedResults = async (reconciliationId) => {
-        try {
-            addMessage('system', '📊 Fetching detailed reconciliation results...', true);
+    try {
+        addMessage('system', '📊 Fetching detailed reconciliation results...', true);
 
-            const reconResult = await apiService.getReconciliationResult(reconciliationId);
+        const reconResult = await apiService.getReconciliationResult(reconciliationId);
 
-            // Mock detailed results - replace with actual API call
-            const detailedResult = {
-                matched: [
-                    reconResult.matched
-                ],
-                unmatched_file_a: [
-                    reconResult.unmatched_file_a
-                ],
-                unmatched_file_b: [
-                    reconResult.unmatched_file_b
-                ]
+        const detailedResult = {
+            matched: reconResult.matched,
+            unmatched_file_a: reconResult.unmatched_file_a,
+            unmatched_file_b: reconResult.unmatched_file_b
+        };
+
+        setTimeout(() => {
+            // Create table data structure for each result type
+            const tableData = {
+                matched: {
+                    title: `✅ Matched Records (${detailedResult.matched.length} total)`,
+                    data: detailedResult.matched.slice(0, 10), // Show first 10 records
+                    columns: detailedResult.matched.length > 0 ? Object.keys(detailedResult.matched[0]) : [],
+                    color: 'green',
+                    totalCount: detailedResult.matched.length
+                },
+                unmatched_file_a: {
+                    title: `❗ Unmatched in File A (${detailedResult.unmatched_file_a.length} records)`,
+                    data: detailedResult.unmatched_file_a.slice(0, 10),
+                    columns: detailedResult.unmatched_file_a.length > 0 ? Object.keys(detailedResult.unmatched_file_a[0]) : [],
+                    color: 'orange',
+                    totalCount: detailedResult.unmatched_file_a.length
+                },
+                unmatched_file_b: {
+                    title: `❗ Unmatched in File B (${detailedResult.unmatched_file_b.length} records)`,
+                    data: detailedResult.unmatched_file_b.slice(0, 10),
+                    columns: detailedResult.unmatched_file_b.length > 0 ? Object.keys(detailedResult.unmatched_file_b[0]) : [],
+                    color: 'purple',
+                    totalCount: detailedResult.unmatched_file_b.length
+                }
             };
 
-            setTimeout(() => {
-                const detailedText = `📋 **Detailed Reconciliation Results:**
+            // Add table message for each result type that has data
+            Object.entries(tableData).forEach(([key, table]) => {
+                if (table.data.length > 0) {
+                    const tableMessage = {
+                        id: Date.now() + Math.random(),
+                        type: 'table',
+                        content: table.title,
+                        tableData: table,
+                        timestamp: new Date()
+                    };
+                    setMessages(prev => [...prev, tableMessage]);
+                }
+            });
 
-✅ **Sample Matched Records (${detailedResult.matched.length} total):**
-${detailedResult.matched.slice(0, 3).map(record => 
-    `• ${JSON.stringify(record)}`
-).join('\n')}
-${detailedResult.matched.length > 3 ? `... and ${detailedResult.matched.length - 3} more matches` : ''}
+            // Add summary message
+            const summaryText = `📊 **Detailed Results Summary:**
 
-❗ **Unmatched in File A (${detailedResult.unmatched_file_a.length} records):**
-${detailedResult.unmatched_file_a.slice(0, 2).map(record => 
-    `• ${record}:`
-).join('\n')}
-${detailedResult.unmatched_file_a.length > 2 ? `... and ${detailedResult.unmatched_file_a.length - 2} more` : ''}
+📋 **Data Overview:**
+• Total Matched: ${detailedResult.matched.length}
+• Unmatched File A: ${detailedResult.unmatched_file_a.length}
+• Unmatched File B: ${detailedResult.unmatched_file_b.length}
 
-❗ **Unmatched in File B (${detailedResult.unmatched_file_b.length} records):**
-${detailedResult.unmatched_file_b.slice(0, 2).map(record => 
-    `• ${record}: `
-).join('\n')}
-${detailedResult.unmatched_file_b.length > 2 ? `... and ${detailedResult.unmatched_file_b.length - 2} more` : ''}
+💡 **Note:** Showing first 10 records of each category. For complete data, use the download buttons in the Results panel →`;
 
-💡 **For complete data, use the download buttons in the Results panel →**`;
+            addMessage('result', summaryText, true);
+        }, 1500);
 
-                addMessage('result', detailedText, true);
-            }, 1500);
-
-        } catch (error) {
-            console.error('Error fetching detailed results:', error);
-            addMessage('error', `❌ Failed to fetch detailed results: ${error.message}`, false);
-        }
-    };
+    } catch (error) {
+        console.error('Error fetching detailed results:', error);
+        addMessage('error', `❌ Failed to fetch detailed results: ${error.message}`, false);
+    }
+};
 
     const downloadResults = async (reconciliationId, resultType) => {
         try {

@@ -175,7 +175,7 @@ async def process_reconciliation_json(
 
     try:
         # Validate request
-        if request.process_type != "reconciliation":
+        if request.process_type != "ai-reconciliation":
             raise HTTPException(status_code=400, detail="Invalid process_type. Expected 'reconciliation'")
 
         if len(request.files) != 2:
