@@ -113,7 +113,8 @@ const ReconciliationFlow = ({
         if (currentIndex < steps.length - 1) {
             const nextStepId = steps[currentIndex + 1].id;
             setCurrentStep(nextStepId);
-            onSendMessage('system', `✅ Step ${currentIndex + 1} completed. Moving to: ${steps[currentIndex + 1].title}`);
+            // Disabled sending it to chat because its making the flow window flicker
+            // onSendMessage('system', `✅ Step ${currentIndex + 1} completed. Moving to: ${steps[currentIndex + 1].title}`);
         }
     };
 
