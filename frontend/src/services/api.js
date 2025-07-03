@@ -452,8 +452,8 @@ export const apiService = {
         return response.data;
     },
 
-    downloadReconciliationResults: async (reconciliationId, fileType) => {
-        const response = await api.get(`/api/v1/reconcile/${reconciliationId}/download/${fileType}`);
+    downloadReconciliationResults: async (reconciliationId, format, result_type) => {
+        const response = await api.get(`/download/${reconciliationId}?format=${format}&result_type=${result_type}`);
         return response.data;
     },
 

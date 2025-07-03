@@ -175,8 +175,8 @@ async def process_reconciliation_json(
 
     try:
         # Validate request
-        if request.process_type != "ai-reconciliation":
-            raise HTTPException(status_code=400, detail="Invalid process_type. Expected 'reconciliation'")
+        # if request.process_type != "ai-reconciliation":
+        #     raise HTTPException(status_code=400, detail="Invalid process_type. Expected 'reconciliation'")
 
         if len(request.files) != 2:
             raise HTTPException(status_code=400, detail="Exactly 2 files are required for reconciliation")
@@ -400,7 +400,7 @@ async def get_reconciliation_results_optimized(
 @router.get("/download/{reconciliation_id}")
 async def download_reconciliation_results_optimized(
         reconciliation_id: str,
-        format: str = "excel",
+        format: str = "csv",
         result_type: str = "all",  # all, matched, unmatched_a, unmatched_b
         compress: bool = True
 ):
