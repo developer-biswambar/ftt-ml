@@ -1,6 +1,6 @@
-// src/components/ChatInterface.jsx - Fixed auto-scroll for flow components
+// src/components/ChatInterface.jsx - Enhanced with result display options
 import React, {useEffect, useRef, useState} from 'react';
-import {AlertCircle, CheckCircle, Send, Settings} from 'lucide-react';
+import {AlertCircle, CheckCircle, Send, Settings, Eye, Download} from 'lucide-react';
 import ReconciliationFlow from './ReconciliationFlow';
 import FileGeneratorFlow from './FileGeneratorFlow';
 
@@ -27,7 +27,7 @@ const TypingIndicator = ({message}) => {
     );
 };
 
-const MessageComponent = ({message}) => {
+const MessageComponent = ({message, onDisplayDetailedResults}) => {
     const getMessageStyle = () => {
         switch (message.type) {
             case 'user':
@@ -47,10 +47,32 @@ const MessageComponent = ({message}) => {
         }
     };
 
+    // Check if this is a result message that can show detailed results
+    const isResultMessage = message.type === 'result' && message.content.includes('Reconciliation Results');
+
     return (
         <div
             className={`p-4 rounded-lg mb-4 ${getMessageStyle()} transform transition-all duration-300 ease-out animate-fadeIn`}>
             <div className="text-sm whitespace-pre-line leading-relaxed">{message.content}</div>
+
+            {/* Action buttons for result messages */}
+            {isResultMessage && onDisplayDetailedResults && (
+                <div className="mt-4 pt-3 border-t border-blue-200">
+                    <div className="flex items-center space-x-2">
+                        <button
+                            onClick={() => onDisplayDetailedResults('current')}
+                            className="flex items-center space-x-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-xs transition-all duration-200 hover:scale-105"
+                        >
+                            <Eye size={14}/>
+                            <span>Display Detailed Results</span>
+                        </button>
+                        <span className="text-xs text-blue-600">
+                            View sample data and detailed breakdowns in chat
+                        </span>
+                    </div>
+                </div>
+            )}
+
             <div className="text-xs opacity-60 mt-2">
                 {message.timestamp.toLocaleTimeString()}
             </div>
@@ -71,7 +93,8 @@ const ChatInterface = ({
                            isTyping,
                            typingMessage,
                            files,
-                           onSendMessage
+                           onSendMessage,
+                           onDisplayDetailedResults
                        }) => {
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
@@ -273,7 +296,11 @@ const ChatInterface = ({
             {/* Messages */}
             <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4">
                 {messages.map((message) => (
-                    <MessageComponent key={message.id} message={message}/>
+                    <MessageComponent
+                        key={message.id}
+                        message={message}
+                        onDisplayDetailedResults={onDisplayDetailedResults}
+                    />
                 ))}
 
                 {/* Typing Indicator */}
