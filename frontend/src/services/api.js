@@ -453,7 +453,7 @@ export const apiService = {
     },
 
     downloadReconciliationResults: async (reconciliationId, format, result_type) => {
-        const response = await api.get(`/download/${reconciliationId}?format=${format}&result_type=${result_type}`);
+        const response = await api.get(`reconciliation/download/${reconciliationId}?format=${format}&result_type=${result_type}`);
         return response.data;
     },
 
