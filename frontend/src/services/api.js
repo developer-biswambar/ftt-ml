@@ -447,6 +447,10 @@ export const apiService = {
         const response = await api.get(`/api/v1/reconcile/?skip=${skip}&limit=${limit}`);
         return response.data;
     },
+    getReconciliationResult: async (reconciliation_id) => {
+        const response = await api.get(`/reconciliation/results/${reconciliation_id}`);
+        return response.data;
+    },
 
     downloadReconciliationResults: async (reconciliationId, fileType) => {
         const response = await api.get(`/api/v1/reconcile/${reconciliationId}/download/${fileType}`);

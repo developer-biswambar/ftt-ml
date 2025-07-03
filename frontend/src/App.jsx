@@ -529,42 +529,41 @@ Use the download buttons in the "Results" panel → to get detailed reports, or 
         try {
             addMessage('system', '📊 Fetching detailed reconciliation results...', true);
 
+            const reconResult = await apiService.getReconciliationResult(reconciliationId);
+
             // Mock detailed results - replace with actual API call
-            const mockDetailedResults = {
+            const detailedResult = {
                 matched: [
-                    { Trade_ID: 'TRD001', FileA_Amount: 1000.00, FileB_Amount: 1000.00, Match_Status: 'Perfect Match' },
-                    { Trade_ID: 'TRD002', FileA_Amount: 2500.50, FileB_Amount: 2500.50, Match_Status: 'Perfect Match' },
-                    { Trade_ID: 'TRD003', FileA_Amount: 750.25, FileB_Amount: 750.00, Match_Status: 'Tolerance Match' }
+                    reconResult.matched
                 ],
                 unmatched_file_a: [
-                    { Trade_ID: 'TRD100', Amount: 500.00, Status: 'Only in File A' },
-                    { Trade_ID: 'TRD101', Amount: 1200.75, Status: 'Only in File A' }
+                    reconResult.unmatched_file_a
                 ],
                 unmatched_file_b: [
-                    { Trade_ID: 'TRD200', Amount: 800.00, Status: 'Only in File B' }
+                    reconResult.unmatched_file_b
                 ]
             };
 
             setTimeout(() => {
                 const detailedText = `📋 **Detailed Reconciliation Results:**
 
-✅ **Sample Matched Records (${mockDetailedResults.matched.length} total):**
-${mockDetailedResults.matched.slice(0, 3).map(record => 
-    `• ${record.Trade_ID}: $${record.FileA_Amount} ↔ $${record.FileB_Amount} (${record.Match_Status})`
+✅ **Sample Matched Records (${detailedResult.matched.length} total):**
+${detailedResult.matched.slice(0, 3).map(record => 
+    `• ${JSON.stringify(record)}`
 ).join('\n')}
-${mockDetailedResults.matched.length > 3 ? `... and ${mockDetailedResults.matched.length - 3} more matches` : ''}
+${detailedResult.matched.length > 3 ? `... and ${detailedResult.matched.length - 3} more matches` : ''}
 
-❗ **Unmatched in File A (${mockDetailedResults.unmatched_file_a.length} records):**
-${mockDetailedResults.unmatched_file_a.slice(0, 2).map(record => 
-    `• ${record.Trade_ID}: $${record.Amount} (${record.Status})`
+❗ **Unmatched in File A (${detailedResult.unmatched_file_a.length} records):**
+${detailedResult.unmatched_file_a.slice(0, 2).map(record => 
+    `• ${record}:`
 ).join('\n')}
-${mockDetailedResults.unmatched_file_a.length > 2 ? `... and ${mockDetailedResults.unmatched_file_a.length - 2} more` : ''}
+${detailedResult.unmatched_file_a.length > 2 ? `... and ${detailedResult.unmatched_file_a.length - 2} more` : ''}
 
-❗ **Unmatched in File B (${mockDetailedResults.unmatched_file_b.length} records):**
-${mockDetailedResults.unmatched_file_b.slice(0, 2).map(record => 
-    `• ${record.Trade_ID}: $${record.Amount} (${record.Status})`
+❗ **Unmatched in File B (${detailedResult.unmatched_file_b.length} records):**
+${detailedResult.unmatched_file_b.slice(0, 2).map(record => 
+    `• ${record}: `
 ).join('\n')}
-${mockDetailedResults.unmatched_file_b.length > 2 ? `... and ${mockDetailedResults.unmatched_file_b.length - 2} more` : ''}
+${detailedResult.unmatched_file_b.length > 2 ? `... and ${detailedResult.unmatched_file_b.length - 2} more` : ''}
 
 💡 **For complete data, use the download buttons in the Results panel →**`;
 
