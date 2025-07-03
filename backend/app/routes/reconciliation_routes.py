@@ -1,12 +1,12 @@
 import io
 import json
-import uuid
 import logging
+import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 import pandas as pd
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 

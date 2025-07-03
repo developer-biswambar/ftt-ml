@@ -1,5 +1,5 @@
 // src/App.jsx - Enhanced with result display and download options
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {BrowserRouter as Router, Route, Routes} from 'react-router-dom';
 import {apiService} from './services/api';
 import LeftSidebar from './components/LeftSidebar';
@@ -88,11 +88,16 @@ const MainApp = () => {
         };
     }, [isResizing]);
 
-    // Initial setup
+    const didRun = useRef(false);
+
     useEffect(() => {
+        if (didRun.current) return;
+        didRun.current = true;
+
         simulateTyping('system', '🎯 Welcome to Financial Data Reconciliation!\n\n📋 **Getting Started:**\n1. Upload two files to compare\n2. Select them in the file selector\n3. Choose a template (try our AI-powered option!)\n4. Configure reconciliation rules\n5. Start the reconciliation process\n\nI\'ll analyze your data and provide detailed matching results with downloadable reports.\n\n💡 **New Features:**\n• 🤖 AI-powered rule generation\n• 👁️ Click the eye icon to view/edit files\n• ⚙️ Manual configuration for full control\n• 🔧 AI File Generator for creating new files\n• 📊 Display results directly in chat\n• 📥 Download individual result types');
         loadInitialData();
     }, []);
+
 
     // Auto-analyze when required files are selected
     useEffect(() => {
@@ -603,7 +608,7 @@ Use the download buttons in the "Results" panel → to get detailed reports, or 
             const filename = `reconciliation_${reconciliationId}_${resultType}.csv`;
 
             // 🔁 1. Fetch the file as a Blob
-            const data = await apiService.downloadReconciliationResults(reconciliationId, 'csv','matched');
+            const data = await apiService.downloadReconciliationResults(reconciliationId, 'csv', 'matched');
 
             // 🧷 2. Create a Blob URL
             const blob = new Blob([data]);

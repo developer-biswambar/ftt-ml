@@ -1,5 +1,15 @@
 import React from 'react';
-import {AlertCircle, CheckCircle, Clock, Download, FileText, RefreshCw, Eye, BarChart3, FileSpreadsheet} from 'lucide-react';
+import {
+    AlertCircle,
+    BarChart3,
+    CheckCircle,
+    Clock,
+    Download,
+    Eye,
+    FileSpreadsheet,
+    FileText,
+    RefreshCw
+} from 'lucide-react';
 
 const RightSidebar = ({
                           processedFiles = [], // ✅ Add default empty array
@@ -91,10 +101,15 @@ const RightSidebar = ({
                                     <>
                                         <div className="text-xs text-gray-600 mb-3 bg-gray-50 p-2 rounded">
                                             <div className="grid grid-cols-2 gap-2">
-                                                <div>✅ Match Rate: {(reconciliation.summary.match_percentage || 0).toFixed(1)}%</div>
-                                                <div>🎯 Confidence: {(reconciliation.summary.match_percentage || 0).toFixed(1)}%</div>
+                                                <div>✅ Match
+                                                    Rate: {(reconciliation.summary.match_percentage || 0).toFixed(1)}%
+                                                </div>
+                                                <div>🎯
+                                                    Confidence: {(reconciliation.summary.match_percentage || 0).toFixed(1)}%
+                                                </div>
                                                 <div>📊 Matched: {reconciliation.summary?.matched_records || 0}</div>
-                                                <div>⚠️ Unmatched: {(reconciliation.summary?.unmatched_file_a || 0) + (reconciliation.summary?.unmatched_file_b || 0)}</div>
+                                                <div>⚠️
+                                                    Unmatched: {(reconciliation.summary?.unmatched_file_a || 0) + (reconciliation.summary?.unmatched_file_b || 0)}</div>
                                             </div>
                                         </div>
 
@@ -122,7 +137,8 @@ const RightSidebar = ({
 
                                             {/* Download Buttons */}
                                             <div className="space-y-1">
-                                                <div className="text-xs text-gray-500 font-medium">Download Options:</div>
+                                                <div className="text-xs text-gray-500 font-medium">Download Options:
+                                                </div>
                                                 <div className="grid grid-cols-3 gap-1">
                                                     <button
                                                         onClick={() => onDownloadResults(reconciliation.reconciliation_id, 'matched')}
@@ -176,8 +192,10 @@ const RightSidebar = ({
 
                                 {/* Processing Status (if processing) */}
                                 {reconciliation.status === 'processing' && (
-                                    <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded flex items-center space-x-2">
-                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                                    <div
+                                        className="text-xs text-blue-600 bg-blue-50 p-2 rounded flex items-center space-x-2">
+                                        <div
+                                            className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
                                         <span>Processing reconciliation...</span>
                                     </div>
                                 )}

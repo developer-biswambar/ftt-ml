@@ -1,6 +1,6 @@
 // src/components/ChatInterface.jsx - Enhanced with tabular result display
 import React, {useEffect, useRef, useState} from 'react';
-import {AlertCircle, CheckCircle, Send, Settings, Eye, Download} from 'lucide-react';
+import {AlertCircle, CheckCircle, Eye, Send, Settings} from 'lucide-react';
 import ReconciliationFlow from './ReconciliationFlow';
 import FileGeneratorFlow from './FileGeneratorFlow';
 
@@ -97,26 +97,27 @@ const MessageComponent = ({message, onDisplayDetailedResults}) => {
                         <div className="overflow-x-auto">
                             <table className="w-full text-xs border-collapse">
                                 <thead>
-                                    <tr className={getColorClasses(message.tableData.color).header}>
-                                        {message.tableData.columns.map(col => (
-                                            <th key={col}
-                                                className={`border ${getColorClasses(message.tableData.color).border} px-2 py-1 text-left font-medium ${getColorClasses(message.tableData.color).headerText}`}>
-                                                {col}
-                                            </th>
-                                        ))}
-                                    </tr>
+                                <tr className={getColorClasses(message.tableData.color).header}>
+                                    {message.tableData.columns.map(col => (
+                                        <th key={col}
+                                            className={`border ${getColorClasses(message.tableData.color).border} px-2 py-1 text-left font-medium ${getColorClasses(message.tableData.color).headerText}`}>
+                                            {col}
+                                        </th>
+                                    ))}
+                                </tr>
                                 </thead>
                                 <tbody>
-                                    {message.tableData.data.map((row, idx) => (
-                                        <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : getColorClasses(message.tableData.color).evenRow}`}>
-                                            {message.tableData.columns.map(col => (
-                                                <td key={col}
-                                                    className={`border ${getColorClasses(message.tableData.color).border} px-2 py-1 ${getColorClasses(message.tableData.color).cellText}`}>
-                                                    {row[col] !== null && row[col] !== undefined ? String(row[col]) : ''}
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    ))}
+                                {message.tableData.data.map((row, idx) => (
+                                    <tr key={idx}
+                                        className={`${idx % 2 === 0 ? 'bg-white' : getColorClasses(message.tableData.color).evenRow}`}>
+                                        {message.tableData.columns.map(col => (
+                                            <td key={col}
+                                                className={`border ${getColorClasses(message.tableData.color).border} px-2 py-1 ${getColorClasses(message.tableData.color).cellText}`}>
+                                                {row[col] !== null && row[col] !== undefined ? String(row[col]) : ''}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
                                 </tbody>
                             </table>
 
