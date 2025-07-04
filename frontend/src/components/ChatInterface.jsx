@@ -17,7 +17,7 @@ const TypingIndicator = ({message}) => {
                 </div>
 
                 <span className="flex items-center space-x-1">
-                  <span>Wall-e typing...</span>
+                  <span>Typing...</span>
                   <span className="animate-bounce">🤖</span>
                   <span className="text-green-500">🌱</span>
                 </span>

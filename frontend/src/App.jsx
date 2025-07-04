@@ -158,21 +158,7 @@ const MainApp = () => {
         try {
             const response = await apiService.getReconciliationTemplates();
             const baseTemplates = response.data || [];
-
-            // Add the AI File Generator template
-            const enhancedTemplates = [
-                ...baseTemplates,
-                {
-                    name: "🤖 AI File Generator",
-                    description: "Generate new files from existing data using natural language prompts. Perfect for creating reports, transforming data formats, or extracting specific information.",
-                    category: "ai-generation",
-                    filesRequired: 1,
-                    fileLabels: ["Source File"],
-                    user_requirements: "Describe the file you want to generate. For example: 'create reporting file with jurisdiction always italy, trade_id from Trade_ID, header always XYZ'",
-                }
-            ];
-
-            setTemplates(enhancedTemplates);
+            setTemplates(baseTemplates);
         } catch (error) {
             console.error('Failed to load templates:', error);
             simulateTyping('error', 'Failed to load process templates');
