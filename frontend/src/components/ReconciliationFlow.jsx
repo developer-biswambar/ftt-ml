@@ -80,19 +80,19 @@ const ReconciliationFlow = ({
         return [...originalColumns, ...extractedColumns];
     };
 
-    // Get mandatory columns that must be included (extracted + reconciliation columns)
+      // Get mandatory columns that must be included (extracted + reconciliation columns)
     const getMandatoryColumns = (fileIndex) => {
         const mandatoryColumns = new Set();
 
-        // Add extracted columns - only if they have complete, non-empty names
-        const extractedColumns = config.Files[fileIndex]?.Extract?.map(rule => rule.ResultColumnName).filter(name => name && name.trim().length > 0) || [];
+        // Add extracted columns - only if they have complete, non-empty names (minimum 3 characters to avoid partial typing)
+        const extractedColumns = config.Files[fileIndex]?.Extract?.map(rule => rule.ResultColumnName).filter(name => name && name.trim().length >= 3) || [];
         extractedColumns.forEach(col => mandatoryColumns.add(col.trim()));
 
-        // Add reconciliation rule columns - only if they have complete, non-empty names
+        // Add reconciliation rule columns - only if they have complete, non-empty names (minimum 3 characters)
         reconciliationRules.forEach(rule => {
-            if (fileIndex === 0 && rule.LeftFileColumn && rule.LeftFileColumn.trim().length > 0) {
+            if (fileIndex === 0 && rule.LeftFileColumn && rule.LeftFileColumn.trim().length >= 3) {
                 mandatoryColumns.add(rule.LeftFileColumn.trim());
-            } else if (fileIndex === 1 && rule.RightFileColumn && rule.RightFileColumn.trim().length > 0) {
+            } else if (fileIndex === 1 && rule.RightFileColumn && rule.RightFileColumn.trim().length >= 3) {
                 mandatoryColumns.add(rule.RightFileColumn.trim());
             }
         });
