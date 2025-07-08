@@ -1,4 +1,3 @@
-// src/components/ReconciliationFlow.jsx - Complete with mandatory Result Column Selection
 import React, {useEffect, useState} from 'react';
 import {
     AlertCircle,
@@ -150,11 +149,29 @@ const ReconciliationFlow = ({
             const mandatoryColumns = getMandatoryColumns(fileIndex);
             const currentSelected = fileIndex === 0 ? selectedColumnsFileA : selectedColumnsFileB;
 
-            // Only include mandatory columns that are not empty/undefined
-            const validMandatoryColumns = mandatoryColumns.filter(col => col && col.trim().length > 0);
+            // Only include mandatory columns that are not empty/undefined and have at least 3 characters
+            const validMandatoryColumns = mandatoryColumns.filter(col => col && col.trim().length >= 3);
 
-            // Merge current selection with valid mandatory columns, removing duplicates
-            const updatedSelection = [...new Set([...currentSelected, ...validMandatoryColumns])];
+            // Remove any partial names that might be incomplete versions of valid column names
+            const cleanedCurrentSelection = currentSelected.filter(col => {
+                // Keep the column if:
+                // 1. It's a valid mandatory column, OR
+                // 2. It's not a partial name of any mandatory column, OR
+                // 3. It's from original file columns (not extracted)
+                const originalColumns = fileColumns[getFileByIndex(fileIndex)?.file_id] || [];
+                const isOriginalColumn = originalColumns.includes(col);
+                const isValidMandatory = validMandatoryColumns.includes(col);
+
+                // Check if this might be a partial name of a longer valid column
+                const isPartialName = validMandatoryColumns.some(validCol =>
+                    validCol !== col && validCol.startsWith(col) && col.length < validCol.length
+                );
+
+                return isValidMandatory || isOriginalColumn || !isPartialName;
+            });
+
+            // Merge cleaned selection with valid mandatory columns, removing duplicates
+            const updatedSelection = [...new Set([...cleanedCurrentSelection, ...validMandatoryColumns])];
 
             if (fileIndex === 0) {
                 setSelectedColumnsFileA(updatedSelection);
@@ -163,11 +180,11 @@ const ReconciliationFlow = ({
             }
         };
 
-        // Add a small delay to prevent multiple rapid updates during typing
+        // Add a longer delay to allow for complete typing before updating mandatory columns
         const timeoutId = setTimeout(() => {
             updateSelectedColumns(0);
             updateSelectedColumns(1);
-        }, 100);
+        }, 500);
 
         return () => clearTimeout(timeoutId);
     }, [config, reconciliationRules]);
@@ -273,21 +290,6 @@ const ReconciliationFlow = ({
             updatedConfig.Files[fileIndex].Extract[ruleIndex][field] = value;
         }
         setConfig(updatedConfig);
-
-        // Only auto-add to selected columns if it's a complete column name (not partial input)
-        if (field === 'ResultColumnName' && value && value.trim().length > 2) {
-            // Add a small delay to prevent adding partial names during typing
-            setTimeout(() => {
-                const finalValue = updatedConfig.Files[fileIndex].Extract[ruleIndex].ResultColumnName;
-                if (finalValue && finalValue.trim().length > 2) {
-                    if (fileIndex === 0 && !selectedColumnsFileA.includes(finalValue)) {
-                        setSelectedColumnsFileA(prev => [...prev, finalValue]);
-                    } else if (fileIndex === 1 && !selectedColumnsFileB.includes(finalValue)) {
-                        setSelectedColumnsFileB(prev => [...prev, finalValue]);
-                    }
-                }
-            }, 300);
-        }
     };
 
     const removeExtractionRule = (fileIndex, ruleIndex) => {
