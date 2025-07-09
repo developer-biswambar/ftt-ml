@@ -1,13 +1,15 @@
-# backend/app/routes/file_routes.py - Optimized for large files using dotenv
+# backend/app/routes/file_routes.py - Enhanced with Excel sheet selection
 import io
 import logging
 import os
 import uuid
 from datetime import datetime
+from typing import Optional, List, Dict, Any
 
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import UploadFile, File, HTTPException, APIRouter, BackgroundTasks
+from pydantic import BaseModel
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +23,44 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/files", tags=["files"])
 
 
+# Pydantic models for sheet handling
+class SheetInfo(BaseModel):
+    sheet_name: str
+    row_count: int
+    column_count: int
+    columns: List[str]
+
+
+class UpdateSheetRequest(BaseModel):
+    sheet_name: str
+
+
+def extract_excel_sheet_info(content: bytes, filename: str) -> List[SheetInfo]:
+    """Extract information about all sheets in an Excel file"""
+    try:
+        # Read the Excel file to get all sheet names
+        excel_file = pd.ExcelFile(io.BytesIO(content))
+        sheet_info = []
+
+        for sheet_name in excel_file.sheet_names:
+            try:
+                # Read each sheet to get metadata
+                df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                sheet_info.append(SheetInfo(
+                    sheet_name=sheet_name,
+                    row_count=len(df),
+                    column_count=len(df.columns),
+                    columns=df.columns.tolist()
+                ))
+            except Exception as e:
+                logger.warning(f"Could not read sheet '{sheet_name}' in {filename}: {str(e)}")
+
+        return sheet_info
+    except Exception as e:
+        logger.error(f"Error extracting sheet information from {filename}: {str(e)}")
+        return []
+
+
 @router.post("/upload")
 async def upload_file(
         background_tasks: BackgroundTasks,
@@ -28,6 +68,7 @@ async def upload_file(
 ):
     """
     Upload file with unlimited rows - optimized for large files
+    Enhanced with Excel sheet detection
     """
     try:
         if not file.filename.lower().endswith(('.csv', '.xlsx', '.xls')):
@@ -51,6 +92,11 @@ async def upload_file(
 
         logger.info(f"File size: {file_size / (1024 * 1024):.2f}MB")
 
+        # Initialize variables for Excel sheet handling
+        sheet_info = []
+        selected_sheet = None
+        is_excel = file.filename.lower().endswith(('.xlsx', '.xls'))
+
         # Process file with optimized pandas settings
         try:
             if file.filename.lower().endswith('.csv'):
@@ -61,9 +107,19 @@ async def upload_file(
                     encoding='utf-8'
                 )
             else:
+                # For Excel files, first extract sheet information
+                sheet_info = extract_excel_sheet_info(content, file.filename)
+
+                if not sheet_info:
+                    raise HTTPException(400, "No readable sheets found in Excel file")
+
+                # Default to first sheet
+                selected_sheet = sheet_info[0].sheet_name
+
                 # Use optimized Excel reading
                 df = pd.read_excel(
                     io.BytesIO(content),
+                    sheet_name=selected_sheet,
                     engine='openpyxl' if file.filename.lower().endswith('.xlsx') else 'xlrd'
                 )
         except Exception as e:
@@ -78,18 +134,26 @@ async def upload_file(
         file_info = {
             "file_id": file_id,
             "filename": file.filename,
+            "file_type": "excel" if is_excel else "csv",
             "file_size_mb": round(file_size / (1024 * 1024), 2),
             "total_rows": total_rows,
             "total_columns": total_cols,
             "columns": list(df.columns),
             "upload_time": datetime.utcnow().isoformat(),
-            "data_types": {col: str(dtype) for col, dtype in df.dtypes.items()}
+            "data_types": {col: str(dtype) for col, dtype in df.dtypes.items()},
+            # Excel-specific fields
+            "is_excel": is_excel,
+            "sheet_names": [sheet.sheet_name for sheet in sheet_info] if sheet_info else None,
+            "selected_sheet": selected_sheet,
+            "available_sheets": [sheet.dict() for sheet in sheet_info] if sheet_info else None
         }
 
         # Store in memory (consider using database for production with large files)
         uploaded_files[file_id] = {
             "info": file_info,
-            "data": df
+            "data": df,
+            "raw_content": content if is_excel else None,  # Store raw content for sheet switching
+            "sheet_info": sheet_info
         }
 
         # Add cleanup task for very large files (optional)
@@ -97,9 +161,13 @@ async def upload_file(
         if total_rows > cleanup_threshold:
             logger.info(f"Large file detected ({total_rows:,} rows). Consider implementing cleanup logic.")
 
+        response_message = f"File uploaded successfully - {total_rows:,} rows processed"
+        if is_excel and len(sheet_info) > 1:
+            response_message += f" from sheet '{selected_sheet}' ({len(sheet_info)} sheets available)"
+
         return {
             "success": True,
-            "message": f"File uploaded successfully - {total_rows:,} rows processed",
+            "message": response_message,
             "data": file_info
         }
 
@@ -108,6 +176,82 @@ async def upload_file(
     except Exception as e:
         logger.error(f"Upload error for {file.filename}: {e}")
         raise HTTPException(500, f"Upload failed: {str(e)}")
+
+
+@router.get("/{file_id}/sheets")
+async def get_file_sheets(file_id: str):
+    """Get available sheets for an Excel file"""
+    if file_id not in uploaded_files:
+        raise HTTPException(404, "File not found")
+
+    file_data = uploaded_files[file_id]
+    file_info = file_data["info"]
+
+    if not file_info.get("is_excel", False):
+        raise HTTPException(400, "File is not an Excel file")
+
+    return {
+        "success": True,
+        "data": {
+            "file_id": file_id,
+            "filename": file_info["filename"],
+            "current_sheet": file_info.get("selected_sheet"),
+            "available_sheets": file_info.get("available_sheets", [])
+        }
+    }
+
+
+@router.post("/{file_id}/select-sheet")
+async def select_sheet(file_id: str, request: UpdateSheetRequest):
+    """Switch to a different sheet in an Excel file"""
+    if file_id not in uploaded_files:
+        raise HTTPException(404, "File not found")
+
+    file_data = uploaded_files[file_id]
+    file_info = file_data["info"]
+
+    if not file_info.get("is_excel", False):
+        raise HTTPException(400, "File is not an Excel file")
+
+    # Check if requested sheet exists
+    available_sheets = [sheet["sheet_name"] for sheet in file_info.get("available_sheets", [])]
+    if request.sheet_name not in available_sheets:
+        raise HTTPException(400, f"Sheet '{request.sheet_name}' not found. Available sheets: {available_sheets}")
+
+    try:
+        # Load the new sheet
+        raw_content = file_data["raw_content"]
+        df = pd.read_excel(
+            io.BytesIO(raw_content),
+            sheet_name=request.sheet_name,
+            engine='openpyxl' if file_info["filename"].lower().endswith('.xlsx') else 'xlrd'
+        )
+
+        # Update stored data
+        uploaded_files[file_id]["data"] = df
+        uploaded_files[file_id]["info"]["selected_sheet"] = request.sheet_name
+        uploaded_files[file_id]["info"]["total_rows"] = len(df)
+        uploaded_files[file_id]["info"]["total_columns"] = len(df.columns)
+        uploaded_files[file_id]["info"]["columns"] = list(df.columns)
+        uploaded_files[file_id]["info"]["data_types"] = {col: str(dtype) for col, dtype in df.dtypes.items()}
+
+        logger.info(
+            f"Switched to sheet '{request.sheet_name}' for file {file_info['filename']}: {len(df):,} rows, {len(df.columns)} columns")
+
+        return {
+            "success": True,
+            "message": f"Successfully switched to sheet '{request.sheet_name}'",
+            "data": {
+                "selected_sheet": request.sheet_name,
+                "total_rows": len(df),
+                "total_columns": len(df.columns),
+                "columns": list(df.columns)
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error switching to sheet '{request.sheet_name}': {str(e)}")
+        raise HTTPException(500, f"Failed to switch sheet: {str(e)}")
 
 
 @router.get("/")
