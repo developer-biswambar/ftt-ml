@@ -1,4 +1,4 @@
-// src/services/api.js - Enhanced with row multiplication features
+// src/services/api.js - Enhanced with sheet selection and all existing features
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000';
@@ -38,6 +38,47 @@ export const apiService = {
 
     deleteFile: async (fileId) => {
         const response = await api.delete(`/files/${fileId}`);
+        return response.data;
+    },
+
+    // ===========================================
+    // EXCEL ANALYSIS FOR UPLOAD
+    // ===========================================
+    analyzeExcelSheets: async (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await api.post('/files/analyze-sheets', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    },
+
+    validateFileName: async (filename) => {
+        const response = await api.post('/files/validate-name', {
+            filename: filename
+        });
+        return response.data;
+    },
+
+    // Enhanced upload with sheet and custom name
+    uploadFileWithOptions: async (file, sheetName = '', customName = '') => {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (sheetName) {
+            formData.append('sheet_name', sheetName);
+        }
+        if (customName) {
+            formData.append('custom_name', customName);
+        }
+
+        const response = await api.post('files/upload', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
         return response.data;
     },
 
@@ -447,6 +488,7 @@ export const apiService = {
         const response = await api.get(`/api/v1/reconcile/?skip=${skip}&limit=${limit}`);
         return response.data;
     },
+
     getReconciliationResult: async (reconciliation_id) => {
         const response = await api.get(`/reconciliation/results/${reconciliation_id}`);
         return response.data;
@@ -460,6 +502,198 @@ export const apiService = {
     analyzeColumns: async (fileAId, fileBId) => {
         const url = `/api/v1/reconcile/analyze-columns?file_a_id=${fileAId}&file_b_id=${fileBId}`;
         const response = await api.post(url);
+        return response.data;
+    },
+
+    // ===========================================
+    // SHEET SELECTION HELPER FUNCTIONS
+    // ===========================================
+    isExcelFile: (file) => {
+        const filename = typeof file === 'string' ? file : file.filename || file.name || '';
+        return filename.toLowerCase().endsWith('.xlsx') || filename.toLowerCase().endsWith('.xls');
+    },
+
+    hasMultipleSheets: (file) => {
+        return file.is_excel && file.sheet_names && file.sheet_names.length > 1;
+    },
+
+    getCurrentSheetInfo: (file) => {
+        if (!file.is_excel || !file.available_sheets) return null;
+
+        return file.available_sheets.find(sheet =>
+            sheet.sheet_name === file.selected_sheet
+        );
+    },
+
+    getSheetSummary: (file) => {
+        if (!file.is_excel) return 'CSV File';
+
+        const currentSheet = apiService.getCurrentSheetInfo(file);
+        const totalSheets = file.sheet_names?.length || 1;
+
+        if (totalSheets === 1) {
+            return `Excel (1 sheet)`;
+        }
+
+        return `Excel (${totalSheets} sheets, active: ${file.selected_sheet})`;
+    },
+
+    validateSheetSelection: (file, requiredSheets = []) => {
+        const errors = [];
+        const warnings = [];
+
+        if (!file.is_excel && requiredSheets.length > 0) {
+            errors.push('Excel file required for sheet-specific operations');
+        }
+
+        if (file.is_excel && !file.selected_sheet) {
+            errors.push('No sheet selected');
+        }
+
+        if (file.is_excel && file.available_sheets?.length === 0) {
+            errors.push('No readable sheets found in Excel file');
+        }
+
+        requiredSheets.forEach(sheetName => {
+            if (file.is_excel && !file.sheet_names?.includes(sheetName)) {
+                errors.push(`Required sheet '${sheetName}' not found`);
+            }
+        });
+
+        return {
+            isValid: errors.length === 0,
+            errors,
+            warnings
+        };
+    },
+
+    // ===========================================
+    // ENHANCED FILE OPERATIONS WITH SHEET SUPPORT
+    // ===========================================
+    getFilePreview: async (fileId, sheetName = null, limit = 10) => {
+        let url = `/files/${fileId}/preview?num_rows=${limit}`;
+        if (sheetName) {
+            url += `&sheet=${encodeURIComponent(sheetName)}`;
+        }
+        const response = await api.get(url);
+        return response.data;
+    },
+
+    getFileDataWithSheet: async (fileId, sheetName = null, page = 1, pageSize = 1000) => {
+        let url = `/files/${fileId}/data?page=${page}&page_size=${pageSize}`;
+        if (sheetName) {
+            url += `&sheet=${encodeURIComponent(sheetName)}`;
+        }
+        const response = await api.get(url);
+        return response.data;
+    },
+
+    downloadFileWithSheet: async (fileId, format = 'csv', sheetName = null) => {
+        let url = `/files/${fileId}/download?format=${format}`;
+        if (sheetName) {
+            url += `&sheet=${encodeURIComponent(sheetName)}`;
+        }
+        const response = await api.get(url, {
+            responseType: 'blob'
+        });
+        return response;
+    },
+
+    // ===========================================
+    // RECONCILIATION WITH SHEET SUPPORT
+    // ===========================================
+    processReconciliationFromStorage: async (fileAId, fileBId, rules) => {
+        const formData = new FormData();
+        formData.append('file_a_id', fileAId);
+        formData.append('file_b_id', fileBId);
+        formData.append('rules', JSON.stringify(rules));
+
+        const response = await api.post('/reconciliation/process-from-storage', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    },
+
+    // ===========================================
+    // BULK OPERATIONS
+    // ===========================================
+    bulkDeleteFiles: async (fileIds) => {
+        const response = await api.post('/files/bulk-delete', {
+            file_ids: fileIds
+        });
+        return response.data;
+    },
+
+    bulkDownloadFiles: async (fileIds, format = 'csv') => {
+        const response = await api.post('/files/bulk-download', {
+            file_ids: fileIds,
+            format: format
+        }, {
+            responseType: 'blob'
+        });
+        return response;
+    },
+
+    // ===========================================
+    // FILE METADATA OPERATIONS
+    // ===========================================
+    updateFileMetadata: async (fileId, metadata) => {
+        const response = await api.put(`/files/${fileId}/metadata`, metadata);
+        return response.data;
+    },
+
+    getFileStatistics: async (fileId) => {
+        const response = await api.get(`/files/${fileId}/statistics`);
+        return response.data;
+    },
+
+    getFileColumns: async (fileId, sheetName = null) => {
+        let url = `/files/${fileId}/columns`;
+        if (sheetName) {
+            url += `?sheet=${encodeURIComponent(sheetName)}`;
+        }
+        const response = await api.get(url);
+        return response.data;
+    },
+
+    // ===========================================
+    // SEARCH AND FILTER OPERATIONS
+    // ===========================================
+    searchFiles: async (query, filters = {}) => {
+        const params = new URLSearchParams({
+            q: query,
+            ...filters
+        });
+        const response = await api.get(`/files/search?${params}`);
+        return response.data;
+    },
+
+    filterFilesByType: async (fileType = 'all') => {
+        const response = await api.get(`/files/filter?type=${fileType}`);
+        return response.data;
+    },
+
+    // ===========================================
+    // IMPORT/EXPORT OPERATIONS
+    // ===========================================
+    exportFileList: async (format = 'json') => {
+        const response = await api.get(`/files/export?format=${format}`, {
+            responseType: format === 'json' ? 'json' : 'blob'
+        });
+        return response;
+    },
+
+    importConfiguration: async (configFile) => {
+        const formData = new FormData();
+        formData.append('config_file', configFile);
+
+        const response = await api.post('/files/import-config', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
         return response.data;
     }
 };
@@ -479,8 +713,20 @@ api.interceptors.response.use(
             throw new Error('Rate limit exceeded. Please wait a moment before trying again.');
         }
 
+        if (error.response?.status === 413) {
+            throw new Error('File too large. Please upload a smaller file.');
+        }
+
+        if (error.response?.status === 415) {
+            throw new Error('Unsupported file type. Please upload CSV or Excel files only.');
+        }
+
         if (error.response?.data?.detail) {
             throw new Error(error.response.data.detail);
+        }
+
+        if (error.response?.data?.message) {
+            throw new Error(error.response.data.message);
         }
 
         throw error;
@@ -490,47 +736,106 @@ api.interceptors.response.use(
 export default apiService;
 
 // ===========================================
-// USAGE EXAMPLES FOR ROW MULTIPLICATION
+// USAGE EXAMPLES FOR SHEET OPERATIONS
 // ===========================================
 
-/*
-// Basic row multiplication validation
-const promptAnalysis = apiService.validateRowMultiplicationPrompt(
-    "generate 2 rows for each source row, status active in first, inactive in second"
-);
-console.log('Multiplication detected:', promptAnalysis.hasMultiplication);
-console.log('Estimated count:', promptAnalysis.estimatedCount);
+// Example: Working with Excel sheets
+export const exampleSheetOperations = {
+    // Check if file is Excel and has multiple sheets
+    checkFileSheets: async (fileId) => {
+        const file = await apiService.getFileInfo(fileId);
+        if (apiService.hasMultipleSheets(file)) {
+            console.log('Multiple sheets available:', file.sheet_names);
 
-// Using templates
-const templates = apiService.getRowMultiplicationTemplates();
-const buyTemplate = templates.find(t => t.id === 'buy_sell_pair');
-const processedPrompt = apiService.processTemplatePrompt(buyTemplate, ['Trade_ID', 'Amount']);
+            // Get detailed sheet information
+            const sheetsInfo = await apiService.getFileSheets(fileId);
+            console.log('Sheet details:', sheetsInfo.data.available_sheets);
 
-// Validate prompt with AI
-const validation = await apiService.validatePrompt(file, userPrompt);
-if (validation.success && validation.validation.row_multiplication?.enabled) {
-    console.log(`Will create ${validation.validation.row_multiplication.count}x rows`);
-}
+            return sheetsInfo.data.available_sheets;
+        }
+        return [];
+    },
 
-// Complex generation with safety checks
-const result = await apiService.processComplexGeneration(file, {
-    userPrompt: "generate 20 rows for each source with different sequential values",
-    sheetName: "Sheet1",
-    confirmLargeGeneration: true
-});
+    // Switch to a different sheet
+    switchSheet: async (fileId, sheetName) => {
+        try {
+            const result = await apiService.selectSheet(fileId, sheetName);
+            console.log('Successfully switched to sheet:', sheetName);
+            return result;
+        } catch (error) {
+            console.error('Failed to switch sheet:', error);
+            throw error;
+        }
+    },
 
-if (result.requiresConfirmation) {
-    // Show confirmation dialog to user
-    console.log(result.message);
-}
+    // Get data from specific sheet
+    getSheetData: async (fileId, sheetName = null) => {
+        const data = await apiService.getFileDataWithSheet(fileId, sheetName);
+        return data;
+    },
 
-// File validation
-const fileValidation = apiService.validateFileForGeneration(file);
-if (!fileValidation.isValid) {
-    console.error('File validation errors:', fileValidation.errors);
-}
+    // Validate sheet selection for operations
+    validateSheets: (file, requiredSheets = []) => {
+        const validation = apiService.validateSheetSelection(file, requiredSheets);
+        if (!validation.isValid) {
+            console.error('Sheet validation failed:', validation.errors);
+            return false;
+        }
+        return true;
+    },
 
-// Size estimation
-const sizeEstimate = apiService.estimateOutputSize(1000, 5);
-console.log(`Input: 1000 rows, Output: ${sizeEstimate.outputRows} rows`);
-*/
+    // Process reconciliation with sheet-aware files
+    processReconciliationWithSheets: async (fileAId, fileBId, fileASheet = null, fileBSheet = null) => {
+        const reconciliationRules = {
+            Files: [
+                {
+                    Name: "FileA",
+                    SheetName: fileASheet, // Optional: specific sheet
+                    Extract: [
+                        {
+                            ResultColumnName: "ExtractedAmount",
+                            SourceColumn: "Description",
+                            MatchType: "regex",
+                            Patterns: ["\\d+\\.\\d{2}"]
+                        }
+                    ],
+                    Filter: []
+                },
+                {
+                    Name: "FileB",
+                    SheetName: fileBSheet, // Use specific sheet or current
+                    Extract: [
+                        {
+                            ResultColumnName: "ExtractedAmount",
+                            SourceColumn: "Details",
+                            MatchType: "regex",
+                            Patterns: ["\\d+\\.\\d{2}"]
+                        }
+                    ],
+                    Filter: []
+                }
+            ],
+            ReconciliationRules: [
+                {
+                    LeftFileColumn: "ExtractedAmount",
+                    RightFileColumn: "ExtractedAmount",
+                    MatchType: "equals"
+                }
+            ]
+        };
+
+        return await apiService.processReconciliationFromStorage(fileAId, fileBId, reconciliationRules);
+    },
+
+    // Download file from specific sheet
+    downloadSheet: async (fileId, sheetName = null, format = 'csv') => {
+        const blob = await apiService.downloadFileWithSheet(fileId, format, sheetName);
+        return blob;
+    },
+
+    // Get preview of specific sheet
+    previewSheet: async (fileId, sheetName = null, limit = 5) => {
+        const preview = await apiService.getFilePreview(fileId, sheetName, limit);
+        return preview;
+    }
+};

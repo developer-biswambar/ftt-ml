@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 
 import pandas as pd
 from dotenv import load_dotenv
-from fastapi import UploadFile, File, HTTPException, APIRouter, BackgroundTasks
+from fastapi import UploadFile, File, HTTPException, APIRouter, BackgroundTasks, Form
 from pydantic import BaseModel
 
 # Load environment variables
@@ -61,14 +61,84 @@ def extract_excel_sheet_info(content: bytes, filename: str) -> List[SheetInfo]:
         return []
 
 
+@router.post("/analyze-sheets")
+async def analyze_excel_sheets(file: UploadFile = File(...)):
+    """
+    Analyze Excel file to get available sheets without uploading
+    """
+    try:
+        if not file.filename.lower().endswith(('.xlsx', '.xls')):
+            raise HTTPException(400, "Only Excel files are supported for sheet analysis")
+
+        # Read content
+        content = await file.read()
+
+        # Extract sheet information
+        sheet_info = extract_excel_sheet_info(content, file.filename)
+
+        return {
+            "success": True,
+            "sheets": [sheet.dict() for sheet in sheet_info],
+            "message": f"Found {len(sheet_info)} sheets"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing Excel sheets: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "sheets": []
+        }
+
+
+@router.post("/validate-name")
+async def validate_file_name(request: dict):
+    """
+    Validate if a filename is available
+    """
+    try:
+        filename = request.get('filename', '').strip()
+
+        if not filename:
+            return {
+                "isValid": False,
+                "error": "Filename is required"
+            }
+
+        # Check if name already exists
+        for file_id, file_data in uploaded_files.items():
+            existing_name = file_data["info"].get("custom_name") or file_data["info"]["filename"]
+            if existing_name.lower() == filename.lower():
+                return {
+                    "isValid": False,
+                    "error": "A file with this name already exists"
+                }
+
+        return {
+            "isValid": True,
+            "message": "Filename is available"
+        }
+
+    except Exception as e:
+        logger.error(f"Error validating filename: {e}")
+        return {
+            "isValid": False,
+            "error": "Validation failed"
+        }
+
+
 @router.post("/upload")
 async def upload_file(
         background_tasks: BackgroundTasks,
-        file: UploadFile = File(...)
+        file: UploadFile = File(...),
+        sheet_name: str = Form(None),
+        custom_name: str = Form(None)
 ):
     """
-    Upload file with unlimited rows - optimized for large files
-    Enhanced with Excel sheet detection
+    Upload file with optional sheet selection and custom naming
+    Enhanced with Excel sheet selection and file naming
     """
     try:
         if not file.filename.lower().endswith(('.csv', '.xlsx', '.xls')):
@@ -92,10 +162,9 @@ async def upload_file(
 
         logger.info(f"File size: {file_size / (1024 * 1024):.2f}MB")
 
-        # Initialize variables for Excel sheet handling
-        sheet_info = []
-        selected_sheet = None
+        # Initialize variables
         is_excel = file.filename.lower().endswith(('.xlsx', '.xls'))
+        df = None
 
         # Process file with optimized pandas settings
         try:
@@ -107,21 +176,20 @@ async def upload_file(
                     encoding='utf-8'
                 )
             else:
-                # For Excel files, first extract sheet information
-                sheet_info = extract_excel_sheet_info(content, file.filename)
+                # For Excel files, use specified sheet or default
+                if sheet_name:
+                    df = pd.read_excel(
+                        io.BytesIO(content),
+                        sheet_name=sheet_name,
+                        engine='openpyxl' if file.filename.lower().endswith('.xlsx') else 'xlrd'
+                    )
+                else:
+                    # Use first sheet if no sheet specified
+                    df = pd.read_excel(
+                        io.BytesIO(content),
+                        engine='openpyxl' if file.filename.lower().endswith('.xlsx') else 'xlrd'
+                    )
 
-                if not sheet_info:
-                    raise HTTPException(400, "No readable sheets found in Excel file")
-
-                # Default to first sheet
-                selected_sheet = sheet_info[0].sheet_name
-
-                # Use optimized Excel reading
-                df = pd.read_excel(
-                    io.BytesIO(content),
-                    sheet_name=selected_sheet,
-                    engine='openpyxl' if file.filename.lower().endswith('.xlsx') else 'xlrd'
-                )
         except Exception as e:
             logger.error(f"Error reading file {file.filename}: {str(e)}")
             raise HTTPException(400, f"Error reading file: {str(e)}")
@@ -131,9 +199,21 @@ async def upload_file(
         total_cols = len(df.columns)
         logger.info(f"Successfully processed {file.filename}: {total_rows:,} rows, {total_cols} columns")
 
+        # Determine final filename
+        final_filename = custom_name.strip() if custom_name else file.filename
+
+        # Validate custom name if provided
+        if custom_name:
+            # Check if custom name already exists
+            for existing_file_id, existing_file_data in uploaded_files.items():
+                existing_name = existing_file_data["info"].get("custom_name") or existing_file_data["info"]["filename"]
+                if existing_name.lower() == custom_name.strip().lower():
+                    raise HTTPException(400, f"A file with the name '{custom_name}' already exists")
+
         file_info = {
             "file_id": file_id,
-            "filename": file.filename,
+            "filename": file.filename,  # Original filename
+            "custom_name": custom_name.strip() if custom_name else None,  # Custom display name
             "file_type": "excel" if is_excel else "csv",
             "file_size_mb": round(file_size / (1024 * 1024), 2),
             "total_rows": total_rows,
@@ -141,19 +221,13 @@ async def upload_file(
             "columns": list(df.columns),
             "upload_time": datetime.utcnow().isoformat(),
             "data_types": {col: str(dtype) for col, dtype in df.dtypes.items()},
-            # Excel-specific fields
-            "is_excel": is_excel,
-            "sheet_names": [sheet.sheet_name for sheet in sheet_info] if sheet_info else None,
-            "selected_sheet": selected_sheet,
-            "available_sheets": [sheet.dict() for sheet in sheet_info] if sheet_info else None
+            "sheet_name": sheet_name if sheet_name else None,  # Store selected sheet
         }
 
-        # Store in memory (consider using database for production with large files)
+        # Store in memory
         uploaded_files[file_id] = {
             "info": file_info,
-            "data": df,
-            "raw_content": content if is_excel else None,  # Store raw content for sheet switching
-            "sheet_info": sheet_info
+            "data": df
         }
 
         # Add cleanup task for very large files (optional)
@@ -162,8 +236,10 @@ async def upload_file(
             logger.info(f"Large file detected ({total_rows:,} rows). Consider implementing cleanup logic.")
 
         response_message = f"File uploaded successfully - {total_rows:,} rows processed"
-        if is_excel and len(sheet_info) > 1:
-            response_message += f" from sheet '{selected_sheet}' ({len(sheet_info)} sheets available)"
+        if sheet_name:
+            response_message += f" from sheet '{sheet_name}'"
+        if custom_name:
+            response_message += f" with custom name '{custom_name}'"
 
         return {
             "success": True,
