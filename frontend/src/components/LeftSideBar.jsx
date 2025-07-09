@@ -59,15 +59,13 @@ const LeftSidebar = ({
             setShowUploadModal(true);
             await loadExcelSheets(file);
         } else {
-            // Direct upload for CSV files with name validation
-            const baseName = file.name.replace(/\.csv$/i, '');
-            setCustomFileName(baseName);
-            setNameError('');
-
             // For CSV, show modal to allow name customization
+            const baseName = file.name.replace(/\.csv$/i, '');
             setUploadFile(file);
+            setCustomFileName(baseName);
             setSelectedSheet(''); // No sheet for CSV
             setAvailableSheets([]);
+            setNameError('');
             setShowUploadModal(true);
         }
     };
@@ -530,9 +528,7 @@ const LeftSidebar = ({
                                                     const displayName = file.custom_name || file.filename;
                                                     return (
                                                         <option key={file.file_id} value={file.file_id}>
-                                                            {displayName}
-                                                            {file.sheet_name ? ` (${file.sheet_name})` : ''}
-                                                            {` - ${file.total_rows?.toLocaleString()} rows`}
+                                                            {displayName} - {file.total_rows?.toLocaleString()} rows, {file.columns?.length} cols
                                                         </option>
                                                     );
                                                 })}
@@ -540,9 +536,6 @@ const LeftSidebar = ({
                                             {selectedFiles[requiredFile.key] && (
                                                 <p className="text-xs text-green-600 ml-1">
                                                     ✓ {selectedFiles[requiredFile.key].custom_name || selectedFiles[requiredFile.key].filename} selected
-                                                    {selectedFiles[requiredFile.key].sheet_name &&
-                                                        ` (Sheet: ${selectedFiles[requiredFile.key].sheet_name})`
-                                                    }
                                                 </p>
                                             )}
                                         </div>
