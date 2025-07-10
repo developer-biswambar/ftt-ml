@@ -1,8 +1,9 @@
-// src/components/ChatInterface.jsx - Enhanced with tabular result display
+// src/components/ChatInterface.jsx - Enhanced with Delta Generation support
 import React, {useEffect, useRef, useState} from 'react';
 import {AlertCircle, CheckCircle, Eye, Send, Settings} from 'lucide-react';
 import ReconciliationFlow from './ReconciliationFlow';
 import FileGeneratorFlow from './FileGeneratorFlow';
+import DeltaGenerationFlow from './DeltaGenerationFlow';
 
 const TypingIndicator = ({message}) => {
     return (
@@ -77,13 +78,28 @@ const MessageComponent = ({message, onDisplayDetailedResults}) => {
                 border: 'border-purple-200',
                 evenRow: 'bg-purple-25',
                 cellText: 'text-purple-800'
+            },
+            red: {
+                header: 'bg-red-100',
+                headerText: 'text-red-800',
+                border: 'border-red-200',
+                evenRow: 'bg-red-25',
+                cellText: 'text-red-800'
+            },
+            blue: {
+                header: 'bg-blue-100',
+                headerText: 'text-blue-800',
+                border: 'border-blue-200',
+                evenRow: 'bg-blue-25',
+                cellText: 'text-blue-800'
             }
         };
         return colorMap[color] || colorMap.green;
     };
 
     // Check if this is a result message that can show detailed results
-    const isResultMessage = message.type === 'result' && message.content.includes('Reconciliation Results');
+    const isResultMessage = message.type === 'result' &&
+        (message.content.includes('Reconciliation Results') || message.content.includes('Delta Generation Summary'));
 
     return (
         <div
@@ -177,6 +193,7 @@ const ChatInterface = ({
                            selectedTemplate,
                            requiredFiles,
                            onStartReconciliation,
+                           onStartDeltaGeneration, // NEW: Delta generation handler
                            isTyping,
                            typingMessage,
                            files,
@@ -240,8 +257,10 @@ const ChatInterface = ({
 
         onSendMessage('user', `${selectedTemplate?.name || 'Process'} configuration completed. Starting process...`);
 
-        // Only call onStartReconciliation for non-generation processes
-        if (onStartReconciliation && !selectedTemplate?.category.includes('ai-generation')) {
+        // Route to appropriate handler based on process type
+        if (processConfig.process_type === 'delta-generation' && onStartDeltaGeneration) {
+            onStartDeltaGeneration(processConfig);
+        } else if (onStartReconciliation && !selectedTemplate?.category.includes('ai-generation')) {
             onStartReconciliation(processConfig);
         } else if (selectedTemplate?.category.includes('ai-generation')) {
             // For file generation, the flow handles everything internally
@@ -255,11 +274,12 @@ const ChatInterface = ({
         onSendMessage('system', 'Process configuration cancelled. Please select a different template or try again.');
     };
 
-    const startReconciliationFlow = () => {
-        // Send initial message
-        onSendMessage('system', `🔧 Let me help you configure this ${selectedTemplate.name.toLowerCase()} step by step.\n\nStarting configuration wizard...`);
+    const startProcessFlow = () => {
+        // Send initial message based on process type
+        const processName = selectedTemplate.name.toLowerCase();
+        onSendMessage('system', `🔧 Let me help you configure this ${processName} step by step.\n\nStarting configuration wizard...`);
 
-        // Start the flow after a brief delay
+        // Start the appropriate flow after a brief delay
         setTimeout(() => {
             if (selectedTemplate.category.includes('reconciliation')) {
                 setCurrentFlow('reconciliation');
@@ -270,6 +290,13 @@ const ChatInterface = ({
                 });
             } else if (selectedTemplate.category.includes('ai-generation')) {
                 setCurrentFlow('file_generation');
+                setFlowData({
+                    selectedFiles,
+                    selectedTemplate,
+                    step: 'file_selection'
+                });
+            } else if (selectedTemplate.category.includes('delta-generation')) {
+                setCurrentFlow('delta_generation');
                 setFlowData({
                     selectedFiles,
                     selectedTemplate,
@@ -299,7 +326,8 @@ const ChatInterface = ({
             userInput.toLowerCase().includes('begin') ||
             userInput.toLowerCase().includes('process') ||
             userInput.toLowerCase().includes('reconcil') ||
-            userInput.toLowerCase().includes('generate');
+            userInput.toLowerCase().includes('generate') ||
+            userInput.toLowerCase().includes('delta');
 
         if (isStartCommand) {
             if (selectedTemplate && areAllFilesSelected()) {
@@ -307,8 +335,10 @@ const ChatInterface = ({
                 setCurrentInput('');
 
                 // Start the appropriate flow
-                if (selectedTemplate.category.includes('reconciliation') || selectedTemplate.category.includes('ai-generation')) {
-                    startReconciliationFlow();
+                if (selectedTemplate.category.includes('reconciliation') ||
+                    selectedTemplate.category.includes('ai-generation') ||
+                    selectedTemplate.category.includes('delta-generation')) {
+                    startProcessFlow();
                 } else {
                     // For single file processes, start directly
                     handleFlowComplete({
@@ -351,6 +381,22 @@ const ChatInterface = ({
 
     const status = getReadyStatus();
 
+    // Get process type display name for UI
+    const getProcessTypeDisplay = () => {
+        if (!selectedTemplate) return null;
+
+        if (selectedTemplate.category.includes('reconciliation')) return '🔄 Reconciliation';
+        if (selectedTemplate.category.includes('delta-generation')) return '📊 Delta Generation';
+        if (selectedTemplate.category.includes('ai-generation')) return '🤖 AI Generation';
+        if (selectedTemplate.category.includes('validation')) return '🔍 Validation';
+        if (selectedTemplate.category.includes('cleaning')) return '🧹 Cleaning';
+        if (selectedTemplate.category.includes('extraction')) return '📋 Extraction';
+        if (selectedTemplate.category.includes('consolidation')) return '📚 Consolidation';
+        if (selectedTemplate.category.includes('ai-analysis')) return '🤖 AI Analysis';
+
+        return '⚙️ Processing';
+    };
+
     return (
         <div className="flex-1 flex flex-col">
             {/* Header */}
@@ -358,7 +404,7 @@ const ChatInterface = ({
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-xl font-semibold text-gray-800">💼 Data Processing Platform</h1>
-                        <p className="text-sm text-gray-600">AI-powered reconciliation, validation, and analysis</p>
+                        <p className="text-sm text-gray-600">AI-powered reconciliation, delta generation, validation, and analysis</p>
                     </div>
 
                     {/* Process Status Indicator */}
@@ -366,7 +412,7 @@ const ChatInterface = ({
                         {selectedTemplate && (
                             <div className="flex items-center space-x-2 bg-blue-50 px-3 py-1 rounded-lg">
                                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                <span className="text-sm text-blue-800 font-medium">{selectedTemplate.name}</span>
+                                <span className="text-sm text-blue-800 font-medium">{getProcessTypeDisplay()}</span>
                             </div>
                         )}
 
@@ -435,6 +481,20 @@ const ChatInterface = ({
                 {currentFlow === 'file_generation' && (
                     <div className="mb-4">
                         <FileGeneratorFlow
+                            files={files}
+                            selectedFiles={selectedFiles}
+                            selectedTemplate={selectedTemplate}
+                            flowData={flowData}
+                            onComplete={handleFlowComplete}
+                            onCancel={handleFlowCancel}
+                            onSendMessage={onSendMessage}
+                        />
+                    </div>
+                )}
+
+                {currentFlow === 'delta_generation' && (
+                    <div className="mb-4">
+                        <DeltaGenerationFlow
                             files={files}
                             selectedFiles={selectedFiles}
                             selectedTemplate={selectedTemplate}
@@ -535,7 +595,7 @@ const ChatInterface = ({
                             ) : (
                                 <input
                                     type="text"
-                                    value={currentInput}
+                                    value={currentInput || ''} // Fix: Ensure value is never undefined
                                     onChange={(e) => setCurrentInput(e.target.value)}
                                     onKeyPress={(e) => e.key === 'Enter' && handleRegularSubmit()}
                                     placeholder={
@@ -569,7 +629,9 @@ const ChatInterface = ({
                         </span>
                         {selectedTemplate && (
                             <span className="text-blue-600">
-                                {selectedTemplate.category.includes('ai') ? '🤖 AI-powered' : '⚙️ Manual config'}
+                                {selectedTemplate.category.includes('ai') ? '🤖 AI-powered' :
+                                 selectedTemplate.category.includes('delta') ? '📊 Delta analysis' :
+                                 '⚙️ Manual config'}
                             </span>
                         )}
                     </div>

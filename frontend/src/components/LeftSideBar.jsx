@@ -1,4 +1,4 @@
-// src/components/LeftSidebar.jsx - Simplified without sheet switching functionality
+// src/components/LeftSidebar.jsx - Integrated with Delta Generation Template
 import React, {useRef, useState} from 'react';
 import {CheckCircle, Eye, FileText, RefreshCw, Upload, AlertCircle, X, Sheet} from 'lucide-react';
 import { apiService } from '../services/api';
@@ -213,18 +213,20 @@ const LeftSidebar = ({
             case 'reconciliation':
             case 'ai-reconciliation':
                 return '🔄';
+            case 'delta-generation':
+                return '📊';
             case 'validation':
                 return '🔍';
             case 'cleaning':
                 return '🧹';
             case 'extraction':
-                return '📊';
-            case 'consolidation':
                 return '📋';
+            case 'consolidation':
+                return '📚';
             case 'ai-analysis':
                 return '🤖';
             case 'ai-generation':
-                return '🤖';
+                return '🎲';
             default:
                 return '⚙️';
         }
@@ -244,6 +246,9 @@ const LeftSidebar = ({
 
         if (category?.includes('ai')) {
             return 'from-purple-500 to-pink-600';
+        }
+        if (category === 'delta-generation') {
+            return 'from-orange-500 to-red-600';
         }
 
         return colors[index % colors.length];
@@ -393,6 +398,12 @@ const LeftSidebar = ({
                                                             <span
                                                                 className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-medium">
                                                                 AI
+                                                            </span>
+                                                        )}
+                                                        {template.category === 'delta-generation' && (
+                                                            <span
+                                                                className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">
+                                                                NEW
                                                             </span>
                                                         )}
                                                     </div>

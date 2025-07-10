@@ -111,6 +111,17 @@ async def get_templates():
             "user_requirements": "Describe the file you want to generate..."
         },
         {
+            "name": "Delta Generation",
+            "description": "Compare two versions of data to identify what changed between older and newer files. Identifies unchanged, amended, deleted, and newly added records.",
+            "category": "delta-generation",
+            "filesRequired": 2,
+            "fileLabels": ["Older File", "Newer File"],
+            "user_requirements": "Delta Generation Process Requirements:Compare yesterday's trade file with today's trade file using TradeID + Account as composite key, and monitor changes in Status, Amount, and Settlement fields.",
+            "icon": "📊",
+            "color": "orange"
+        },
+
+        {
             "name": "📋 ISIN Securities Reconciliation",
             "description": "Extract and match ISIN codes from transaction descriptions for securities reconciliation",
             "user_requirements": "I need to reconcile securities data by extracting ISIN codes from description fields.",
@@ -272,12 +283,15 @@ try:
     from app.routes.file_routes import router as file_router
     from app.routes.regex_routes import router as regex_router
     from app.routes.file_generator import router as file_generator_router
+    from app.routes.delta_routes import router as delta_router
 
     app.include_router(health_routes)
     app.include_router(reconciliation_router)
     app.include_router(viewer_router)
     app.include_router(file_router)
     app.include_router(regex_router)  # NEW: Include regex routes
+
+    app.include_router(delta_router)
 
     app.include_router(file_generator_router)
     print("✅ All routes loaded successfully (optimized reconciliation + AI regex generation enabled)")

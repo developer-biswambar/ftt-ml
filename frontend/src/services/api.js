@@ -695,7 +695,7 @@ export const apiService = {
             },
         });
         return response.data;
-    }
+    },
 };
 
 // Error handling interceptor
@@ -734,108 +734,3 @@ api.interceptors.response.use(
 );
 
 export default apiService;
-
-// ===========================================
-// USAGE EXAMPLES FOR SHEET OPERATIONS
-// ===========================================
-
-// Example: Working with Excel sheets
-export const exampleSheetOperations = {
-    // Check if file is Excel and has multiple sheets
-    checkFileSheets: async (fileId) => {
-        const file = await apiService.getFileInfo(fileId);
-        if (apiService.hasMultipleSheets(file)) {
-            console.log('Multiple sheets available:', file.sheet_names);
-
-            // Get detailed sheet information
-            const sheetsInfo = await apiService.getFileSheets(fileId);
-            console.log('Sheet details:', sheetsInfo.data.available_sheets);
-
-            return sheetsInfo.data.available_sheets;
-        }
-        return [];
-    },
-
-    // Switch to a different sheet
-    switchSheet: async (fileId, sheetName) => {
-        try {
-            const result = await apiService.selectSheet(fileId, sheetName);
-            console.log('Successfully switched to sheet:', sheetName);
-            return result;
-        } catch (error) {
-            console.error('Failed to switch sheet:', error);
-            throw error;
-        }
-    },
-
-    // Get data from specific sheet
-    getSheetData: async (fileId, sheetName = null) => {
-        const data = await apiService.getFileDataWithSheet(fileId, sheetName);
-        return data;
-    },
-
-    // Validate sheet selection for operations
-    validateSheets: (file, requiredSheets = []) => {
-        const validation = apiService.validateSheetSelection(file, requiredSheets);
-        if (!validation.isValid) {
-            console.error('Sheet validation failed:', validation.errors);
-            return false;
-        }
-        return true;
-    },
-
-    // Process reconciliation with sheet-aware files
-    processReconciliationWithSheets: async (fileAId, fileBId, fileASheet = null, fileBSheet = null) => {
-        const reconciliationRules = {
-            Files: [
-                {
-                    Name: "FileA",
-                    SheetName: fileASheet, // Optional: specific sheet
-                    Extract: [
-                        {
-                            ResultColumnName: "ExtractedAmount",
-                            SourceColumn: "Description",
-                            MatchType: "regex",
-                            Patterns: ["\\d+\\.\\d{2}"]
-                        }
-                    ],
-                    Filter: []
-                },
-                {
-                    Name: "FileB",
-                    SheetName: fileBSheet, // Use specific sheet or current
-                    Extract: [
-                        {
-                            ResultColumnName: "ExtractedAmount",
-                            SourceColumn: "Details",
-                            MatchType: "regex",
-                            Patterns: ["\\d+\\.\\d{2}"]
-                        }
-                    ],
-                    Filter: []
-                }
-            ],
-            ReconciliationRules: [
-                {
-                    LeftFileColumn: "ExtractedAmount",
-                    RightFileColumn: "ExtractedAmount",
-                    MatchType: "equals"
-                }
-            ]
-        };
-
-        return await apiService.processReconciliationFromStorage(fileAId, fileBId, reconciliationRules);
-    },
-
-    // Download file from specific sheet
-    downloadSheet: async (fileId, sheetName = null, format = 'csv') => {
-        const blob = await apiService.downloadFileWithSheet(fileId, format, sheetName);
-        return blob;
-    },
-
-    // Get preview of specific sheet
-    previewSheet: async (fileId, sheetName = null, limit = 5) => {
-        const preview = await apiService.getFilePreview(fileId, sheetName, limit);
-        return preview;
-    }
-};
