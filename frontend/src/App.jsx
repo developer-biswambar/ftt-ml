@@ -290,37 +290,37 @@ const MainApp = () => {
 
     // NEW: Delta Generation handler
     const handleDeltaGeneration = async (deltaConfig) => {
-    // ... existing validation code ...
+        // ... existing validation code ...
 
-    setIsProcessing(true);
-    addMessage('user', `Starting ${selectedTemplate.name.toLowerCase()}...`, false);
-    addMessage('system', `📊 Starting Delta Generation...\n\n⏳ Analyzing changes between older and newer files...`, true);
+        setIsProcessing(true);
+        addMessage('user', `Starting ${selectedTemplate.name.toLowerCase()}...`, false);
+        addMessage('system', `📊 Starting Delta Generation...\n\n⏳ Analyzing changes between older and newer files...`, true);
 
-    try {
-        const deltaResponse = await deltaApiService.processDeltaGeneration(deltaConfig);
-        console.log(deltaResponse);
+        try {
+            const deltaResponse = await deltaApiService.processDeltaGeneration(deltaConfig);
+            console.log(deltaResponse);
 
-        // Simulate processing time or handle real response
-        setTimeout(() => {
-            setIsProcessing(false);
+            // Simulate processing time or handle real response
+            setTimeout(() => {
+                setIsProcessing(false);
 
-            if (deltaResponse.success) {
-                // Add the delta to processed files with proper structure
-                const newDelta = {
-                    delta_id: deltaResponse.delta_id,
-                    process_type: 'delta-generation',
-                    status: 'completed',
-                    summary: deltaResponse.summary,
-                    created_at: new Date().toISOString(),
-                    file_a: selectedFiles.file_0?.filename || 'Older File',
-                    file_b: selectedFiles.file_1?.filename || 'Newer File'
-                };
+                if (deltaResponse.success) {
+                    // Add the delta to processed files with proper structure
+                    const newDelta = {
+                        delta_id: deltaResponse.delta_id,
+                        process_type: 'delta-generation',
+                        status: 'completed',
+                        summary: deltaResponse.summary,
+                        created_at: new Date().toISOString(),
+                        file_a: selectedFiles.file_0?.filename || 'Older File',
+                        file_b: selectedFiles.file_1?.filename || 'Newer File'
+                    };
 
-                setProcessedFiles(prev => [newDelta, ...prev]);
+                    setProcessedFiles(prev => [newDelta, ...prev]);
 
-                // Display results
-                const summary = deltaResponse.summary;
-                const summaryText = `🎯 Delta Generation Results:
+                    // Display results
+                    const summary = deltaResponse.summary;
+                    const summaryText = `🎯 Delta Generation Results:
 
 📊 Total Records:
 • Older File: ${summary.total_records_file_a.toLocaleString()} records
@@ -336,23 +336,23 @@ const MainApp = () => {
 
 📁 Delta ID: ${deltaResponse.delta_id}`;
 
-                addMessage('result', summaryText, true);
+                    addMessage('result', summaryText, true);
 
-                setTimeout(() => {
-                    addMessage('system', '💡 Use "Display Detailed Results" button above or download options in the right panel to view the delta details.', true);
-                }, 1000);
+                    setTimeout(() => {
+                        addMessage('system', '💡 Use "Display Detailed Results" button above or download options in the right panel to view the delta details.', true);
+                    }, 1000);
 
-            } else {
-                addMessage('error', `❌ Delta generation failed: ${deltaResponse.errors?.join(', ') || 'Unknown error'}`, false);
-            }
-        }, 3000);
+                } else {
+                    addMessage('error', `❌ Delta generation failed: ${deltaResponse.errors?.join(', ') || 'Unknown error'}`, false);
+                }
+            }, 3000);
 
-    } catch (error) {
-        setIsProcessing(false);
-        console.error('Delta generation error:', error);
-        addMessage('error', `❌ Delta generation failed: ${error.message}`, false);
-    }
-};
+        } catch (error) {
+            setIsProcessing(false);
+            console.error('Delta generation error:', error);
+            addMessage('error', `❌ Delta generation failed: ${error.message}`, false);
+        }
+    };
 
     const startReconciliation = async (reconciliationConfig) => {
         if (!selectedTemplate || !areAllFilesSelected()) {
@@ -543,77 +543,75 @@ Use the download buttons in the "Results" panel → to get detailed reports, or 
                 // Handle delta results display using deltaApiService
                 addMessage('system', '🔍 Fetching delta generation results...', true);
 
-                try {
-                    // Fetch detailed delta results from API
-                    const deltaResults = await deltaApiService.getDeltaResults(resultId, 'all', 1, 1000);
+                // Fetch detailed delta results from API
+                const deltaResults = await deltaApiService.getDeltaResults(resultId, 'all', 1, 1000);
 
-                    // The API should return structured data with different result types
-                    const resultCategories = {
-                        unchanged: deltaResults.unchanged || [],
-                        amended: deltaResults.amended || [],
-                        deleted: deltaResults.deleted || [],
-                        newly_added: deltaResults.newly_added || []
-                    };
+                // The API should return structured data with different result types
+                const resultCategories = {
+                    unchanged: deltaResults.unchanged || [],
+                    amended: deltaResults.amended || [],
+                    deleted: deltaResults.deleted || [],
+                    newly_added: deltaResults.newly_added || []
+                };
 
-                    setTimeout(() => {
-                        // Display each delta category as tables
-                        Object.entries(resultCategories).forEach(([category, data]) => {
-                            if (data.length > 0) {
-                                const categoryNames = {
-                                    unchanged: '🔄 Unchanged Records',
-                                    amended: '✏️ Amended Records',
-                                    deleted: '❌ Deleted Records',
-                                    newly_added: '✅ Newly Added Records'
-                                };
+                setTimeout(() => {
+                    // Display each delta category as tables
+                    Object.entries(resultCategories).forEach(([category, data]) => {
+                        if (data.length > 0) {
+                            const categoryNames = {
+                                unchanged: '🔄 Unchanged Records',
+                                amended: '✏️ Amended Records',
+                                deleted: '❌ Deleted Records',
+                                newly_added: '✅ Newly Added Records'
+                            };
 
-                                const categoryColors = {
-                                    unchanged: 'green',
-                                    amended: 'orange',
-                                    deleted: 'red',
-                                    newly_added: 'purple'
-                                };
+                            const categoryColors = {
+                                unchanged: 'green',
+                                amended: 'orange',
+                                deleted: 'red',
+                                newly_added: 'purple'
+                            };
 
-                                const tableMessage = {
-                                    id: Date.now() + Math.random() + category,
-                                    type: 'table',
-                                    content: `${categoryNames[category]} (${data.length} total)`,
-                                    tableData: {
-                                        data: data.slice(0, 10),
-                                        columns: Object.keys(data[0]),
-                                        color: categoryColors[category],
-                                        totalCount: data.length
-                                    },
-                                    timestamp: new Date()
-                                };
-                                setMessages(prev => [...prev, tableMessage]);
-                            }
-                        });
+                            const tableMessage = {
+                                id: Date.now() + Math.random() + category,
+                                type: 'table',
+                                content: `${categoryNames[category]} (${data.length} total)`,
+                                tableData: {
+                                    data: data.slice(0, 10),
+                                    columns: data.length > 0 ? Object.keys(data[0]) : [],
+                                    color: categoryColors[category],
+                                    totalCount: data.length
+                                },
+                                timestamp: new Date()
+                            };
+                            setMessages(prev => [...prev, tableMessage]);
+                        }
+                    });
 
-                        // Add summary message
-                        const summaryText = `📊 **Delta Results Summary (Sample Data):**
+                    // Add summary message
+                    const summaryText = `📊 **Delta Results Summary:**
 
 📋 **Data Overview:**
-• Total Unchanged: ${mockDeltaDetails.unchanged.length}
-• Total Amended: ${mockDeltaDetails.amended.length}
-• Total Deleted: ${mockDeltaDetails.deleted.length}
-• Total Newly Added: ${mockDeltaDetails.newly_added.length}
+• Total Unchanged: ${resultCategories.unchanged.length}
+• Total Amended: ${resultCategories.amended.length}
+• Total Deleted: ${resultCategories.deleted.length}
+• Total Newly Added: ${resultCategories.newly_added.length}
 
-💡 **Note:** Showing sample data. For complete data, use the download buttons in the Results panel →`;
+💡 **Note:** Showing first 10 records of each category. For complete data, use the download buttons in the Results panel →`;
 
-                        addMessage('result', summaryText, true);
-                    }, 1500);
-                }
+                    addMessage('result', summaryText, true);
+                }, 1500);
 
             } else if (reconRecord) {
-                // Handle reconciliation results (existing logic)
+                // Handle reconciliation results
                 addMessage('system', '📊 Fetching detailed reconciliation results...', true);
 
                 const reconResult = await apiService.getReconciliationResult(reconRecord.reconciliation_id);
 
                 const detailedResult = {
-                    matched: reconResult.matched,
-                    unmatched_file_a: reconResult.unmatched_file_a,
-                    unmatched_file_b: reconResult.unmatched_file_b
+                    matched: reconResult.matched || [],
+                    unmatched_file_a: reconResult.unmatched_file_a || [],
+                    unmatched_file_b: reconResult.unmatched_file_b || []
                 };
 
                 setTimeout(() => {
@@ -621,7 +619,7 @@ Use the download buttons in the "Results" panel → to get detailed reports, or 
                     const tableData = {
                         matched: {
                             title: `✅ Matched Records (${detailedResult.matched.length} total)`,
-                            data: detailedResult.matched.slice(0, 10), // Show first 10 records
+                            data: detailedResult.matched.slice(0, 10),
                             columns: detailedResult.matched.length > 0 ? Object.keys(detailedResult.matched[0]) : [],
                             color: 'green',
                             totalCount: detailedResult.matched.length
@@ -676,192 +674,121 @@ Use the download buttons in the "Results" panel → to get detailed reports, or 
             console.error('Error displaying detailed results:', error);
             addMessage('error', `❌ Failed to fetch detailed results: ${error.message}`, false);
         }
-    };d: '❌ Deleted Records',
-                                    newly_added: '✅ Newly Added Records'
-                                };
+    };
 
-                                const categoryColors = {
-                                    unchanged: 'green',
-                                    amended: 'orange',
-                                    deleted: 'red',
-                                    newly_added: 'purple'
-                                };
-
-                                const tableMessage = {
-                                    id: Date.now() + Math.random() + category,
-                                    type: 'table',
-                                    content: `${categoryNames[category]} (${data.length} total)`,
-                                    tableData: {
-                                        data: data.slice(0, 10),
-                                        columns: Object.keys(data[0]),
-                                        color: categoryColors[category],
-                                        totalCount: data.length
-                                    },
-                                    timestamp: new Date()
-                                };
-                                setMessages(prev => [...prev, tableMessage]);
-                            }
-                        });
-
-                        // Add summary message
-                        const summaryText = `📊 **Delta Results Summary:**
-
-📋 **Data Overview:**
-• Total Unchanged: ${resultCategories.unchanged.length}
-• Total Amended: ${resultCategories.amended.length}
-• Total Deleted: ${resultCategories.deleted.length}
-• Total Newly Added: ${resultCategories.newly_added.length}
-
-💡 **Note:** Showing first 10 records of each category. For complete data, use the download buttons in the Results panel →`;
-
-                        addMessage('result', summaryText, true);
-                    }, 1500);
-
-                } catch (apiError) {
-                    console.error('Error fetching delta results from API:', apiError);
-
-                    // Fallback to mock data if API fails
-                    addMessage('system', '⚠️ Using sample data (API connection failed)', true);
-
-                    // Mock delta detailed results (fallback)
-                    const mockDeltaDetails = {
-                        unchanged: [
-                            { FileA_ID: 'T001', FileA_Amount: 1000, FileB_ID: 'T001', FileB_Amount: 1000, Delta_Type: 'UNCHANGED' },
-                            { FileA_ID: 'T002', FileA_Amount: 2000, FileB_ID: 'T002', FileB_Amount: 2000, Delta_Type: 'UNCHANGED' }
-                        ],
-                        amended: [
-                            { FileA_ID: 'T003', FileA_Amount: 1500, FileB_ID: 'T003', FileB_Amount: 1600, Delta_Type: 'AMENDED', Changes: 'Amount: 1500 -> 1600' },
-                            { FileA_ID: 'T004', FileA_Status: 'Pending', FileB_ID: 'T004', FileB_Status: 'Settled', Delta_Type: 'AMENDED', Changes: 'Status: Pending -> Settled' }
-                        ],
-                        deleted: [
-                            { FileA_ID: 'T005', FileA_Amount: 500, FileB_ID: null, FileB_Amount: null, Delta_Type: 'DELETED', Changes: 'Record deleted from newer file' }
-                        ],
-                        newly_added: [
-                            { FileA_ID: null, FileA_Amount: null, FileB_ID: 'T006', FileB_Amount: 750, Delta_Type: 'NEWLY_ADDED', Changes: 'New record added in newer file' }
-                        ]
-                    };
-
-                    setTimeout(() => {
-                        // Display each delta category as tables
-                        Object.entries(mockDeltaDetails).forEach(([category, data]) => {
-                            if (data.length > 0) {
-                                const categoryNames = {
-                                    unchanged: '🔄 Unchanged Records',
-                                    amended: '✏️ Amended Records',
-                                    delete
 
     const downloadResults = async (resultId, resultType) => {
-    try {
-        // Check if this is a delta result or reconciliation result
-        const deltaRecord = processedFiles.find(f => f.delta_id === resultId);
-        const reconRecord = processedFiles.find(f => f.reconciliation_id === resultId);
+        try {
+            // Check if this is a delta result or reconciliation result
+            const deltaRecord = processedFiles.find(f => f.delta_id === resultId);
+            const reconRecord = processedFiles.find(f => f.reconciliation_id === resultId);
 
-        if (deltaRecord) {
-            // Handle delta downloads using deltaApiService
-            addMessage('system', `📥 Preparing delta ${resultType.replace('_', ' ')} download...`, true);
+            if (deltaRecord) {
+                // Handle delta downloads using deltaApiService
+                addMessage('system', `📥 Preparing delta ${resultType.replace('_', ' ')} download...`, true);
 
-            let format = 'csv';
-            let apiResultType = 'all';
+                let format = 'csv';
+                let apiResultType = 'all';
 
-            switch (resultType) {
-                case 'unchanged':
-                    apiResultType = 'unchanged';
-                    break;
-                case 'amended':
-                    apiResultType = 'amended';
-                    break;
-                case 'deleted':
-                    apiResultType = 'deleted';
-                    break;
-                case 'newly_added':
-                    apiResultType = 'newly_added';
-                    break;
-                case 'all_changes':
-                    apiResultType = 'all_changes';
-                    break;
-                case 'all_excel':
-                    format = 'excel';
-                    apiResultType = 'all';
-                    break;
-                case 'summary_report':
-                    // Download summary only
-                    try {
-                        const summary = await deltaApiService.getDeltaSummary(resultId);
-                        deltaApiService.downloadDeltaSummaryReport(summary, deltaRecord);
-                        addMessage('system', `✅ Delta summary report downloaded`, true);
-                        return;
-                    } catch (error) {
-                        addMessage('error', `❌ Failed to download summary: ${error.message}`, false);
-                        return;
-                    }
-                default:
-                    apiResultType = 'all';
+                switch (resultType) {
+                    case 'unchanged':
+                        apiResultType = 'unchanged';
+                        break;
+                    case 'amended':
+                        apiResultType = 'amended';
+                        break;
+                    case 'deleted':
+                        apiResultType = 'deleted';
+                        break;
+                    case 'newly_added':
+                        apiResultType = 'newly_added';
+                        break;
+                    case 'all_changes':
+                        apiResultType = 'all_changes';
+                        break;
+                    case 'all_excel':
+                        format = 'excel';
+                        apiResultType = 'all';
+                        break;
+                    case 'summary_report':
+                        // Download summary only
+                        try {
+                            const summary = await deltaApiService.getDeltaSummary(resultId);
+                            deltaApiService.downloadDeltaSummaryReport(summary, deltaRecord);
+                            addMessage('system', `✅ Delta summary report downloaded`, true);
+                            return;
+                        } catch (error) {
+                            addMessage('error', `❌ Failed to download summary: ${error.message}`, false);
+                            return;
+                        }
+                    default:
+                        apiResultType = 'all';
+                }
+
+                // Use deltaApiService for actual download
+                const result = await deltaApiService.downloadDeltaResults(resultId, format, apiResultType);
+                addMessage('system', `✅ Delta download completed: ${result.filename}`, true);
+
+            } else if (reconRecord) {
+                // Handle reconciliation downloads (existing logic)
+                addMessage('system', `📥 Preparing download for ${resultType.replace('_', ' ')} results...`, true);
+
+                let downloadFormat = 'csv';
+                let downloadResultType = 'matched';
+
+                switch (resultType) {
+                    case 'matched':
+                        downloadResultType = 'matched';
+                        break;
+                    case 'unmatched_a':
+                        downloadResultType = 'unmatched_a';
+                        break;
+                    case 'unmatched_b':
+                        downloadResultType = 'unmatched_b';
+                        break;
+                    case 'all_excel':
+                        downloadFormat = 'excel';
+                        downloadResultType = 'all';
+                        break;
+                    case 'summary_report':
+                        downloadFormat = 'txt';
+                        downloadResultType = 'summary';
+                        break;
+                    default:
+                        downloadResultType = 'matched';
+                }
+
+                const filename = `reconciliation_${resultId}_${downloadResultType}.${downloadFormat}`;
+
+                // Fetch the file as a Blob
+                const data = await apiService.downloadReconciliationResults(resultId, downloadFormat, downloadResultType);
+
+                // Create a Blob URL
+                const blob = new Blob([data]);
+                const url = window.URL.createObjectURL(blob);
+
+                // Create an anchor element and trigger download
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+
+                // Clean up
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                addMessage('system', `✅ Download started: ${filename}`, true);
+            } else {
+                // Handle other process types in the future
+                addMessage('error', '❌ Process type not recognized for download', false);
             }
 
-            // Use deltaApiService for actual download
-            const result = await deltaApiService.downloadDeltaResults(resultId, format, apiResultType);
-            addMessage('system', `✅ Delta download completed: ${result.filename}`, true);
-
-        } else if (reconRecord) {
-            // Handle reconciliation downloads (existing logic)
-            addMessage('system', `📥 Preparing download for ${resultType.replace('_', ' ')} results...`, true);
-
-            let downloadFormat = 'csv';
-            let downloadResultType = 'matched';
-
-            switch (resultType) {
-                case 'matched':
-                    downloadResultType = 'matched';
-                    break;
-                case 'unmatched_a':
-                    downloadResultType = 'unmatched_a';
-                    break;
-                case 'unmatched_b':
-                    downloadResultType = 'unmatched_b';
-                    break;
-                case 'all_excel':
-                    downloadFormat = 'excel';
-                    downloadResultType = 'all';
-                    break;
-                case 'summary_report':
-                    downloadFormat = 'txt';
-                    downloadResultType = 'summary';
-                    break;
-                default:
-                    downloadResultType = 'matched';
-            }
-
-            const filename = `reconciliation_${resultId}_${downloadResultType}.${downloadFormat}`;
-
-            // Fetch the file as a Blob
-            const data = await apiService.downloadReconciliationResults(resultId, downloadFormat, downloadResultType);
-
-            // Create a Blob URL
-            const blob = new Blob([data]);
-            const url = window.URL.createObjectURL(blob);
-
-            // Create an anchor element and trigger download
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-
-            // Clean up
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-
-            addMessage('system', `✅ Download started: ${filename}`, true);
-        } else {
-            // Handle other process types in the future
-            addMessage('error', '❌ Process type not recognized for download', false);
+        } catch (error) {
+            console.error('Download failed:', error);
+            addMessage('error', `❌ Download failed: ${error.message}`, false);
         }
-
-    } catch (error) {
-        console.error('Download failed:', error);
-        addMessage('error', `❌ Download failed: ${error.message}`, false);
-    }
-};
+    };
 
     return (
         <div className="flex h-screen bg-gray-50 overflow-hidden">
