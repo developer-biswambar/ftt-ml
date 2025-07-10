@@ -20,34 +20,23 @@ async processDeltaGeneration(deltaConfig) {
     try {
         console.log('Processing delta generation with config:', deltaConfig);
 
-        const response = await fetch(`${this.baseURL}/delta/process/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                process_type: 'delta-generation',
-                process_name: 'Delta Generation',
+        const response = await api.post('/delta/process/', {
+            process_type: 'delta-generation',
+            process_name: 'Delta Generation',
+            user_requirements: deltaConfig.user_requirements,
+            files: deltaConfig.files,
+            delta_config: {
+                Files: deltaConfig.delta_config.Files,
+                KeyRules: deltaConfig.delta_config.KeyRules,
+                ComparisonRules: deltaConfig.delta_config.ComparisonRules || [],
+                selected_columns_file_a: deltaConfig.delta_config.selected_columns_file_a,
+                selected_columns_file_b: deltaConfig.delta_config.selected_columns_file_b,
                 user_requirements: deltaConfig.user_requirements,
-                files: deltaConfig.files,
-                delta_config: {
-                    Files: deltaConfig.delta_config.Files,
-                    KeyRules: deltaConfig.delta_config.KeyRules,
-                    ComparisonRules: deltaConfig.delta_config.ComparisonRules || [],
-                    selected_columns_file_a: deltaConfig.delta_config.selected_columns_file_a,
-                    selected_columns_file_b: deltaConfig.delta_config.selected_columns_file_b,
-                    user_requirements: deltaConfig.user_requirements,
-                    files: deltaConfig.files
-                }
-            }),
+                files: deltaConfig.files
+            }
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-        }
-
-        return await response.json();
+        return response.data;
     } catch (error) {
         console.error('Delta generation error:', error);
         throw error;
@@ -64,21 +53,15 @@ async processDeltaGeneration(deltaConfig) {
  */
 async getDeltaResults(deltaId, resultType = 'all', page = 1, pageSize = 1000) {
     try {
-        const response = await fetch(
-            `${this.baseURL}/delta/results/${deltaId}?result_type=${resultType}&page=${page}&page_size=${pageSize}`,
-            {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
+        const response = await api.get(`/delta/results/${deltaId}`, {
+            params: {
+                result_type: resultType,
+                page: page,
+                page_size: pageSize
             }
-        );
+        });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        return await response.json();
+        return response.data;
     } catch (error) {
         console.error('Error fetching delta results:', error);
         throw error;
@@ -94,20 +77,18 @@ async getDeltaResults(deltaId, resultType = 'all', page = 1, pageSize = 1000) {
  */
 async downloadDeltaResults(deltaId, format = 'csv', resultType = 'all') {
     try {
-        const response = await fetch(
-            `${this.baseURL}/delta/download/${deltaId}?format=${format}&result_type=${resultType}`,
-            {
-                method: 'GET'
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        const response = await api.get(`/delta/download/${deltaId}`, {
+            params: {
+                format: format,
+                result_type: resultType
+            },
+            responseType: 'blob'
+        });
 
         // Handle file download
-        const blob = await response.blob();
-        const filename = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') ||
+        const blob = response.data;
+        const contentDisposition = response.headers['content-disposition'];
+        const filename = contentDisposition?.split('filename=')[1]?.replace(/"/g, '') ||
                        `delta_${deltaId}_${resultType}.${format}`;
 
         // Trigger download
@@ -125,8 +106,8 @@ async downloadDeltaResults(deltaId, format = 'csv', resultType = 'all') {
         console.error('Error downloading delta results:', error);
         throw error;
     }
-}
-,
+},
+
 /**
  * Get Delta Generation Summary
  * @param {string} deltaId - Delta generation ID
@@ -134,24 +115,14 @@ async downloadDeltaResults(deltaId, format = 'csv', resultType = 'all') {
  */
 async getDeltaSummary(deltaId) {
     try {
-        const response = await fetch(`${this.baseURL}/delta/results/${deltaId}/summary`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        return await response.json();
+        const response = await api.get(`/delta/results/${deltaId}/summary`);
+        return response.data;
     } catch (error) {
         console.error('Error fetching delta summary:', error);
         throw error;
     }
-}
-,
+},
+
 /**
  * Delete Delta Generation Results
  * @param {string} deltaId - Delta generation ID
@@ -159,18 +130,8 @@ async getDeltaSummary(deltaId) {
  */
 async deleteDeltaResults(deltaId) {
     try {
-        const response = await fetch(`${this.baseURL}/delta/results/${deltaId}`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        return await response.json();
+        const response = await api.delete(`/delta/results/${deltaId}`);
+        return response.data;
     } catch (error) {
         console.error('Error deleting delta results:', error);
         throw error;
@@ -183,24 +144,14 @@ async deleteDeltaResults(deltaId) {
  */
 async getDeltaHealthCheck() {
     try {
-        const response = await fetch(`${this.baseURL}/delta/health`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        return await response.json();
+        const response = await api.get('/delta/health');
+        return response.data;
     } catch (error) {
         console.error('Error checking delta service health:', error);
         throw error;
     }
-}
-,
+},
+
 // =================
 // DELTA HELPER METHODS
 // =================
@@ -385,6 +336,6 @@ async downloadMixedResults(resultId, downloadType, processedFiles) {
         throw error;
     }
 }
-}
+};
 
 export default deltaApiService;
