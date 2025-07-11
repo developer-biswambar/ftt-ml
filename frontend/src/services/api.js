@@ -750,6 +750,153 @@ export const apiService = {
     },
 
     // ===========================================
+    // RECENT RESULTS OPERATIONS
+    // ===========================================
+    getRecentResults: async (limit = 5) => {
+        try {
+            const response = await api.get('/recent-results/list', {
+                params: { limit: limit }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error getting recent results:', error);
+            throw error;
+        }
+    },
+
+    getDeltaResultSummary: async (deltaId) => {
+        try {
+            const response = await api.get(`/recent-results/delta/${deltaId}/summary`);
+            return response.data;
+        } catch (error) {
+            console.error('Error getting delta result summary:', error);
+            throw error;
+        }
+    },
+
+    getReconciliationResultSummary: async (reconId) => {
+        try {
+            const response = await api.get(`/recent-results/reconciliation/${reconId}/summary`);
+            return response.data;
+        } catch (error) {
+            console.error('Error getting reconciliation result summary:', error);
+            throw error;
+        }
+    },
+
+    clearOldResults: async (keepCount = 10) => {
+        try {
+            const response = await api.delete('/recent-results/clear-old', {
+                params: { keep_count: keepCount }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error clearing old results:', error);
+            throw error;
+        }
+    },
+
+    getRecentResultsHealth: async () => {
+        try {
+            const response = await api.get('/recent-results/health');
+            return response.data;
+        } catch (error) {
+            console.error('Error getting recent results health:', error);
+            throw error;
+        }
+    },
+
+    // ===========================================
+    // SAVE RESULTS TO SERVER OPERATIONS
+    // ===========================================
+    saveResultsToServer: async (resultId, resultType, processType, fileFormat = 'csv', customFilename = null, description = null) => {
+        try {
+            const response = await api.post('/save-results/save', {
+                result_id: resultId,
+                result_type: resultType,
+                process_type: processType,
+                file_format: fileFormat,
+                custom_filename: customFilename,
+                description: description
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error saving results to server:', error);
+            throw error;
+        }
+    },
+
+    listSavedResults: async () => {
+        try {
+            const response = await api.get('/save-results/list');
+            return response.data;
+        } catch (error) {
+            console.error('Error listing saved results:', error);
+            throw error;
+        }
+    },
+
+    getSavedFileInfo: async (savedFileId) => {
+        try {
+            const response = await api.get(`/save-results/info/${savedFileId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error getting saved file info:', error);
+            throw error;
+        }
+    },
+
+    deleteSavedFile: async (savedFileId) => {
+        try {
+            const response = await api.delete(`/save-results/delete/${savedFileId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error deleting saved file:', error);
+            throw error;
+        }
+    },
+
+    downloadSavedFile: async (savedFileId, format = 'csv') => {
+        try {
+            const response = await api.get(`/save-results/download/${savedFileId}`, {
+                params: { format: format },
+                responseType: 'blob'
+            });
+
+            // Handle file download
+            const blob = response.data;
+            const contentDisposition = response.headers['content-disposition'];
+            const filename = contentDisposition?.split('filename=')[1]?.replace(/"/g, '') ||
+                           `saved_file_${savedFileId}.${format}`;
+
+            // Trigger download
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            return { success: true, filename };
+        } catch (error) {
+            console.error('Error downloading saved file:', error);
+            throw error;
+        }
+    },
+
+    getSaveResultsHealth: async () => {
+        try {
+            const response = await api.get('/save-results/health');
+            return response.data;
+        } catch (error) {
+            console.error('Error getting save results health:', error);
+            throw error;
+        }
+    },
+
+    // ===========================================
     // ACCESS CONTROL HELPER FUNCTIONS
     // ===========================================
     checkDeleteAccess: async () => {

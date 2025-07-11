@@ -284,6 +284,8 @@ try:
     from app.routes.regex_routes import router as regex_router
     from app.routes.file_generator import router as file_generator_router
     from app.routes.delta_routes import router as delta_router
+    from app.routes.save_results_routes import router as save_results_router
+    from app.routes.recent_results_routes import router as recent_results_router
 
     app.include_router(health_routes)
     app.include_router(reconciliation_router)
@@ -292,6 +294,10 @@ try:
     app.include_router(regex_router)  # NEW: Include regex routes
 
     app.include_router(delta_router)
+
+    app.include_router(save_results_router)
+
+    app.include_router(recent_results_router)
 
     app.include_router(file_generator_router)
     print("✅ All routes loaded successfully (optimized reconciliation + AI regex generation enabled)")

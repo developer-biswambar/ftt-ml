@@ -109,6 +109,60 @@ async downloadDeltaResults(deltaId, format = 'csv', resultType = 'all') {
 },
 
 /**
+ * Save Delta Results to Server Storage
+ * @param {string} deltaId - Delta generation ID
+ * @param {string} resultType - Type of results to save
+ * @param {string} fileFormat - File format (csv, excel)
+ * @param {string} customFilename - Custom filename (optional)
+ * @param {string} description - Description (optional)
+ * @returns {Promise<Object>} Save result
+ */
+async saveDeltaResultsToServer(deltaId, resultType = 'all', fileFormat = 'csv', customFilename = null, description = null) {
+    try {
+        const response = await api.post('/save-results/save', {
+            result_id: deltaId,
+            result_type: resultType,
+            process_type: 'delta',
+            file_format: fileFormat,
+            custom_filename: customFilename,
+            description: description
+        });
+
+        return response.data;
+    } catch (error) {
+        console.error('Error saving delta results to server:', error);
+        throw error;
+    }
+},
+
+/**
+ * Save Reconciliation Results to Server Storage
+ * @param {string} reconciliationId - Reconciliation ID
+ * @param {string} resultType - Type of results to save
+ * @param {string} fileFormat - File format (csv, excel)
+ * @param {string} customFilename - Custom filename (optional)
+ * @param {string} description - Description (optional)
+ * @returns {Promise<Object>} Save result
+ */
+async saveReconciliationResultsToServer(reconciliationId, resultType = 'all', fileFormat = 'csv', customFilename = null, description = null) {
+    try {
+        const response = await api.post('/save-results/save', {
+            result_id: reconciliationId,
+            result_type: resultType,
+            process_type: 'reconciliation',
+            file_format: fileFormat,
+            custom_filename: customFilename,
+            description: description
+        });
+
+        return response.data;
+    } catch (error) {
+        console.error('Error saving reconciliation results to server:', error);
+        throw error;
+    }
+},
+
+/**
  * Get Delta Generation Summary
  * @param {string} deltaId - Delta generation ID
  * @returns {Promise<Object>} Delta summary statistics
@@ -155,6 +209,94 @@ async getDeltaHealthCheck() {
 // =================
 // DELTA HELPER METHODS
 // =================
+
+/**
+ * Get Recent Results (Delta + Reconciliation)
+ * @param {number} limit - Number of recent results to fetch
+ * @returns {Promise<Object>} Recent results
+ */
+async getRecentResults(limit = 5) {
+    try {
+        const response = await api.get('/recent-results/list', {
+            params: { limit: limit }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error getting recent results:', error);
+        throw error;
+    }
+},
+
+/**
+ * Transform recent results to processedFiles format
+ * @param {Array} recentResults - Recent results from API
+ * @returns {Array} Processed files format
+ */
+transformRecentResultsToProcessedFiles(recentResults) {
+    return recentResults.map(result => {
+        if (result.process_type === 'delta') {
+            return {
+                delta_id: result.id,
+                process_type: 'delta-generation',
+                status: result.status,
+                created_at: result.created_at,
+                file_a: result.file_a,
+                file_b: result.file_b,
+                summary: result.summary
+            };
+        } else if (result.process_type === 'reconciliation') {
+            return {
+                reconciliation_id: result.id,
+                process_type: 'ai-reconciliation',
+                status: result.status,
+                created_at: result.created_at,
+                file_a: result.file_a,
+                file_b: result.file_b,
+                summary: result.summary
+            };
+        }
+        return result;
+    });
+},
+
+/**
+ * Load Recent Results for Sidebar
+ * @param {number} limit - Number of results to load
+ * @returns {Promise<Array>} Processed files array
+ */
+async loadRecentResultsForSidebar(limit = 5) {
+    try {
+        const recentResponse = await this.getRecentResults(limit);
+
+        if (recentResponse.success && recentResponse.results) {
+            return this.transformRecentResultsToProcessedFiles(recentResponse.results);
+        }
+
+        return [];
+    } catch (error) {
+        console.error('Error loading recent results for sidebar:', error);
+        return [];
+    }
+},
+
+/**
+ * Get All Process Results (for initialization)
+ * @returns {Promise<Array>} All available process results
+ */
+async getAllProcessResults() {
+    try {
+        // Get recent results from server
+        const recentResults = await this.loadRecentResultsForSidebar(10);
+
+        // You could also add logic here to get other types of results
+        // For example, saved results, file generation results, etc.
+
+        return recentResults;
+    } catch (error) {
+        console.error('Error getting all process results:', error);
+        return [];
+    }
+},
 
 /**
  * Download Delta Summary Report
@@ -261,13 +403,9 @@ async getProcessedResults(resultId, processedFiles) {
                 results: results
             };
         } else if (reconRecord) {
-            // Handle reconciliation results
-            const results = await this.getReconciliationResult(resultId);
-            return {
-                type: 'reconciliation',
-                record: reconRecord,
-                results: results
-            };
+            // Handle reconciliation results - would need to import from apiService
+            // This is a placeholder - you'd need to implement getReconciliationResult
+            throw new Error('Reconciliation results handling not implemented in deltaApiService');
         } else {
             throw new Error('Result ID not found in processed files');
         }
@@ -278,19 +416,22 @@ async getProcessedResults(resultId, processedFiles) {
 },
 
 /**
- * Download Mixed Results
+ * Download Mixed Results with Save to Server Option
  * @param {string} resultId - Result ID
  * @param {string} downloadType - Download type
  * @param {Array} processedFiles - Array of processed files
- * @returns {Promise<Object>} Download result
+ * @param {boolean} saveToServer - Whether to save to server instead of download
+ * @param {string} customFilename - Custom filename for server save
+ * @param {string} description - Description for server save
+ * @returns {Promise<Object>} Download/Save result
  */
-async downloadMixedResults(resultId, downloadType, processedFiles) {
+async downloadMixedResults(resultId, downloadType, processedFiles, saveToServer = false, customFilename = null, description = null) {
     try {
         const deltaRecord = processedFiles.find(f => f.delta_id === resultId);
         const reconRecord = processedFiles.find(f => f.reconciliation_id === resultId);
 
         if (deltaRecord) {
-            // Handle delta downloads
+            // Handle delta downloads/saves
             let format = 'csv';
             let resultType = 'all';
 
@@ -316,23 +457,97 @@ async downloadMixedResults(resultId, downloadType, processedFiles) {
                     break;
                 case 'summary_report':
                     // Download summary only
-                    { const summary = await this.getDeltaSummary(resultId);
+                    const summary = await this.getDeltaSummary(resultId);
                     this.downloadDeltaSummaryReport(summary, deltaRecord);
-                    return { success: true, type: 'summary' }; }
+                    return { success: true, type: 'summary' };
                 default:
                     resultType = 'all';
             }
 
-            return await this.downloadDeltaResults(resultId, format, resultType);
+            if (saveToServer) {
+                return await this.saveDeltaResultsToServer(resultId, resultType, format, customFilename, description);
+            } else {
+                return await this.downloadDeltaResults(resultId, format, resultType);
+            }
 
         } else if (reconRecord) {
-            // Handle reconciliation downloads
-            return await this.downloadReconciliationResults(resultId, 'csv', downloadType);
+            // Handle reconciliation downloads/saves
+            if (saveToServer) {
+                return await this.saveReconciliationResultsToServer(resultId, downloadType, 'csv', customFilename, description);
+            } else {
+                // Would need to import reconciliation download function
+                throw new Error('Reconciliation download not implemented in deltaApiService');
+            }
         } else {
             throw new Error('Result ID not found');
         }
     } catch (error) {
-        console.error('Download error:', error);
+        console.error('Download/Save error:', error);
+        throw error;
+    }
+},
+
+/**
+ * List All Saved Results
+ * @returns {Promise<Object>} List of saved results
+ */
+async listSavedResults() {
+    try {
+        const response = await api.get('/save-results/list');
+        return response.data;
+    } catch (error) {
+        console.error('Error listing saved results:', error);
+        throw error;
+    }
+},
+
+/**
+ * Delete Saved Result File
+ * @param {string} savedFileId - Saved file ID
+ * @returns {Promise<Object>} Deletion result
+ */
+async deleteSavedResult(savedFileId) {
+    try {
+        const response = await api.delete(`/save-results/delete/${savedFileId}`);
+        return response.data;
+    } catch (error) {
+        console.error('Error deleting saved result:', error);
+        throw error;
+    }
+},
+
+/**
+ * Download Saved Result File
+ * @param {string} savedFileId - Saved file ID
+ * @param {string} format - Download format
+ * @returns {Promise<Object>} Download result
+ */
+async downloadSavedResult(savedFileId, format = 'csv') {
+    try {
+        const response = await api.get(`/save-results/download/${savedFileId}`, {
+            params: { format: format },
+            responseType: 'blob'
+        });
+
+        // Handle file download
+        const blob = response.data;
+        const contentDisposition = response.headers['content-disposition'];
+        const filename = contentDisposition?.split('filename=')[1]?.replace(/"/g, '') ||
+                       `saved_result_${savedFileId}.${format}`;
+
+        // Trigger download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        return { success: true, filename };
+    } catch (error) {
+        console.error('Error downloading saved result:', error);
         throw error;
     }
 }
