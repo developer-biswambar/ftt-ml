@@ -1,6 +1,6 @@
-// src/components/LeftSidebar.jsx - Integrated with Delta Generation Template
+// src/components/LeftSidebar.jsx - Enhanced with Delete Feature
 import React, {useRef, useState} from 'react';
-import {CheckCircle, Eye, FileText, RefreshCw, Upload, AlertCircle, X, Sheet} from 'lucide-react';
+import {CheckCircle, Eye, FileText, RefreshCw, Upload, AlertCircle, X, Sheet, Trash2, AlertTriangle} from 'lucide-react';
 import { apiService } from '../services/api';
 
 const LeftSidebar = ({
@@ -19,12 +19,15 @@ const LeftSidebar = ({
                      }) => {
     const fileInputRef = useRef(null);
     const [showUploadModal, setShowUploadModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [fileToDelete, setFileToDelete] = useState(null);
     const [uploadFile, setUploadFile] = useState(null);
     const [availableSheets, setAvailableSheets] = useState([]);
     const [selectedSheet, setSelectedSheet] = useState('');
     const [customFileName, setCustomFileName] = useState('');
     const [loadingSheets, setLoadingSheets] = useState(false);
     const [nameError, setNameError] = useState('');
+    const [deleteInProgress, setDeleteInProgress] = useState(false);
 
     const openFileViewer = (fileId) => {
         const viewerUrl = `/viewer/${fileId}`;
@@ -39,6 +42,53 @@ const LeftSidebar = ({
         } else {
             window.open(viewerUrl, '_blank');
         }
+    };
+
+    const handleDeleteFile = (file, event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setFileToDelete(file);
+        setShowDeleteModal(true);
+    };
+
+    const confirmDeleteFile = async () => {
+        if (!fileToDelete) return;
+
+        setDeleteInProgress(true);
+        try {
+            const result = await apiService.deleteFile(fileToDelete.file_id);
+
+            if (result.success) {
+                // Remove file from selected files if it was selected
+                const updatedSelectedFiles = { ...selectedFiles };
+                Object.keys(updatedSelectedFiles).forEach(key => {
+                    if (updatedSelectedFiles[key]?.file_id === fileToDelete.file_id) {
+                        delete updatedSelectedFiles[key];
+                    }
+                });
+                setSelectedFiles(updatedSelectedFiles);
+
+                // Refresh the file list
+                await onRefreshFiles();
+
+                // Close modal and reset state
+                setShowDeleteModal(false);
+                setFileToDelete(null);
+            } else {
+                throw new Error(result.message || 'Delete failed');
+            }
+        } catch (error) {
+            console.error('Error deleting file:', error);
+            alert(`Failed to delete file: ${error.message}`);
+        } finally {
+            setDeleteInProgress(false);
+        }
+    };
+
+    const closeDeleteModal = () => {
+        if (deleteInProgress) return; // Prevent closing during deletion
+        setShowDeleteModal(false);
+        setFileToDelete(null);
     };
 
     const handleFileInputChange = async (event) => {
@@ -206,6 +256,12 @@ const LeftSidebar = ({
         };
     };
 
+    const isFileInUse = (file) => {
+        return Object.values(selectedFiles).some(selectedFile =>
+            selectedFile?.file_id === file.file_id
+        );
+    };
+
     const status = getFileSelectionStatus();
 
     const getProcessIcon = (category) => {
@@ -266,6 +322,7 @@ const LeftSidebar = ({
     const renderFileItem = (file) => {
         const displayName = file.custom_name || file.filename;
         const isExcel = file.filename.toLowerCase().endsWith('.xlsx') || file.filename.toLowerCase().endsWith('.xls');
+        const fileInUse = isFileInUse(file);
 
         return (
             <div
@@ -289,6 +346,11 @@ const LeftSidebar = ({
                                     }`}>
                                         {isExcel ? 'Excel' : 'CSV'}
                                     </span>
+                                    {fileInUse && (
+                                        <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">
+                                            In Use
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="text-xs text-slate-500">
                                     {file.total_rows?.toLocaleString()} rows • {file.columns?.length} cols
@@ -298,17 +360,27 @@ const LeftSidebar = ({
                                 </div>
                             </div>
                         </div>
-                        <button
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openFileViewer(file.file_id);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-all duration-200"
-                            title="View/Edit File"
-                        >
-                            <Eye size={14}/>
-                        </button>
+                        <div className="flex items-center space-x-1">
+                            <button
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openFileViewer(file.file_id);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-all duration-200"
+                                title="View/Edit File"
+                            >
+                                <Eye size={14}/>
+                            </button>
+                            <button
+                                onClick={(e) => handleDeleteFile(file, e)}
+                                className="opacity-0 group-hover:opacity-100 p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-all duration-200"
+                                title="Delete File"
+                                disabled={fileInUse}
+                            >
+                                <Trash2 size={14}/>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -692,6 +764,91 @@ const LeftSidebar = ({
                                 className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {uploadProgress === true ? 'Uploading...' : 'Upload'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && fileToDelete && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                    <AlertTriangle className="text-red-600" size={20} />
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-800">Confirm Delete</h3>
+                            </div>
+                            <button
+                                onClick={closeDeleteModal}
+                                disabled={deleteInProgress}
+                                className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                                <p className="text-sm text-red-800 mb-2">
+                                    Are you sure you want to delete this file? This action cannot be undone.
+                                </p>
+
+                                <div className="bg-white border border-red-200 rounded p-2">
+                                    <div className="flex items-center space-x-2 mb-1">
+                                        <span className="text-lg">{getFileTypeIcon(fileToDelete.filename)}</span>
+                                        <span className="text-sm font-medium text-gray-800">
+                                            {fileToDelete.custom_name || fileToDelete.filename}
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-gray-600">
+                                        {fileToDelete.total_rows?.toLocaleString()} rows • {fileToDelete.columns?.length} columns
+                                        {fileToDelete.sheet_name && (
+                                            <span className="ml-1 text-blue-600">• {fileToDelete.sheet_name}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {isFileInUse(fileToDelete) && (
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                                    <div className="flex items-center space-x-2">
+                                        <AlertTriangle className="text-yellow-600" size={16} />
+                                        <p className="text-sm text-yellow-800">
+                                            <strong>Warning:</strong> This file is currently selected for use in the process.
+                                            Deleting it will remove it from your selection.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex space-x-3 mt-6">
+                            <button
+                                onClick={closeDeleteModal}
+                                disabled={deleteInProgress}
+                                className="flex-1 px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDeleteFile}
+                                disabled={deleteInProgress}
+                                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                            >
+                                {deleteInProgress ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                        <span>Deleting...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 size={16} />
+                                        <span>Delete File</span>
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>

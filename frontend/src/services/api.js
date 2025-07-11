@@ -1,4 +1,4 @@
-// src/services/api.js - Enhanced with sheet selection and all existing features
+// src/services/api.js - Enhanced with delete access control and all existing features
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000';
@@ -37,8 +37,44 @@ export const apiService = {
     },
 
     deleteFile: async (fileId) => {
-        const response = await api.delete(`/files/${fileId}`);
-        return response.data;
+        try {
+            const response = await api.delete(`/files/${fileId}`);
+            return response.data;
+        } catch (error) {
+            // Handle specific access control errors
+            if (error.response?.status === 403) {
+                const errorMessage = error.response?.data?.detail || error.response?.data?.message || '';
+
+                // Check if it's a permission/access related error
+                if (errorMessage.toLowerCase().includes('permission') ||
+                    errorMessage.toLowerCase().includes('access') ||
+                    errorMessage.toLowerCase().includes('unauthorized') ||
+                    errorMessage.toLowerCase().includes('forbidden')) {
+
+                    throw new Error('You do not have access to delete files. Please raise an RSAM request for DELETE_FILE resource to get the necessary permissions.');
+                }
+            }
+
+            // Handle other specific status codes
+            if (error.response?.status === 401) {
+                throw new Error('Authentication required. Please log in and try again.');
+            }
+
+            if (error.response?.status === 404) {
+                throw new Error('File not found. It may have already been deleted.');
+            }
+
+            if (error.response?.status === 409) {
+                throw new Error('File cannot be deleted because it is currently in use. Please try again later.');
+            }
+
+            if (error.response?.status === 500) {
+                throw new Error('Server error occurred while deleting the file. Please try again later.');
+            }
+
+            // Re-throw the original error if it's not handled above
+            throw error;
+        }
     },
 
     // ===========================================
@@ -620,10 +656,26 @@ export const apiService = {
     // BULK OPERATIONS
     // ===========================================
     bulkDeleteFiles: async (fileIds) => {
-        const response = await api.post('/files/bulk-delete', {
-            file_ids: fileIds
-        });
-        return response.data;
+        try {
+            const response = await api.post('/files/bulk-delete', {
+                file_ids: fileIds
+            });
+            return response.data;
+        } catch (error) {
+            // Handle bulk delete access control errors
+            if (error.response?.status === 403) {
+                const errorMessage = error.response?.data?.detail || error.response?.data?.message || '';
+
+                if (errorMessage.toLowerCase().includes('permission') ||
+                    errorMessage.toLowerCase().includes('access') ||
+                    errorMessage.toLowerCase().includes('unauthorized') ||
+                    errorMessage.toLowerCase().includes('forbidden')) {
+
+                    throw new Error('You do not have access to delete files. Please raise an RSAM request for DELETE_FILE resource to get the necessary permissions.');
+                }
+            }
+            throw error;
+        }
     },
 
     bulkDownloadFiles: async (fileIds, format = 'csv') => {
@@ -696,15 +748,83 @@ export const apiService = {
         });
         return response.data;
     },
+
+    // ===========================================
+    // ACCESS CONTROL HELPER FUNCTIONS
+    // ===========================================
+    checkDeleteAccess: async () => {
+        try {
+            // Make a test call to check delete permissions
+            // This could be a specific endpoint that checks permissions without actually deleting
+            const response = await api.get('/files/check-delete-access');
+            return response.data;
+        } catch (error) {
+            if (error.response?.status === 403) {
+                return {
+                    hasAccess: false,
+                    message: 'You do not have access to delete files. Please raise an RSAM request for DELETE_FILE resource.'
+                };
+            }
+            return {
+                hasAccess: true,
+                message: 'Delete access check failed, but deletion may still be possible.'
+            };
+        }
+    },
+
+    getRequiredPermissions: (action) => {
+        const permissionMap = {
+            'delete': 'DELETE_FILE',
+            'upload': 'UPLOAD_FILE',
+            'download': 'DOWNLOAD_FILE',
+            'view': 'VIEW_FILE',
+            'edit': 'EDIT_FILE',
+            'bulk_delete': 'DELETE_FILE',
+            'bulk_download': 'DOWNLOAD_FILE'
+        };
+
+        return permissionMap[action] || 'UNKNOWN_PERMISSION';
+    },
+
+    formatAccessErrorMessage: (action, permission = null) => {
+        const requiredPermission = permission || apiService.getRequiredPermissions(action);
+        return `You do not have access to ${action} files. Please raise an RSAM request for ${requiredPermission} resource to get the necessary permissions.`;
+    }
 };
 
-// Error handling interceptor
+// Enhanced error handling interceptor with access control
 api.interceptors.response.use(
     (response) => response,
     (error) => {
         console.error('API Error:', error);
 
-        // Handle specific error cases
+        // Handle access control errors first
+        if (error.response?.status === 403) {
+            const errorMessage = error.response?.data?.detail || error.response?.data?.message || '';
+
+            if (errorMessage.toLowerCase().includes('delete')) {
+                throw new Error('You do not have access to delete files. Please raise an RSAM request for DELETE_FILE resource to get the necessary permissions.');
+            }
+
+            if (errorMessage.toLowerCase().includes('upload')) {
+                throw new Error('You do not have access to upload files. Please raise an RSAM request for UPLOAD_FILE resource to get the necessary permissions.');
+            }
+
+            if (errorMessage.toLowerCase().includes('download')) {
+                throw new Error('You do not have access to download files. Please raise an RSAM request for DOWNLOAD_FILE resource to get the necessary permissions.');
+            }
+
+            // Generic access denied message
+            if (errorMessage.toLowerCase().includes('permission') ||
+                errorMessage.toLowerCase().includes('access') ||
+                errorMessage.toLowerCase().includes('unauthorized') ||
+                errorMessage.toLowerCase().includes('forbidden')) {
+
+                throw new Error('You do not have the required permissions for this action. Please raise an RSAM request for the appropriate resource access.');
+            }
+        }
+
+        // Handle other specific error cases
         if (error.response?.status === 500 && error.response?.data?.detail?.includes('OpenAI')) {
             throw new Error('AI service is currently unavailable. Please try again later.');
         }
@@ -719,6 +839,18 @@ api.interceptors.response.use(
 
         if (error.response?.status === 415) {
             throw new Error('Unsupported file type. Please upload CSV or Excel files only.');
+        }
+
+        if (error.response?.status === 401) {
+            throw new Error('Authentication required. Please log in and try again.');
+        }
+
+        if (error.response?.status === 404) {
+            throw new Error('Requested resource not found.');
+        }
+
+        if (error.response?.status === 409) {
+            throw new Error('Conflict detected. The resource may be in use or locked.');
         }
 
         if (error.response?.data?.detail) {

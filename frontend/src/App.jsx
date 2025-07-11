@@ -659,7 +659,7 @@ Use the download buttons in the "Results" panel → to get detailed reports, or 
 
 📋 **Data Overview:**
 • Total Matched: ${detailedResult.matched.length}
-• Unmatched File A: ${detailedResult.unmatched_file_a.length}
+• Unmatched File A: ${detailedResult.unmatched_file_a.length}/
 • Unmatched File B: ${detailedResult.unmatched_file_b.length}
 
 💡 **Note:** Showing first 10 records of each category. For complete data, use the download buttons in the Results panel →`;
