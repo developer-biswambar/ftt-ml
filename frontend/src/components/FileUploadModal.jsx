@@ -64,7 +64,7 @@ const FileUploadModal = ({
         // // Basic character validation
         // const invalidChars = /[<>:"/\\|?*]/;
         // if (invalidChars.test(fileName)) {
-        //     return { isValid: false, message: 'File name contains invalid characters' };
+        //     return { isValid: false, message: 'File name conta
         // }
 
         // Check for duplicate names in existing files
