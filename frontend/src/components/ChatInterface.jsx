@@ -193,7 +193,7 @@ const ChatInterface = ({
                            selectedTemplate,
                            requiredFiles,
                            onStartReconciliation,
-                           onStartDeltaGeneration, // NEW: Delta generation handler
+                           onStartDeltaGeneration,
                            isTyping,
                            typingMessage,
                            files,
@@ -204,6 +204,7 @@ const ChatInterface = ({
     const messagesContainerRef = useRef(null);
     const [currentFlow, setCurrentFlow] = useState(null);
     const [flowData, setFlowData] = useState({});
+    const [setMessages] = useState(); // Added setMessages for table message functionality
 
     // Helper function to check if all files are selected
     const areAllFilesSelected = () => {
@@ -221,7 +222,7 @@ const ChatInterface = ({
                     inline: 'nearest'
                 });
             }
-        }, 100); // Small delay to ensure DOM has updated
+        }, 100);
     };
 
     // Auto-scroll when messages change
@@ -232,10 +233,7 @@ const ChatInterface = ({
     // Auto-scroll when flow appears or changes
     useEffect(() => {
         if (currentFlow) {
-            // Immediate scroll when flow starts
             scrollToBottom('auto');
-
-            // Additional scroll after a longer delay to ensure flow is fully rendered
             setTimeout(() => {
                 scrollToBottom();
             }, 500);
@@ -286,7 +284,7 @@ const ChatInterface = ({
                 setFlowData({
                     selectedFiles,
                     selectedTemplate,
-                    step: 'file_selection'
+                    step: 'rule_management'
                 });
             } else if (selectedTemplate.category.includes('ai-generation')) {
                 setCurrentFlow('file_generation');
@@ -595,7 +593,7 @@ const ChatInterface = ({
                             ) : (
                                 <input
                                     type="text"
-                                    value={currentInput || ''} // Fix: Ensure value is never undefined
+                                    value={currentInput || ''}
                                     onChange={(e) => setCurrentInput(e.target.value)}
                                     onKeyPress={(e) => e.key === 'Enter' && handleRegularSubmit()}
                                     placeholder={

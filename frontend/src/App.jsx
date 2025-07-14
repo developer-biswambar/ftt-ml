@@ -20,6 +20,7 @@ import RecentResultsPage from './pages/RecentResultsPage';
 
 const MainApp = () => {
     const [fileGenerationProcessing, setFileGenerationProcessing] = useState([]);
+
     // All state management is now handled by custom hooks
     const {files, uploadProgress, loadFiles, uploadFile} = useFileManagement();
     const {templates} = useTemplateManagement();
@@ -215,7 +216,6 @@ const MainApp = () => {
             addMessage('error', messageService.getErrorMessage(error.message, 'File generation failed'), false);
         }
     };
-
 
     // Helper function to convert data to CSV
     const convertDataToCSV = (data, columns) => {

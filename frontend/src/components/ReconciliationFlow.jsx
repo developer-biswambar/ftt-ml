@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     AlertCircle,
     Check,
@@ -9,30 +9,41 @@ import {
     Filter,
     Minus,
     Plus,
+    Save,
     Settings,
     Target,
+    Upload,
     Wand2,
     X
 } from 'lucide-react';
 import AIRegexGenerator from './AIRegexGenerator';
+import RuleSaveLoad from './RuleSaveLoad';
 
 const ReconciliationFlow = ({
-                                files,
-                                selectedFiles,
-                                selectedTemplate,
-                                flowData,
-                                onComplete,
-                                onCancel,
-                                onSendMessage
-                            }) => {
-    const [currentStep, setCurrentStep] = useState('file_selection');
+    files,
+    selectedFiles,
+    selectedTemplate,
+    flowData,
+    onComplete,
+    onCancel,
+    onSendMessage
+}) => {
+    // State management
+    const [currentStep, setCurrentStep] = useState('rule_management');
     const [config, setConfig] = useState({
         Files: [],
         ReconciliationRules: []
     });
     const [reconciliationRules, setReconciliationRules] = useState([]);
     const [fileColumns, setFileColumns] = useState({});
+    const [selectedColumnsFileA, setSelectedColumnsFileA] = useState([]);
+    const [selectedColumnsFileB, setSelectedColumnsFileB] = useState([]);
+
+    // AI and Rule Management State
     const [showAIRegexGenerator, setShowAIRegexGenerator] = useState(false);
+    const [showRuleSaveLoad, setShowRuleSaveLoad] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [loadedRuleId, setLoadedRuleId] = useState(null);
     const [currentAIContext, setCurrentAIContext] = useState({
         fileIndex: 0,
         ruleIndex: 0,
@@ -40,22 +51,20 @@ const ReconciliationFlow = ({
         columnName: ''
     });
 
-    // State for result column selection
-    const [selectedColumnsFileA, setSelectedColumnsFileA] = useState([]);
-    const [selectedColumnsFileB, setSelectedColumnsFileB] = useState([]);
-
+    // Step definitions
     const steps = [
-        {id: 'file_selection', title: 'File Selection', icon: FileText},
-        {id: 'extraction_rules', title: 'Data Extraction', icon: Target},
-        {id: 'filter_rules', title: 'Data Filtering', icon: Filter},
-        {id: 'reconciliation_rules', title: 'Matching Rules', icon: Settings},
-        {id: 'result_columns', title: 'Result Columns', icon: Columns},
-        {id: 'review', title: 'Review & Confirm', icon: Check}
+        { id: 'rule_management', title: 'Load/Save Rules', icon: Save },
+        { id: 'file_selection', title: 'File Selection', icon: FileText },
+        { id: 'extraction_rules', title: 'Data Extraction', icon: Target },
+        { id: 'filter_rules', title: 'Data Filtering', icon: Filter },
+        { id: 'reconciliation_rules', title: 'Matching Rules', icon: Settings },
+        { id: 'result_columns', title: 'Result Columns', icon: Columns },
+        { id: 'review', title: 'Review & Confirm', icon: Check }
     ];
 
+    // Helper functions
     const getCurrentStepIndex = () => steps.findIndex(step => step.id === currentStep);
 
-    // Helper function to get files array from selectedFiles object
     const getSelectedFilesArray = () => {
         return Object.keys(selectedFiles)
             .sort()
@@ -63,13 +72,11 @@ const ReconciliationFlow = ({
             .filter(file => file !== null && file !== undefined);
     };
 
-    // Helper function to get file by index
     const getFileByIndex = (index) => {
         const key = `file_${index}`;
         return selectedFiles[key];
     };
 
-    // Get all available columns for a file (original + extracted)
     const getAllAvailableColumns = (fileIndex) => {
         const file = getFileByIndex(fileIndex);
         const originalColumns = fileColumns[file?.file_id] || [];
@@ -77,15 +84,14 @@ const ReconciliationFlow = ({
         return [...originalColumns, ...extractedColumns];
     };
 
-    // Get mandatory columns that must be included (extracted + reconciliation columns)
     const getMandatoryColumns = (fileIndex) => {
         const mandatoryColumns = new Set();
 
-        // Add extracted columns - only if they have complete, non-empty names (minimum 3 characters to avoid partial typing)
+        // Add extracted columns
         const extractedColumns = config.Files[fileIndex]?.Extract?.map(rule => rule.ResultColumnName).filter(name => name && name.trim().length >= 3) || [];
         extractedColumns.forEach(col => mandatoryColumns.add(col.trim()));
 
-        // Add reconciliation rule columns - only if they have complete, non-empty names (minimum 3 characters)
+        // Add reconciliation rule columns
         reconciliationRules.forEach(rule => {
             if (fileIndex === 0 && rule.LeftFileColumn && rule.LeftFileColumn.trim().length >= 3) {
                 mandatoryColumns.add(rule.LeftFileColumn.trim());
@@ -97,14 +103,12 @@ const ReconciliationFlow = ({
         return Array.from(mandatoryColumns);
     };
 
-    // Get optional columns (all columns minus mandatory ones)
     const getOptionalColumns = (fileIndex) => {
         const allColumns = getAllAvailableColumns(fileIndex);
         const mandatoryColumns = getMandatoryColumns(fileIndex);
         return allColumns.filter(col => !mandatoryColumns.includes(col));
     };
 
-    // Generate sample text for AI context
     const getSampleTextForColumn = (fileIndex, columnName) => {
         const file = getFileByIndex(fileIndex);
         if (!file || !file.sample_data || !columnName) return '';
@@ -117,6 +121,7 @@ const ReconciliationFlow = ({
         return sampleValues.join(', ');
     };
 
+    // Effects
     useEffect(() => {
         const filesArray = getSelectedFilesArray();
         if (filesArray.length >= 2) {
@@ -140,34 +145,20 @@ const ReconciliationFlow = ({
         }
     }, [selectedFiles]);
 
-    // Update selected columns when config or reconciliation rules change
     useEffect(() => {
         const updateSelectedColumns = (fileIndex) => {
             const mandatoryColumns = getMandatoryColumns(fileIndex);
             const currentSelected = fileIndex === 0 ? selectedColumnsFileA : selectedColumnsFileB;
-
-            // Only include mandatory columns that are not empty/undefined and have at least 3 characters
             const validMandatoryColumns = mandatoryColumns.filter(col => col && col.trim().length >= 3);
-
-            // Remove any partial names that might be incomplete versions of valid column names
             const cleanedCurrentSelection = currentSelected.filter(col => {
-                // Keep the column if:
-                // 1. It's a valid mandatory column, OR
-                // 2. It's not a partial name of any mandatory column, OR
-                // 3. It's from original file columns (not extracted)
                 const originalColumns = fileColumns[getFileByIndex(fileIndex)?.file_id] || [];
                 const isOriginalColumn = originalColumns.includes(col);
                 const isValidMandatory = validMandatoryColumns.includes(col);
-
-                // Check if this might be a partial name of a longer valid column
                 const isPartialName = validMandatoryColumns.some(validCol =>
                     validCol !== col && validCol.startsWith(col) && col.length < validCol.length
                 );
-
                 return isValidMandatory || isOriginalColumn || !isPartialName;
             });
-
-            // Merge cleaned selection with valid mandatory columns, removing duplicates
             const updatedSelection = [...new Set([...cleanedCurrentSelection, ...validMandatoryColumns])];
 
             if (fileIndex === 0) {
@@ -177,7 +168,6 @@ const ReconciliationFlow = ({
             }
         };
 
-        // Add a longer delay to allow for complete typing before updating mandatory columns
         const timeoutId = setTimeout(() => {
             updateSelectedColumns(0);
             updateSelectedColumns(1);
@@ -186,6 +176,47 @@ const ReconciliationFlow = ({
         return () => clearTimeout(timeoutId);
     }, [config, reconciliationRules]);
 
+    useEffect(() => {
+        if (loadedRuleId) {
+            setHasUnsavedChanges(true);
+        }
+    }, [config, reconciliationRules, selectedColumnsFileA, selectedColumnsFileB]);
+
+    // Rule management handlers
+    const handleRuleLoaded = (rule, adaptedConfig, warnings) => {
+        setConfig(adaptedConfig);
+        setReconciliationRules(adaptedConfig.ReconciliationRules || []);
+        setLoadedRuleId(rule.id);
+        setHasUnsavedChanges(false);
+
+        if (warnings && warnings.length > 0) {
+            onSendMessage('system', `⚠️ Rule loaded with warnings:\n${warnings.join('\n')}\n\nPlease review and update the configuration as needed.`);
+        } else {
+            onSendMessage('system', `✅ Rule "${rule.name}" loaded successfully!`);
+        }
+
+        setTimeout(() => {
+            setCurrentStep('file_selection');
+        }, 1000);
+    };
+
+    const handleRuleSaved = (savedRule) => {
+        setLoadedRuleId(savedRule.id);
+        setHasUnsavedChanges(false);
+        onSendMessage('system', `✅ Rule "${savedRule.name}" saved successfully!`);
+    };
+
+    const getCurrentRuleConfig = () => {
+        return {
+            Files: config.Files,
+            ReconciliationRules: reconciliationRules,
+            selected_columns_file_a: selectedColumnsFileA,
+            selected_columns_file_b: selectedColumnsFileB,
+            user_requirements: 'Reconcile files using the configured rules'
+        };
+    };
+
+    // Navigation handlers
     const nextStep = () => {
         const currentIndex = getCurrentStepIndex();
         if (currentIndex < steps.length - 1) {
@@ -207,7 +238,7 @@ const ReconciliationFlow = ({
             ReconciliationRules: reconciliationRules,
             selected_columns_file_a: selectedColumnsFileA,
             selected_columns_file_b: selectedColumnsFileB,
-            user_requirements: `Reconcile files using the configured rules`,
+            user_requirements: 'Reconcile files using the configured rules',
             files: getSelectedFilesArray().map((file, index) => ({
                 file_id: file.file_id,
                 role: `file_${index}`,
@@ -219,7 +250,7 @@ const ReconciliationFlow = ({
         onComplete(finalConfig);
     };
 
-    // Result column selection functions
+    // Column selection handlers
     const toggleColumnSelection = (fileIndex, columnName) => {
         const mandatoryColumns = getMandatoryColumns(fileIndex);
         if (mandatoryColumns.includes(columnName)) {
@@ -259,6 +290,7 @@ const ReconciliationFlow = ({
         }
     };
 
+    // Extraction rule handlers
     const addExtractionRule = (fileIndex) => {
         const newRule = {
             ResultColumnName: '',
@@ -267,9 +299,9 @@ const ReconciliationFlow = ({
             Patterns: ['']
         };
 
-        const updatedConfig = {...config};
+        const updatedConfig = { ...config };
         if (!updatedConfig.Files[fileIndex]) {
-            updatedConfig.Files[fileIndex] = {Extract: [], Filter: []};
+            updatedConfig.Files[fileIndex] = { Extract: [], Filter: [] };
         }
         if (!updatedConfig.Files[fileIndex].Extract) {
             updatedConfig.Files[fileIndex].Extract = [];
@@ -279,7 +311,7 @@ const ReconciliationFlow = ({
     };
 
     const updateExtractionRule = (fileIndex, ruleIndex, field, value) => {
-        const updatedConfig = {...config};
+        const updatedConfig = { ...config };
         if (field === 'Patterns') {
             updatedConfig.Files[fileIndex].Extract[ruleIndex].Patterns = [value];
         } else {
@@ -289,7 +321,7 @@ const ReconciliationFlow = ({
     };
 
     const removeExtractionRule = (fileIndex, ruleIndex) => {
-        const updatedConfig = {...config};
+        const updatedConfig = { ...config };
         const removedColumnName = updatedConfig.Files[fileIndex].Extract[ruleIndex].ResultColumnName;
         updatedConfig.Files[fileIndex].Extract.splice(ruleIndex, 1);
         setConfig(updatedConfig);
@@ -310,6 +342,7 @@ const ReconciliationFlow = ({
         }
     };
 
+    // AI handlers
     const openAIRegexGenerator = (fileIndex, ruleIndex) => {
         const rule = config.Files[fileIndex]?.Extract?.[ruleIndex];
         const sampleText = rule?.SourceColumn ? getSampleTextForColumn(fileIndex, rule.SourceColumn) : '';
@@ -324,12 +357,13 @@ const ReconciliationFlow = ({
     };
 
     const handleAIRegexGenerated = (generatedRegex) => {
-        const {fileIndex, ruleIndex} = currentAIContext;
+        const { fileIndex, ruleIndex } = currentAIContext;
         updateExtractionRule(fileIndex, ruleIndex, 'Patterns', generatedRegex);
         updateExtractionRule(fileIndex, ruleIndex, 'MatchType', 'regex');
-        onSendMessage('system', `✨ AI generated regex pattern applied to extraction rule`);
+        onSendMessage('system', '✨ AI generated regex pattern applied to extraction rule');
     };
 
+    // Filter rule handlers
     const addFilterRule = (fileIndex) => {
         const newRule = {
             ColumnName: '',
@@ -337,9 +371,9 @@ const ReconciliationFlow = ({
             Value: ''
         };
 
-        const updatedConfig = {...config};
+        const updatedConfig = { ...config };
         if (!updatedConfig.Files[fileIndex]) {
-            updatedConfig.Files[fileIndex] = {Extract: [], Filter: []};
+            updatedConfig.Files[fileIndex] = { Extract: [], Filter: [] };
         }
         if (!updatedConfig.Files[fileIndex].Filter) {
             updatedConfig.Files[fileIndex].Filter = [];
@@ -349,17 +383,18 @@ const ReconciliationFlow = ({
     };
 
     const updateFilterRule = (fileIndex, ruleIndex, field, value) => {
-        const updatedConfig = {...config};
+        const updatedConfig = { ...config };
         updatedConfig.Files[fileIndex].Filter[ruleIndex][field] = value;
         setConfig(updatedConfig);
     };
 
     const removeFilterRule = (fileIndex, ruleIndex) => {
-        const updatedConfig = {...config};
+        const updatedConfig = { ...config };
         updatedConfig.Files[fileIndex].Filter.splice(ruleIndex, 1);
         setConfig(updatedConfig);
     };
 
+    // Reconciliation rule handlers
     const addReconciliationRule = () => {
         const newRule = {
             LeftFileColumn: '',
@@ -381,10 +416,79 @@ const ReconciliationFlow = ({
         setReconciliationRules(updatedRules);
     };
 
+    // Step content renderer
     const renderStepContent = () => {
         const filesArray = getSelectedFilesArray();
 
         switch (currentStep) {
+            case 'rule_management':
+                return (
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-gray-800">Load Existing Rule or Start Fresh</h3>
+                        <p className="text-sm text-gray-600">
+                            You can load a previously saved reconciliation rule to reuse your configuration,
+                            or start fresh with a new configuration.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
+                                <div className="flex items-center space-x-2 mb-3">
+                                    <Upload size={20} className="text-blue-600"/>
+                                    <h4 className="text-md font-medium text-blue-800">Load Existing Rule</h4>
+                                </div>
+                                <p className="text-sm text-blue-700 mb-4">
+                                    Load a previously saved rule template and adapt it to your current files.
+                                </p>
+                                <button
+                                    onClick={() => setShowRuleSaveLoad(true)}
+                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                >
+                                    <Upload size={16}/>
+                                    <span>Browse Saved Rules</span>
+                                </button>
+                            </div>
+
+                            <div className="p-4 border border-green-200 bg-green-50 rounded-lg">
+                                <div className="flex items-center space-x-2 mb-3">
+                                    <FileText size={20} className="text-green-600"/>
+                                    <h4 className="text-md font-medium text-green-800">Start Fresh</h4>
+                                </div>
+                                <p className="text-sm text-green-700 mb-4">
+                                    Create a new reconciliation configuration from scratch.
+                                </p>
+                                <button
+                                    onClick={() => nextStep()}
+                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                                >
+                                    <FileText size={16}/>
+                                    <span>Start New Configuration</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {loadedRuleId && (
+                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                        <Check size={16} className="text-yellow-600"/>
+                                        <span className="text-sm text-yellow-800">
+                                            Rule loaded. {hasUnsavedChanges ? 'You have unsaved changes.' : 'No changes made.'}
+                                        </span>
+                                    </div>
+                                    {hasUnsavedChanges && (
+                                        <button
+                                            onClick={() => setShowRuleSaveLoad(true)}
+                                            className="text-xs px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                                        >
+                                            Save Changes
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+
             case 'file_selection':
                 return (
                     <div className="space-y-4">
@@ -396,20 +500,16 @@ const ReconciliationFlow = ({
                                 const letters = ['A', 'B'];
 
                                 return (
-                                    <div key={index}
-                                         className={`p-4 border border-${colors[index]}-200 bg-${colors[index]}-50 rounded-lg`}>
+                                    <div key={index} className={`p-4 border border-${colors[index]}-200 bg-${colors[index]}-50 rounded-lg`}>
                                         <div className="flex items-center space-x-2 mb-2">
-                                            <div
-                                                className={`w-6 h-6 bg-${colors[index]}-500 rounded-full flex items-center justify-center text-white text-sm font-bold`}>
+                                            <div className={`w-6 h-6 bg-${colors[index]}-500 rounded-full flex items-center justify-center text-white text-sm font-bold`}>
                                                 {letters[index]}
                                             </div>
-                                            <span
-                                                className={`font-medium text-${colors[index]}-800`}>{labels[index]}</span>
+                                            <span className={`font-medium text-${colors[index]}-800`}>{labels[index]}</span>
                                         </div>
                                         <div className={`text-sm text-${colors[index]}-700`}>
                                             <p className="font-medium">{file?.filename}</p>
-                                            <p className="text-xs">{file?.total_rows} rows
-                                                • {file?.columns?.length} columns</p>
+                                            <p className="text-xs">{file?.total_rows} rows • {file?.columns?.length} columns</p>
                                         </div>
                                     </div>
                                 );
@@ -750,7 +850,7 @@ const ReconciliationFlow = ({
                     <div className="space-y-6">
                         <div>
                             <h3 className="text-lg font-semibold text-gray-800">Result Column Selection</h3>
-                            <p className="text-sm text-gray-600">Choose which columns from each file should be included in the reconciliation results. Extracted columns and reconciliation rule columns are automatically included and cannot be deselected.</p>
+                            <p className="text-sm text-gray-600">Choose which columns from each file should be included in the reconciliation results.</p>
                         </div>
                         <div className="grid grid-cols-2 gap-6">
                             {/* File A Column Selection */}
@@ -770,39 +870,29 @@ const ReconciliationFlow = ({
                                         <button
                                             onClick={() => deselectAllColumns(0)}
                                             className="text-xs px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
-                                            title="Deselects optional columns only"
                                         >
                                             Clear Optional
                                         </button>
                                     </div>
                                 </div>
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                                    {/* Mandatory Columns */}
                                     {getMandatoryColumns(0).length > 0 && (
                                         <>
-                                            <div className="text-xs font-medium text-green-700 mb-2">Required Columns (Auto-included):</div>
-                                            {getMandatoryColumns(0).map(column => {
-                                                const isExtracted = config.Files[0]?.Extract?.some(rule => rule.ResultColumnName === column);
-                                                const isReconColumn = reconciliationRules.some(rule => rule.LeftFileColumn === column);
-                                                return (
-                                                    <label key={column} className="flex items-center space-x-2 text-sm opacity-75">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={true}
-                                                            disabled={true}
-                                                            className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                                                        />
-                                                        <span className="text-green-700">{column}</span>
-                                                        <span className="text-xs text-green-500">
-                                                            {isExtracted && isReconColumn ? '(extracted + reconciliation)' :
-                                                                isExtracted ? '(extracted)' : '(reconciliation)'}
-                                                        </span>
-                                                    </label>
-                                                );
-                                            })}
+                                            <div className="text-xs font-medium text-green-700 mb-2">Required Columns:</div>
+                                            {getMandatoryColumns(0).map(column => (
+                                                <label key={column} className="flex items-center space-x-2 text-sm opacity-75">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={true}
+                                                        disabled={true}
+                                                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                                    />
+                                                    <span className="text-green-700">{column}</span>
+                                                    <span className="text-xs text-green-500">(required)</span>
+                                                </label>
+                                            ))}
                                         </>
                                     )}
-                                    {/* Optional Columns */}
                                     {getOptionalColumns(0).length > 0 && (
                                         <>
                                             <div className="text-xs font-medium text-green-700 mb-2 mt-4">Optional Columns:</div>
@@ -822,7 +912,6 @@ const ReconciliationFlow = ({
                                 </div>
                                 <div className="mt-3 text-xs text-green-600">
                                     Selected: {selectedColumnsFileA.length} columns
-                                    ({getMandatoryColumns(0).length} required + {selectedColumnsFileA.length - getMandatoryColumns(0).length} optional)
                                 </div>
                             </div>
 
@@ -843,39 +932,29 @@ const ReconciliationFlow = ({
                                         <button
                                             onClick={() => deselectAllColumns(1)}
                                             className="text-xs px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
-                                            title="Deselects optional columns only"
                                         >
                                             Clear Optional
                                         </button>
                                     </div>
                                 </div>
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                                    {/* Mandatory Columns */}
                                     {getMandatoryColumns(1).length > 0 && (
                                         <>
-                                            <div className="text-xs font-medium text-purple-700 mb-2">Required Columns (Auto-included):</div>
-                                            {getMandatoryColumns(1).map(column => {
-                                                const isExtracted = config.Files[1]?.Extract?.some(rule => rule.ResultColumnName === column);
-                                                const isReconColumn = reconciliationRules.some(rule => rule.RightFileColumn === column);
-                                                return (
-                                                    <label key={column} className="flex items-center space-x-2 text-sm opacity-75">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={true}
-                                                            disabled={true}
-                                                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                                                        />
-                                                        <span className="text-purple-700">{column}</span>
-                                                        <span className="text-xs text-purple-500">
-                                                            {isExtracted && isReconColumn ? '(extracted + reconciliation)' :
-                                                                isExtracted ? '(extracted)' : '(reconciliation)'}
-                                                        </span>
-                                                    </label>
-                                                );
-                                            })}
+                                            <div className="text-xs font-medium text-purple-700 mb-2">Required Columns:</div>
+                                            {getMandatoryColumns(1).map(column => (
+                                                <label key={column} className="flex items-center space-x-2 text-sm opacity-75">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={true}
+                                                        disabled={true}
+                                                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                                    />
+                                                    <span className="text-purple-700">{column}</span>
+                                                    <span className="text-xs text-purple-500">(required)</span>
+                                                </label>
+                                            ))}
                                         </>
                                     )}
-                                    {/* Optional Columns */}
                                     {getOptionalColumns(1).length > 0 && (
                                         <>
                                             <div className="text-xs font-medium text-purple-700 mb-2 mt-4">Optional Columns:</div>
@@ -895,12 +974,8 @@ const ReconciliationFlow = ({
                                 </div>
                                 <div className="mt-3 text-xs text-purple-600">
                                     Selected: {selectedColumnsFileB.length} columns
-                                    ({getMandatoryColumns(1).length} required + {selectedColumnsFileB.length - getMandatoryColumns(1).length} optional)
                                 </div>
                             </div>
-                        </div>
-                        <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-                            <p><strong>Note:</strong> Extracted columns and reconciliation rule columns are automatically included and cannot be deselected. You can select additional optional columns to include in the results. Selected columns will be prefixed with "FileA_" or "FileB_" in the reconciliation output.</p>
                         </div>
                     </div>
                 );
@@ -925,140 +1000,7 @@ const ReconciliationFlow = ({
                             </div>
                         </div>
 
-                        {/* Extraction Rules Summary */}
-                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                            <h4 className="font-medium text-green-800 mb-2">Extraction Rules</h4>
-                            <div className="space-y-2 text-sm">
-                                {config.Files.map((file, index) => (
-                                    <div key={index}>
-                                        <span className="font-medium">{file.Name}:</span>
-                                        {file.Extract && file.Extract.length > 0 ? (
-                                            <ul className="ml-4 list-disc">
-                                                {file.Extract.map((rule, ruleIndex) => (
-                                                    <li key={ruleIndex} className="text-xs">
-                                                        Extract "{rule.ResultColumnName}" from "{rule.SourceColumn}" using {rule.MatchType}
-                                                        {rule.MatchType === 'ai_generated' && <span className="text-purple-600 ml-1">✨ AI Generated</span>}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        ) : (
-                                            <span className="text-xs text-gray-500 ml-2">No extraction rules</span>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Filter Rules Summary */}
-                        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                            <h4 className="font-medium text-yellow-800 mb-2">Filter Rules</h4>
-                            <div className="space-y-2 text-sm">
-                                {config.Files.map((file, index) => (
-                                    <div key={index}>
-                                        <span className="font-medium">{file.Name}:</span>
-                                        {file.Filter && file.Filter.length > 0 ? (
-                                            <ul className="ml-4 list-disc">
-                                                {file.Filter.map((rule, ruleIndex) => (
-                                                    <li key={ruleIndex} className="text-xs">
-                                                        {rule.ColumnName} {rule.MatchType} "{rule.Value}"
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        ) : (
-                                            <span className="text-xs text-gray-500 ml-2">No filter rules</span>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Reconciliation Rules Summary */}
-                        <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                            <h4 className="font-medium text-purple-800 mb-2">Reconciliation Rules</h4>
-                            <div className="space-y-2 text-sm">
-                                {reconciliationRules.length > 0 ? (
-                                    <ul className="space-y-1">
-                                        {reconciliationRules.map((rule, index) => (
-                                            <li key={index} className="text-xs">
-                                                Match "{rule.LeftFileColumn}" with "{rule.RightFileColumn}" using {rule.MatchType}
-                                                {(rule.MatchType === 'tolerance' || rule.MatchType === 'percentage') && rule.ToleranceValue && ` (tolerance: ${rule.ToleranceValue})`}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <span className="text-xs text-gray-500">No reconciliation rules defined</span>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Result Column Selection Summary */}
-                        <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-                            <h4 className="font-medium text-indigo-800 mb-2">Result Column Selection</h4>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <span className="font-medium text-indigo-700">File A Columns:</span>
-                                    <div className="ml-2 text-xs">
-                                        <div className="text-indigo-600 mb-1">
-                                            <strong>Required ({getMandatoryColumns(0).length}):</strong>
-                                            {getMandatoryColumns(0).length > 0 ? (
-                                                <ul className="ml-2">
-                                                    {getMandatoryColumns(0).slice(0, 3).map(col => (
-                                                        <li key={col}>• {col}</li>))}
-                                                    {getMandatoryColumns(0).length > 3 && (
-                                                        <li className="text-indigo-500">... and {getMandatoryColumns(0).length - 3} more</li>
-                                                    )}
-                                                </ul>
-                                            ) : (<span className="ml-2">None</span>)}
-                                        </div>
-                                        <div className="text-indigo-600">
-                                            <strong>Optional ({selectedColumnsFileA.length - getMandatoryColumns(0).length}):</strong>
-                                            {selectedColumnsFileA.length - getMandatoryColumns(0).length > 0 ? (
-                                                <ul className="ml-2">
-                                                    {getOptionalColumns(0).filter(col => selectedColumnsFileA.includes(col)).slice(0, 3).map(col => (
-                                                        <li key={col}>• {col}</li>
-                                                    ))}
-                                                    {(selectedColumnsFileA.length - getMandatoryColumns(0).length) > 3 && (
-                                                        <li className="text-indigo-500">... and {(selectedColumnsFileA.length - getMandatoryColumns(0).length) - 3} more</li>
-                                                    )}
-                                                </ul>
-                                            ) : (<span className="ml-2">None selected</span>)}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <span className="font-medium text-indigo-700">File B Columns:</span>
-                                    <div className="ml-2 text-xs">
-                                        <div className="text-indigo-600 mb-1">
-                                            <strong>Required ({getMandatoryColumns(1).length}):</strong>
-                                            {getMandatoryColumns(1).length > 0 ? (
-                                                <ul className="ml-2">
-                                                    {getMandatoryColumns(1).slice(0, 3).map(col => (
-                                                        <li key={col}>• {col}</li>))}
-                                                    {getMandatoryColumns(1).length > 3 && (
-                                                        <li className="text-indigo-500">... and {getMandatoryColumns(1).length - 3} more</li>
-                                                    )}
-                                                </ul>
-                                            ) : (<span className="ml-2">None</span>)}
-                                        </div>
-                                        <div className="text-indigo-600">
-                                            <strong>Optional ({selectedColumnsFileB.length - getMandatoryColumns(1).length}):</strong>
-                                            {selectedColumnsFileB.length - getMandatoryColumns(1).length > 0 ? (
-                                                <ul className="ml-2">
-                                                    {getOptionalColumns(1).filter(col => selectedColumnsFileB.includes(col)).slice(0, 3).map(col => (
-                                                        <li key={col}>• {col}</li>
-                                                    ))}
-                                                    {(selectedColumnsFileB.length - getMandatoryColumns(1).length) > 3 && (
-                                                        <li className="text-indigo-500">... and {(selectedColumnsFileB.length - getMandatoryColumns(1).length) - 3} more</li>
-                                                    )}
-                                                </ul>
-                                            ) : (<span className="ml-2">None selected</span>)}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Validation */}
+                        {/* Configuration Status */}
                         <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                             <h4 className="font-medium text-gray-800 mb-2">Configuration Status</h4>
                             <div className="space-y-1 text-sm">
@@ -1079,6 +1021,25 @@ const ReconciliationFlow = ({
                                     <span>Result column selection configured</span>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Save Rule Option */}
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                                <h4 className="font-medium text-blue-800">Save This Configuration</h4>
+                                <button
+                                    onClick={() => setShowRuleSaveLoad(true)}
+                                    disabled={reconciliationRules.length === 0}
+                                    className="flex items-center space-x-1 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
+                                >
+                                    <Save size={14}/>
+                                    <span>{loadedRuleId && hasUnsavedChanges ? 'Update Rule' : 'Save as New Rule'}</span>
+                                </button>
+                            </div>
+                            <p className="text-sm text-blue-700">
+                                Save this configuration as a reusable rule template for future reconciliations.
+                                {loadedRuleId && hasUnsavedChanges && ' You have unsaved changes to the loaded rule.'}
+                            </p>
                         </div>
                     </div>
                 );
@@ -1179,6 +1140,20 @@ const ReconciliationFlow = ({
                     columnName={currentAIContext.columnName}
                     onRegexGenerated={handleAIRegexGenerated}
                     onClose={() => setShowAIRegexGenerator(false)}
+                />
+            )}
+
+            {/* RuleSaveLoad Modal */}
+            {showRuleSaveLoad && (
+                <RuleSaveLoad
+                    selectedTemplate={selectedTemplate}
+                    currentConfig={getCurrentRuleConfig()}
+                    fileColumns={fileColumns}
+                    loadedRuleId={loadedRuleId}
+                    hasUnsavedChanges={hasUnsavedChanges}
+                    onRuleLoaded={handleRuleLoaded}
+                    onRuleSaved={handleRuleSaved}
+                    onClose={() => setShowRuleSaveLoad(false)}
                 />
             )}
         </>

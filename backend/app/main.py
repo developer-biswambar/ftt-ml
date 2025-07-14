@@ -286,6 +286,7 @@ try:
     from app.routes.delta_routes import router as delta_router
     from app.routes.save_results_routes import router as save_results_router
     from app.routes.recent_results_routes import router as recent_results_router
+    from app.routes.rule_management_routes import router as rule_management_router
 
     app.include_router(health_routes)
     app.include_router(reconciliation_router)
@@ -298,6 +299,7 @@ try:
     app.include_router(save_results_router)
 
     app.include_router(recent_results_router)
+    app.include_router(rule_management_router)
 
     app.include_router(file_generator_router)
     print("✅ All routes loaded successfully (optimized reconciliation + AI regex generation enabled)")

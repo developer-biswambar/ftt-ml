@@ -936,8 +936,160 @@ export const apiService = {
     formatAccessErrorMessage: (action, permission = null) => {
         const requiredPermission = permission || apiService.getRequiredPermissions(action);
         return `You do not have access to ${action} files. Please raise an RSAM request for ${requiredPermission} resource to get the necessary permissions.`;
-    }
+    },
+    // ===========================================
+    // RULE MANAGEMENT OPERATIONS
+    // ===========================================
+    saveReconciliationRule: async (ruleData, metadata) => {
+        const response = await api.post('/rules/save', {
+            metadata: metadata,
+            rule_config: ruleData
+        });
+        return response.data;
+    },
+
+    listReconciliationRules: async (filters = {}) => {
+        const params = new URLSearchParams();
+        if (filters.category) params.append('category', filters.category);
+        if (filters.template_id) params.append('template_id', filters.template_id);
+        if (filters.limit) params.append('limit', filters.limit.toString());
+        if (filters.offset) params.append('offset', filters.offset.toString());
+
+        const response = await api.get(`/rules/list?${params}`);
+        return response.data;
+    },
+
+    getRulesByTemplate: async (templateId) => {
+        const response = await api.get(`/rules/template/${templateId}`);
+        return response.data;
+    },
+
+    getReconciliationRule: async (ruleId) => {
+        const response = await api.get(`/rules/${ruleId}`);
+        return response.data;
+    },
+
+    updateReconciliationRule: async (ruleId, updates) => {
+        const response = await api.put(`/rules/${ruleId}`, updates);
+        return response.data;
+    },
+
+    deleteReconciliationRule: async (ruleId) => {
+        const response = await api.delete(`/rules/${ruleId}`);
+        return response.data;
+    },
+
+    markRuleAsUsed: async (ruleId) => {
+        const response = await api.post(`/rules/${ruleId}/use`);
+        return response.data;
+    },
+
+    searchReconciliationRules: async (searchFilters) => {
+        const response = await api.post('/rules/search', searchFilters);
+        return response.data;
+    },
+
+    getRuleCategories: async () => {
+        const response = await api.get('/rules/categories/list');
+        return response.data;
+    },
+
+    getRuleManagementHealth: async () => {
+        const response = await api.get('/rules/health');
+        return response.data;
+    },
+
+    // Helper functions for rule management
+    validateRuleMetadata: (metadata) => {
+        const errors = [];
+
+        if (!metadata.name || metadata.name.trim().length < 3) {
+            errors.push('Rule name must be at least 3 characters long');
+        }
+
+        if (metadata.name && metadata.name.length > 100) {
+            errors.push('Rule name must be less than 100 characters');
+        }
+
+        if (metadata.description && metadata.description.length > 500) {
+            errors.push('Description must be less than 500 characters');
+        }
+
+        if (metadata.tags && metadata.tags.length > 10) {
+            errors.push('Maximum 10 tags allowed');
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors
+        };
+    },
+
+    createRuleFromConfig: (config, selectedTemplate, metadata = {}) => {
+        // Create a clean rule configuration without file-specific data
+        const ruleConfig = {
+            Files: config.Files || [],
+            ReconciliationRules: config.ReconciliationRules || [],
+            selected_columns_file_a: config.selected_columns_file_a || [],
+            selected_columns_file_b: config.selected_columns_file_b || [],
+            user_requirements: config.user_requirements || ''
+        };
+
+        const ruleMetadata = {
+            name: metadata.name || `${selectedTemplate?.name || 'Custom'} Rule - ${new Date().toLocaleDateString()}`,
+            description: metadata.description || `Rule for ${selectedTemplate?.name || 'custom reconciliation'}`,
+            category: metadata.category || 'reconciliation',
+            tags: metadata.tags || [selectedTemplate?.category || 'general'],
+            template_id: selectedTemplate?.id,
+            template_name: selectedTemplate?.name
+        };
+
+        return {
+            ruleConfig,
+            ruleMetadata
+        };
+    },
+
+    adaptRuleToFiles: (savedRule, fileColumns) => {
+        // Adapt a saved rule to work with new files
+        const adaptedConfig = { ...savedRule.rule_config };
+
+        // The rule structure is already file-agnostic, but we might need to
+        // validate that required columns exist in the new files
+        const warnings = [];
+        const errors = [];
+
+        // Check if extraction rules reference columns that exist
+        if (adaptedConfig.Files) {
+            adaptedConfig.Files.forEach((fileConfig, index) => {
+                const availableColumns = Object.values(fileColumns)[index] || [];
+
+                if (fileConfig.Extract) {
+                    fileConfig.Extract.forEach(extractRule => {
+                        if (extractRule.SourceColumn && !availableColumns.includes(extractRule.SourceColumn)) {
+                            warnings.push(`Column "${extractRule.SourceColumn}" not found in file ${index + 1}. You may need to update this extraction rule.`);
+                        }
+                    });
+                }
+
+                if (fileConfig.Filter) {
+                    fileConfig.Filter.forEach(filterRule => {
+                        if (filterRule.ColumnName && !availableColumns.includes(filterRule.ColumnName)) {
+                            warnings.push(`Column "${filterRule.ColumnName}" not found in file ${index + 1}. You may need to update this filter rule.`);
+                        }
+                    });
+                }
+            });
+        }
+
+        return {
+            adaptedConfig,
+            warnings,
+            errors
+        };
+    },
 };
+
 
 // Enhanced error handling interceptor with access control
 api.interceptors.response.use(
