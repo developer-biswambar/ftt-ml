@@ -1,8 +1,8 @@
 // src/hooks/useAppState.js
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { fileManagementService } from '../services/fileManagementService';
-import { processManagementService } from '../services/processManagementService';
-import { messageService } from '../services/messageService';
+import {useState, useEffect, useRef, useCallback} from 'react';
+import {fileManagementService} from '../services/fileManagementService';
+import {processManagementService} from '../services/processManagementService';
+import {messageService} from '../services/messageService';
 
 export const useFileManagement = () => {
     const [files, setFiles] = useState([]);
@@ -127,7 +127,7 @@ export const useProcessManagement = () => {
                 prev.map(file => {
                     const idField = type === 'delta-generation' ? 'delta_id' : 'reconciliation_id';
                     return file[idField] === processId
-                        ? { ...file, status: 'completed' }
+                        ? {...file, status: 'completed'}
                         : file;
                 })
             );
@@ -143,6 +143,40 @@ export const useProcessManagement = () => {
     const downloadResults = useCallback(async (resultId, resultType, processType) => {
         return await processManagementService.downloadResults(resultId, resultType, processType);
     }, []);
+
+    const addProcessingResult = (processingEntry) => {
+        setProcessedFiles(prev => [processingEntry, ...prev]);
+    };
+
+// Function to update a processing result (e.g., from processing to completed)
+    const updateProcessingResult = (tempId, updatedEntry) => {
+        setProcessedFiles(prev =>
+            prev.map(file => {
+                // Check different ID fields based on process type
+                if (file.generation_id === tempId ||
+                    file.delta_id === tempId ||
+                    file.reconciliation_id === tempId ||
+                    file.process_id === tempId ||
+                    file.id === tempId) {
+                    return updatedEntry;
+                }
+                return file;
+            })
+        );
+    };
+
+// Function to remove a processing result (if needed)
+    const removeProcessingResult = (tempId) => {
+        setProcessedFiles(prev =>
+            prev.filter(file =>
+                file.generation_id !== tempId &&
+                file.delta_id !== tempId &&
+                file.reconciliation_id !== tempId &&
+                file.process_id !== tempId &&
+                file.id !== tempId
+            )
+        );
+    };
 
     // Cleanup auto-refresh interval on unmount
     useEffect(() => {
@@ -161,7 +195,10 @@ export const useProcessManagement = () => {
         startProcess,
         monitorProcess,
         getDetailedResults,
-        downloadResults
+        downloadResults,
+        addProcessingResult,
+        updateProcessingResult,
+        removeProcessingResult
     };
 };
 

@@ -25,7 +25,9 @@ import {
     TrendingUp,
     Database,
     Activity,
-    PieChart
+    PieChart,
+    Zap,
+    Layers
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { deltaApiService } from '../services/deltaApiService';
@@ -86,6 +88,7 @@ const RecentResultsPage = () => {
         const totalResults = resultsData.length;
         const deltaResults = resultsData.filter(r => r.process_type === 'delta').length;
         const reconciliationResults = resultsData.filter(r => r.process_type === 'reconciliation').length;
+        const fileGenerationResults = resultsData.filter(r => r.process_type === 'file_generation').length;
         const completedResults = resultsData.filter(r => r.status === 'completed').length;
         const processingResults = resultsData.filter(r => r.status === 'processing').length;
         const failedResults = resultsData.filter(r => r.status === 'failed').length;
@@ -101,6 +104,7 @@ const RecentResultsPage = () => {
             total: totalResults,
             delta: deltaResults,
             reconciliation: reconciliationResults,
+            fileGeneration: fileGenerationResults,
             completed: completedResults,
             processing: processingResults,
             failed: failedResults,
@@ -126,6 +130,14 @@ const RecentResultsPage = () => {
                 label: 'Reconciliation',
                 id: result.id,
                 type: 'reconciliation'
+            };
+        } else if (result.process_type === 'file_generation') {
+            return {
+                icon: Zap,
+                color: 'green',
+                label: 'AI File Generation',
+                id: result.id,
+                type: 'file_generation'
             };
         } else {
             return {
@@ -385,6 +397,7 @@ const RecentResultsPage = () => {
                                     <option value="all">All Types</option>
                                     <option value="delta">Delta Generation</option>
                                     <option value="reconciliation">Reconciliation</option>
+                                    <option value="file_generation">AI File Generation</option>
                                 </select>
                             </div>
 
@@ -807,6 +820,46 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                                             <div className="text-xs text-gray-500 mt-1">Records added to newer file</div>
                                         </div>
                                     </div>
+                                </div>
+                            ) : processInfo.type === 'file_generation' ? (
+                                <div>
+                                    <h4 className="text-lg font-medium text-gray-900 mb-4">AI File Generation Summary</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                            <div className="text-2xl font-bold text-blue-600">
+                                                {(result.summary.total_input_records || 0).toLocaleString()}
+                                            </div>
+                                            <div className="text-sm text-blue-600 font-medium">Input Records</div>
+                                            <div className="text-xs text-gray-500 mt-1">Original source records</div>
+                                        </div>
+                                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                            <div className="text-2xl font-bold text-green-600">
+                                                {(result.summary.total_output_records || 0).toLocaleString()}
+                                            </div>
+                                            <div className="text-sm text-green-600 font-medium">Output Records</div>
+                                            <div className="text-xs text-gray-500 mt-1">Generated records</div>
+                                        </div>
+                                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                                            <div className="text-2xl font-bold text-purple-600">
+                                                {(result.summary.columns_generated?.length || 0)}
+                                            </div>
+                                            <div className="text-sm text-purple-600 font-medium">Columns Generated</div>
+                                            <div className="text-xs text-gray-500 mt-1">Output file columns</div>
+                                        </div>
+                                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                            <div className="text-2xl font-bold text-orange-600">
+                                                {(result.summary.row_multiplication_factor || result.row_multiplication_factor || 1)}x
+                                            </div>
+                                            <div className="text-sm text-orange-600 font-medium">Multiplication Factor</div>
+                                            <div className="text-xs text-gray-500 mt-1">Rows per source record</div>
+                                        </div>
+                                    </div>
+                                    {result.summary.rules_description && (
+                                        <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                            <div className="text-sm font-medium text-gray-900 mb-2">Generation Rules Applied:</div>
+                                            <div className="text-sm text-gray-700">{result.summary.rules_description}</div>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div>

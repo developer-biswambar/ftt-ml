@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from 'react';
 import {
     AlertCircle,
     BarChart3,
@@ -17,8 +16,11 @@ import {
     X,
     Loader,
     ExternalLink,
-    History
+    History,
+    Zap,
+    Layers
 } from 'lucide-react';
+import {useEffect, useState} from "react";
 
 const RightSidebar = ({
                           processedFiles = [],
@@ -48,7 +50,7 @@ const RightSidebar = ({
             } else {
                 // Merge current processed files with recent results from server
                 try {
-                    const { deltaApiService } = await import('../services/deltaApiService');
+                    const {deltaApiService} = await import('../services/deltaApiService');
                     const recentResults = await deltaApiService.loadRecentResultsForSidebar(10);
 
                     // Create a merged list, avoiding duplicates
@@ -59,6 +61,7 @@ const RightSidebar = ({
                         const existsInProcessed = processedFiles.some(pf =>
                             (pf.delta_id && pf.delta_id === recentResult.delta_id) ||
                             (pf.reconciliation_id && pf.reconciliation_id === recentResult.reconciliation_id) ||
+                            (pf.generation_id && pf.generation_id === recentResult.generation_id) ||
                             (pf.process_id && pf.process_id === recentResult.process_id) ||
                             (pf.id && pf.id === recentResult.id)
                         );
@@ -92,7 +95,7 @@ const RightSidebar = ({
         setLoadingRecentResults(true);
         try {
             // Import deltaApiService dynamically
-            const { deltaApiService } = await import('../services/deltaApiService');
+            const {deltaApiService} = await import('../services/deltaApiService');
 
             const recentResults = await deltaApiService.loadRecentResultsForSidebar(10);
 
@@ -148,7 +151,7 @@ const RightSidebar = ({
             }
 
             // Then load recent results from server
-            const { deltaApiService } = await import('../services/deltaApiService');
+            const {deltaApiService} = await import('../services/deltaApiService');
             const recentResults = await deltaApiService.loadRecentResultsForSidebar(10);
 
             // Merge with current processedFiles
@@ -203,6 +206,16 @@ const RightSidebar = ({
                 type: 'reconciliation'
             };
         }
+        // Check if it's a file generation
+        else if (processedFile.generation_id) {
+            return {
+                icon: Zap,
+                color: 'green',
+                label: 'AI File Generation',
+                id: processedFile.generation_id,
+                type: 'file_generation'
+            };
+        }
         // Default for other process types
         else {
             return {
@@ -222,27 +235,40 @@ const RightSidebar = ({
         if (processInfo.type === 'delta') {
             const summary = processedFile.summary || {};
             return {
-                stat1: { label: 'Unchanged', value: summary.unchanged_records || 0, color: 'green' },
-                stat2: { label: 'Amended', value: summary.amended_records || 0, color: 'orange' },
-                stat3: { label: 'Deleted', value: summary.deleted_records || 0, color: 'red' },
-                stat4: { label: 'Added', value: summary.newly_added_records || 0, color: 'purple' }
+                stat1: {label: 'Unchanged', value: summary.unchanged_records || 0, color: 'green'},
+                stat2: {label: 'Amended', value: summary.amended_records || 0, color: 'orange'},
+                stat3: {label: 'Deleted', value: summary.deleted_records || 0, color: 'red'},
+                stat4: {label: 'Added', value: summary.newly_added_records || 0, color: 'purple'}
             };
         } else if (processInfo.type === 'reconciliation') {
             const summary = processedFile.summary || {};
             return {
-                stat1: { label: 'Match Rate', value: `${(summary.match_percentage || 0).toFixed(1)}%`, color: 'green' },
-                stat2: { label: 'Confidence', value: `${(summary.match_percentage || 0).toFixed(1)}%`, color: 'blue' },
-                stat3: { label: 'Matched', value: summary.matched_records || 0, color: 'green' },
-                stat4: { label: 'Unmatched', value: (summary.unmatched_file_a || 0) + (summary.unmatched_file_b || 0), color: 'orange' }
+                stat1: {label: 'Match Rate', value: `${(summary.match_percentage || 0).toFixed(1)}%`, color: 'green'},
+                stat2: {label: 'Confidence', value: `${(summary.match_percentage || 0).toFixed(1)}%`, color: 'blue'},
+                stat3: {label: 'Matched', value: summary.matched_records || 0, color: 'green'},
+                stat4: {
+                    label: 'Unmatched',
+                    value: (summary.unmatched_file_a || 0) + (summary.unmatched_file_b || 0),
+                    color: 'orange'
+                }
+            };
+        } else if (processInfo.type === 'file_generation') {
+            const summary = processedFile.summary || {};
+            const multiplicationFactor = processedFile.row_multiplication_factor || summary.row_multiplication_factor || 1;
+            return {
+                stat1: {label: 'Input Rows', value: summary.total_input_records || 0, color: 'blue'},
+                stat2: {label: 'Output Rows', value: summary.total_output_records || 0, color: 'green'},
+                stat3: {label: 'Columns', value: summary.columns_generated?.length || 0, color: 'purple'},
+                stat4: {label: 'Multiply', value: `${multiplicationFactor}x`, color: 'orange'}
             };
         } else {
             // Generic stats for other process types
             const summary = processedFile.summary || {};
             return {
-                stat1: { label: 'Success Rate', value: `${(summary.success_rate || 0).toFixed(1)}%`, color: 'green' },
-                stat2: { label: 'Processed', value: summary.total_processed || 0, color: 'blue' },
-                stat3: { label: 'Errors', value: summary.total_errors || 0, color: 'red' },
-                stat4: { label: 'Warnings', value: summary.total_warnings || 0, color: 'orange' }
+                stat1: {label: 'Success Rate', value: `${(summary.success_rate || 0).toFixed(1)}%`, color: 'green'},
+                stat2: {label: 'Processed', value: summary.total_processed || 0, color: 'blue'},
+                stat3: {label: 'Errors', value: summary.total_errors || 0, color: 'red'},
+                stat4: {label: 'Warnings', value: summary.total_warnings || 0, color: 'orange'}
             };
         }
     };
@@ -254,29 +280,40 @@ const RightSidebar = ({
         if (processInfo.type === 'delta') {
             return {
                 primary: [
-                    { key: 'unchanged', label: 'Unchanged', color: 'green', icon: Download },
-                    { key: 'amended', label: 'Amended', color: 'orange', icon: Download },
-                    { key: 'deleted', label: 'Deleted', color: 'red', icon: Download }
+                    {key: 'unchanged', label: 'Unchanged', color: 'green', icon: Download},
+                    {key: 'amended', label: 'Amended', color: 'orange', icon: Download},
+                    {key: 'deleted', label: 'Deleted', color: 'red', icon: Download}
                 ],
                 secondary: [
-                    { key: 'newly_added', label: 'Added', color: 'purple', icon: Download },
-                    { key: 'all_changes', label: 'All Changes', color: 'indigo', icon: Download },
-                    { key: 'all_excel', label: 'Excel All', color: 'indigo', icon: FileSpreadsheet }
+                    {key: 'newly_added', label: 'Added', color: 'purple', icon: Download},
+                    {key: 'all_changes', label: 'All Changes', color: 'indigo', icon: Download},
+                    {key: 'all_excel', label: 'Excel All', color: 'indigo', icon: FileSpreadsheet}
                 ],
                 extra: [
-                    { key: 'summary_report', label: 'Report', color: 'gray', icon: FileText }
+                    {key: 'summary_report', label: 'Report', color: 'gray', icon: FileText}
                 ]
             };
         } else if (processInfo.type === 'reconciliation') {
             return {
                 primary: [
-                    { key: 'matched', label: 'Matched', color: 'green', icon: Download },
-                    { key: 'unmatched_a', label: 'A Only', color: 'orange', icon: Download },
-                    { key: 'unmatched_b', label: 'B Only', color: 'purple', icon: Download }
+                    {key: 'matched', label: 'Matched', color: 'green', icon: Download},
+                    {key: 'unmatched_a', label: 'A Only', color: 'orange', icon: Download},
+                    {key: 'unmatched_b', label: 'B Only', color: 'purple', icon: Download}
                 ],
                 secondary: [
-                    { key: 'all_excel', label: 'Excel All', color: 'indigo', icon: FileSpreadsheet },
-                    { key: 'summary_report', label: 'Report', color: 'gray', icon: FileText }
+                    {key: 'all_excel', label: 'Excel All', color: 'indigo', icon: FileSpreadsheet},
+                    {key: 'summary_report', label: 'Report', color: 'gray', icon: FileText}
+                ],
+                extra: []
+            };
+        } else if (processInfo.type === 'file_generation') {
+            return {
+                primary: [
+                    {key: 'all', label: 'Generated File', color: 'green', icon: Download}
+                ],
+                secondary: [
+                    {key: 'all_excel', label: 'Excel Format', color: 'indigo', icon: FileSpreadsheet},
+                    {key: 'summary_report', label: 'Report', color: 'gray', icon: FileText}
                 ],
                 extra: []
             };
@@ -284,12 +321,12 @@ const RightSidebar = ({
             // Generic download options for other process types
             return {
                 primary: [
-                    { key: 'results', label: 'Results', color: 'blue', icon: Download },
-                    { key: 'errors', label: 'Errors', color: 'red', icon: Download }
+                    {key: 'results', label: 'Results', color: 'blue', icon: Download},
+                    {key: 'errors', label: 'Errors', color: 'red', icon: Download}
                 ],
                 secondary: [
-                    { key: 'all_excel', label: 'Excel All', color: 'indigo', icon: FileSpreadsheet },
-                    { key: 'summary_report', label: 'Report', color: 'gray', icon: FileText }
+                    {key: 'all_excel', label: 'Excel All', color: 'indigo', icon: FileSpreadsheet},
+                    {key: 'summary_report', label: 'Report', color: 'gray', icon: FileText}
                 ],
                 extra: []
             };
@@ -317,10 +354,10 @@ const RightSidebar = ({
         setSaveInProgress(true);
         try {
             // Import the deltaApiService for saving
-            const { deltaApiService } = await import('../services/deltaApiService');
+            const {deltaApiService} = await import('../services/deltaApiService');
 
             let result;
-            const { processId, downloadType, processInfo } = saveModalData;
+            const {processId, downloadType, processInfo} = saveModalData;
 
             if (processInfo.type === 'delta') {
                 let resultType = downloadType;
@@ -421,9 +458,9 @@ const RightSidebar = ({
                                 className="w-full inline-flex items-center justify-center px-3 py-2 border border-blue-300 shadow-sm text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
                                 title="Open detailed results view in new tab"
                             >
-                                <History className="w-4 h-4 mr-2" />
+                                <History className="w-4 h-4 mr-2"/>
                                 <span>View All Results</span>
-                                <ExternalLink className="w-3 h-3 ml-2" />
+                                <ExternalLink className="w-3 h-3 ml-2"/>
                             </button>
                         </div>
                     )}
@@ -466,13 +503,15 @@ const RightSidebar = ({
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center space-x-2">
                                                 <ProcessIcon size={16} className={`text-${processInfo.color}-500`}/>
-                                                <span className="text-xs font-medium text-gray-600">{processInfo.label}</span>
+                                                <span
+                                                    className="text-xs font-medium text-gray-600">{processInfo.label}</span>
                                                 {processedFile.status === 'completed' &&
                                                     <CheckCircle size={16} className="text-green-500"/>}
                                                 {processedFile.status === 'processing' && (
                                                     <div className="flex items-center space-x-1">
                                                         <Clock size={16} className="text-blue-500 animate-pulse"/>
-                                                        <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce"></div>
+                                                        <div
+                                                            className="w-1 h-1 bg-blue-500 rounded-full animate-bounce"></div>
                                                     </div>
                                                 )}
                                                 {processedFile.status === 'failed' &&
@@ -539,14 +578,17 @@ const RightSidebar = ({
 
                                                     {/* Download & Save Options */}
                                                     <div className="space-y-1">
-                                                        <div className="text-xs text-gray-500 font-medium">Download & Save Options:</div>
+                                                        <div className="text-xs text-gray-500 font-medium">Download &
+                                                            Save Options:
+                                                        </div>
 
                                                         {/* Primary Downloads/Saves */}
                                                         <div className="space-y-1">
                                                             {downloadOptions.primary.map((option) => {
                                                                 const OptionIcon = option.icon;
                                                                 return (
-                                                                    <div key={option.key} className="grid grid-cols-2 gap-1">
+                                                                    <div key={option.key}
+                                                                         className="grid grid-cols-2 gap-1">
                                                                         <button
                                                                             onClick={() => onDownloadResults(processInfo.id, option.key)}
                                                                             className={`px-2 py-1 text-xs bg-${option.color}-100 text-${option.color}-700 rounded hover:bg-${option.color}-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1`}
@@ -574,7 +616,8 @@ const RightSidebar = ({
                                                                 {downloadOptions.secondary.map((option) => {
                                                                     const OptionIcon = option.icon;
                                                                     return (
-                                                                        <div key={option.key} className="grid grid-cols-2 gap-1">
+                                                                        <div key={option.key}
+                                                                             className="grid grid-cols-2 gap-1">
                                                                             <button
                                                                                 onClick={() => onDownloadResults(processInfo.id, option.key)}
                                                                                 className={`px-2 py-1 text-xs bg-${option.color}-100 text-${option.color}-700 rounded hover:bg-${option.color}-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1`}
@@ -623,8 +666,10 @@ const RightSidebar = ({
 
                                         {/* Processing Status (if processing) */}
                                         {processedFile.status === 'processing' && (
-                                            <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded flex items-center space-x-2">
-                                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                                            <div
+                                                className="text-xs text-blue-600 bg-blue-50 p-2 rounded flex items-center space-x-2">
+                                                <div
+                                                    className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
                                                 <span>Processing {processInfo.label.toLowerCase()}...</span>
                                             </div>
                                         )}
@@ -702,7 +747,7 @@ const RightSidebar = ({
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center space-x-3">
                                 <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                                    <Server className="text-green-600" size={20} />
+                                    <Server className="text-green-600" size={20}/>
                                 </div>
                                 <h3 className="text-lg font-semibold text-gray-800">Save to Server</h3>
                             </div>
@@ -711,7 +756,7 @@ const RightSidebar = ({
                                 disabled={saveInProgress}
                                 className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
                             >
-                                <X size={20} />
+                                <X size={20}/>
                             </button>
                         </div>
 
@@ -719,7 +764,8 @@ const RightSidebar = ({
                             {/* Process Info */}
                             <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
                                 <div className="flex items-center space-x-2 mb-2">
-                                    <saveModalData.processInfo.icon size={16} className={`text-${saveModalData.processInfo.color}-600`} />
+                                    <saveModalData.processInfo.icon size={16}
+                                                                    className={`text-${saveModalData.processInfo.color}-600`}/>
                                     <span className="text-sm font-medium text-gray-800">
                                         {saveModalData.processInfo.label}
                                     </span>
@@ -728,7 +774,8 @@ const RightSidebar = ({
                                     Process ID: {saveModalData.processInfo.id}
                                 </p>
                                 <p className="text-xs text-gray-600">
-                                    Data Type: {saveModalData.downloadType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                    Data
+                                    Type: {saveModalData.downloadType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                 </p>
                             </div>
 
@@ -766,9 +813,10 @@ const RightSidebar = ({
                             {/* Save Info */}
                             <div className="bg-green-50 border border-green-200 rounded-md p-3">
                                 <div className="flex items-center space-x-2">
-                                    <Save className="text-green-600" size={16} />
+                                    <Save className="text-green-600" size={16}/>
                                     <p className="text-sm text-green-800">
-                                        <strong>Note:</strong> The file will be saved to server storage and will appear in your File Library for future use.
+                                        <strong>Note:</strong> The file will be saved to server storage and will appear
+                                        in your File Library for future use.
                                     </p>
                                 </div>
                             </div>
@@ -789,12 +837,13 @@ const RightSidebar = ({
                             >
                                 {saveInProgress ? (
                                     <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                        <div
+                                            className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                                         <span>Saving...</span>
                                     </>
                                 ) : (
                                     <>
-                                        <Save size={16} />
+                                        <Save size={16}/>
                                         <span>Save File to Server</span>
                                     </>
                                 )}

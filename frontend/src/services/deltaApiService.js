@@ -163,6 +163,86 @@ async saveReconciliationResultsToServer(reconciliationId, resultType = 'all', fi
 },
 
 /**
+ * Save File Generation Results to Server Storage
+ * @param {string} generationId - File generation ID
+ * @param {string} resultType - Type of results to save (usually 'all' for file generation)
+ * @param {string} fileFormat - File format (csv, excel)
+ * @param {string} customFilename - Custom filename (optional)
+ * @param {string} description - Description (optional)
+ * @returns {Promise<Object>} Save result
+ */
+async saveFileGenerationResultsToServer(generationId, resultType = 'all', fileFormat = 'csv', customFilename = null, description = null) {
+    try {
+        const response = await api.post('/save-results/save', {
+            result_id: generationId,
+            result_type: resultType,
+            process_type: 'file_generation',
+            file_format: fileFormat,
+            custom_filename: customFilename,
+            description: description
+        });
+
+        return response.data;
+    } catch (error) {
+        console.error('Error saving file generation results to server:', error);
+        throw error;
+    }
+},
+
+/**
+ * Download File Generation Results
+ * @param {string} generationId - File generation ID
+ * @param {string} format - File format (csv, excel)
+ * @returns {Promise<Object>} Download result
+ */
+async downloadFileGenerationResults(generationId, format = 'csv') {
+    try {
+        const response = await api.get(`/file-generator/download/${generationId}`, {
+            params: {
+                format: format
+            },
+            responseType: 'blob'
+        });
+
+        // Handle file download
+        const blob = response.data;
+        const contentDisposition = response.headers['content-disposition'];
+        const filename = contentDisposition?.split('filename=')[1]?.replace(/"/g, '') ||
+                       `generated_file_${generationId}.${format === 'excel' ? 'xlsx' : 'csv'}`;
+
+        // Trigger download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        return { success: true, filename };
+    } catch (error) {
+        console.error('Error downloading file generation results:', error);
+        throw error;
+    }
+},
+
+/**
+ * Get File Generation Results
+ * @param {string} generationId - File generation ID
+ * @returns {Promise<Object>} File generation results
+ */
+async getFileGenerationResults(generationId) {
+    try {
+        const response = await api.get(`/file-generator/results/${generationId}`);
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching file generation results:', error);
+        throw error;
+    }
+},
+
+/**
  * Get Delta Generation Summary
  * @param {string} deltaId - Delta generation ID
  * @returns {Promise<Object>} Delta summary statistics
@@ -193,6 +273,21 @@ async deleteDeltaResults(deltaId) {
 },
 
 /**
+ * Delete File Generation Results
+ * @param {string} generationId - File generation ID
+ * @returns {Promise<Object>} Deletion confirmation
+ */
+async deleteFileGenerationResults(generationId) {
+    try {
+        const response = await api.delete(`/file-generator/results/${generationId}`);
+        return response.data;
+    } catch (error) {
+        console.error('Error deleting file generation results:', error);
+        throw error;
+    }
+},
+
+/**
  * Get Delta Generation Health Check
  * @returns {Promise<Object>} Service health status
  */
@@ -211,7 +306,7 @@ async getDeltaHealthCheck() {
 // =================
 
 /**
- * Get Recent Results (Delta + Reconciliation)
+ * Get Recent Results (Delta + Reconciliation + File Generation)
  * @param {number} limit - Number of recent results to fetch
  * @returns {Promise<Object>} Recent results
  */
@@ -254,7 +349,16 @@ transformRecentResultsToProcessedFiles(recentResults) {
                 file_b: result.file_b,
                 summary: result.summary
             };
-        }
+        } else if (result.process_type === 'file_generation') {
+            return {
+                generation_id: result.id,
+                process_type: 'ai-file-generation',
+                status: result.status,
+                created_at: result.created_at,
+                source_file: result.source_file,
+                output_filename: result.output_filename,
+                summary: result.summary,
+        } }
         return result;
     });
 },
@@ -286,7 +390,7 @@ async loadRecentResultsForSidebar(limit = 5) {
 async getAllProcessResults() {
     try {
         // Get recent results from server
-        const recentResults = await this.loadRecentResultsForSidebar(10);
+        const recentResults = await this.loadRecentResultsForSidebar(15);
 
         // You could also add logic here to get other types of results
         // For example, saved results, file generation results, etc.
@@ -344,6 +448,47 @@ Data Quality Metrics:
 },
 
 /**
+ * Download File Generation Summary Report
+ * @param {Object} summary - File generation summary data
+ * @param {Object} generationRecord - File generation record information
+ */
+downloadFileGenerationSummaryReport(summary, generationRecord) {
+    const reportContent = `AI File Generation Summary Report
+Generated: ${new Date().toLocaleString()}
+
+Source Information:
+- Source File: ${generationRecord.source_file}
+- Output File: ${generationRecord.output_filename}
+
+Generation Summary:
+- Input Records: ${summary.summary.total_input_records.toLocaleString()}
+- Output Records: ${summary.summary.total_output_records.toLocaleString()}
+- Row Multiplication: ${summary.summary.row_multiplication_factor}x
+- Columns Generated: ${summary.summary.columns_generated.join(', ')}
+
+Processing Details:
+- Rules Applied: ${summary.summary.rules_description}
+- Generation ID: ${generationRecord.generation_id}
+- Timestamp: ${generationRecord.created_at}
+
+Transformation Metrics:
+- Expansion Rate: ${((summary.summary.total_output_records / summary.summary.total_input_records) * 100).toFixed(2)}%
+- Data Multiplication: ${summary.summary.row_multiplication_factor > 1 ? 'Enabled' : 'Disabled'}
+- Output Columns: ${summary.summary.columns_generated.length}
+`;
+
+    const blob = new Blob([reportContent], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `file_generation_summary_${generationRecord.generation_id}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+},
+
+/**
  * Validate Delta Configuration
  * @param {Object} deltaConfig - Delta configuration to validate
  * @returns {Object} Validation result
@@ -383,16 +528,17 @@ validateDeltaConfig(deltaConfig) {
 },
 
 /**
- * Process Mixed Results (Reconciliation + Delta)
- * @param {string} resultId - Result ID (could be reconciliation_id or delta_id)
+ * Process Mixed Results (Reconciliation + Delta + File Generation)
+ * @param {string} resultId - Result ID (could be reconciliation_id, delta_id, or generation_id)
  * @param {Array} processedFiles - Array of processed files
  * @returns {Promise<Object>} Processed results
  */
 async getProcessedResults(resultId, processedFiles) {
     try {
-        // Check if this is a delta result or reconciliation result
+        // Check if this is a delta result, reconciliation result, or file generation result
         const deltaRecord = processedFiles.find(f => f.delta_id === resultId);
         const reconRecord = processedFiles.find(f => f.reconciliation_id === resultId);
+        const generationRecord = processedFiles.find(f => f.generation_id === resultId);
 
         if (deltaRecord) {
             // Handle delta results
@@ -406,6 +552,14 @@ async getProcessedResults(resultId, processedFiles) {
             // Handle reconciliation results - would need to import from apiService
             // This is a placeholder - you'd need to implement getReconciliationResult
             throw new Error('Reconciliation results handling not implemented in deltaApiService');
+        } else if (generationRecord) {
+            // Handle file generation results
+            const results = await this.getFileGenerationResults(resultId);
+            return {
+                type: 'file_generation',
+                record: generationRecord,
+                results: results
+            };
         } else {
             throw new Error('Result ID not found in processed files');
         }
@@ -429,6 +583,7 @@ async downloadMixedResults(resultId, downloadType, processedFiles, saveToServer 
     try {
         const deltaRecord = processedFiles.find(f => f.delta_id === resultId);
         const reconRecord = processedFiles.find(f => f.reconciliation_id === resultId);
+        const generationRecord = processedFiles.find(f => f.generation_id === resultId);
 
         if (deltaRecord) {
             // Handle delta downloads/saves
@@ -457,9 +612,9 @@ async downloadMixedResults(resultId, downloadType, processedFiles, saveToServer 
                     break;
                 case 'summary_report':
                     // Download summary only
-                    const summary = await this.getDeltaSummary(resultId);
+                    { const summary = await this.getDeltaSummary(resultId);
                     this.downloadDeltaSummaryReport(summary, deltaRecord);
-                    return { success: true, type: 'summary' };
+                    return { success: true, type: 'summary' }; }
                 default:
                     resultType = 'all';
             }
@@ -477,6 +632,28 @@ async downloadMixedResults(resultId, downloadType, processedFiles, saveToServer 
             } else {
                 // Would need to import reconciliation download function
                 throw new Error('Reconciliation download not implemented in deltaApiService');
+            }
+        } else if (generationRecord) {
+            // Handle file generation downloads/saves
+            let format = 'csv';
+
+            switch (downloadType) {
+                case 'all_excel':
+                    format = 'excel';
+                    break;
+                case 'summary_report':
+                    // Download summary only
+                    const summary = await this.getFileGenerationResults(resultId);
+                    this.downloadFileGenerationSummaryReport(summary, generationRecord);
+                    return { success: true, type: 'summary' };
+                default:
+                    format = 'csv';
+            }
+
+            if (saveToServer) {
+                return await this.saveFileGenerationResultsToServer(resultId, 'all', format, customFilename, description);
+            } else {
+                return await this.downloadFileGenerationResults(resultId, format);
             }
         } else {
             throw new Error('Result ID not found');

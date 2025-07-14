@@ -1,7 +1,7 @@
-// src/App.jsx - Updated with Recent Results Route
-import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import { messageService } from './services/messageService';
+// src/App.jsx - Updated with AI File Generation Processing Support
+import React, {useState} from 'react';
+import {BrowserRouter as Router, Route, Routes} from 'react-router-dom';
+import {messageService} from './services/messageService';
 import {
     useFileManagement,
     useTemplateManagement,
@@ -19,9 +19,10 @@ import FileLibraryPage from './pages/FileLibraryPage';
 import RecentResultsPage from './pages/RecentResultsPage';
 
 const MainApp = () => {
+    const [fileGenerationProcessing, setFileGenerationProcessing] = useState([]);
     // All state management is now handled by custom hooks
-    const { files, uploadProgress, loadFiles, uploadFile } = useFileManagement();
-    const { templates } = useTemplateManagement();
+    const {files, uploadProgress, loadFiles, uploadFile} = useFileManagement();
+    const {templates} = useTemplateManagement();
     const {
         processedFiles,
         isProcessing,
@@ -29,7 +30,9 @@ const MainApp = () => {
         startProcess,
         getDetailedResults,
         downloadResults,
-        loadProcessedFiles
+        loadProcessedFiles,
+        addProcessingResult,
+        updateProcessingResult
     } = useProcessManagement();
     const {
         messages,
@@ -69,7 +72,6 @@ const MainApp = () => {
 
     // File upload handler
     const handleFileUpload = async (file) => {
-        // const file = file.target.files[0];
         if (!file) return;
 
         addMessage('system', messageService.getUploadProgressMessage(file.name), true);
@@ -94,6 +96,167 @@ const MainApp = () => {
         }
     };
 
+    const handleFileGeneration = async (generationConfig) => {
+        try {
+            // Generate a temporary ID for tracking
+            const tempGenerationId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+            // Create processing entry
+            const processingEntry = {
+                generation_id: tempGenerationId,
+                process_type: 'ai-file-generation',
+                status: 'processing',
+                created_at: new Date().toISOString(),
+                source_file: selectedFiles.file_0?.filename || 'Unknown Source',
+                output_filename: 'generated_file.csv',
+                summary: {
+                    total_input_records: 0,
+                    total_output_records: 0,
+                    row_multiplication_factor: 1,
+                    columns_generated: [],
+                    rules_description: 'Processing...'
+                },
+                row_multiplication_factor: 1
+            };
+
+            // Add to file generation processing state
+            setFileGenerationProcessing(prev => [processingEntry, ...prev]);
+
+            addMessage('user', `Starting ${selectedTemplate.name.toLowerCase()}...`, false);
+            addMessage('system', `⚡ Starting AI File Generation...\n\n🧠 Analyzing your requirements and generating intelligent file transformations...`, true);
+
+            // Import and use API service for file generation
+            const { apiService } = await import('./services/api');
+
+            // Get the selected file data
+            const selectedFile = selectedFiles.file_0;
+            if (!selectedFile) {
+                throw new Error('No file selected for generation');
+            }
+
+            // Get file data to convert to proper File object
+            const fileData = await apiService.getFileData(selectedFile.file_id, 1, 5000);
+            if (!fileData.success) {
+                throw new Error('Could not fetch file data');
+            }
+
+            // Convert data to CSV format for the API
+            const csvContent = convertDataToCSV(fileData.data.rows, fileData.data.columns);
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const file = new File([blob], selectedFile.filename, { type: 'text/csv' });
+
+            // Call the file generation API
+            const result = await apiService.generateFileFromRules(
+                file,
+                generationConfig.user_requirements || currentInput
+            );
+
+            if (result.success) {
+                // Create completed entry
+                const completedEntry = {
+                    generation_id: result.generation_id, // Use real ID from API
+                    process_type: 'ai-file-generation',
+                    status: 'completed',
+                    created_at: new Date().toISOString(),
+                    source_file: selectedFiles.file_0?.filename || 'Unknown Source',
+                    summary: {
+                        total_input_records: result.summary.total_input_records,
+                        total_output_records: result.summary.total_output_records,
+                        row_multiplication_factor: result.summary.row_multiplication_factor,
+                        columns_generated: result.summary.columns_generated,
+                        rules_description: result.summary.rules_applied
+                    },
+                    row_multiplication_factor: result.summary.row_multiplication_factor,
+                    output_filename: result.rules_used?.output_filename || 'generated_file.csv'
+                };
+
+                // Remove processing entry and the system will pick up completed entry from server
+                setFileGenerationProcessing(prev =>
+                    prev.filter(f => f.generation_id !== tempGenerationId)
+                );
+
+                const summaryText = formatFileGenerationResults(result.summary, result.generation_id);
+                addMessage('result', summaryText, true);
+
+                setTimeout(() => {
+                    addMessage('system', '💡 Use "Display Detailed Results" button above or download options in the right panel to view the generated file details.', true);
+                }, 1000);
+
+                setCurrentInput('');
+
+                // Refresh the processed files to get the completed result from server
+                setTimeout(() => {
+                    if (loadProcessedFiles) {
+                        loadProcessedFiles();
+                    }
+                }, 2000);
+
+            } else {
+                // Update with failed status
+                setFileGenerationProcessing(prev =>
+                    prev.map(f =>
+                        f.generation_id === tempGenerationId
+                            ? { ...f, status: 'failed', error: result.errors?.join(', ') || 'Generation failed' }
+                            : f
+                    )
+                );
+
+                addMessage('error', messageService.getErrorMessage(result.errors?.join(', ') || 'Unknown error', 'File generation failed'), false);
+            }
+
+        } catch (error) {
+            console.error('File generation error:', error);
+
+            // Update processing entry to failed
+            setFileGenerationProcessing(prev =>
+                prev.map(f => ({ ...f, status: 'failed', error: error.message }))
+            );
+
+            addMessage('error', messageService.getErrorMessage(error.message, 'File generation failed'), false);
+        }
+    };
+
+
+    // Helper function to convert data to CSV
+    const convertDataToCSV = (data, columns) => {
+        const headers = columns.join(',');
+        const rows = data.map(row =>
+            columns.map(col => {
+                const value = row[col];
+                if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+                    return `"${value.replace(/"/g, '""')}"`;
+                }
+                return value || '';
+            }).join(',')
+        );
+        return [headers, ...rows].join('\n');
+    };
+
+    // Helper function to format file generation results
+    const formatFileGenerationResults = (summary, generationId) => {
+        let resultText = `🎉 **AI File Generation Complete!**\n\n`;
+        resultText += `📊 **Generation Summary:**\n`;
+        resultText += `• Input Records: ${summary.total_input_records.toLocaleString()}\n`;
+        resultText += `• Output Records: ${summary.total_output_records.toLocaleString()}\n`;
+
+        if (summary.row_multiplication_factor > 1) {
+            resultText += `• Row Multiplication: ${summary.row_multiplication_factor}x\n`;
+        }
+
+        resultText += `• Columns Generated: ${summary.columns_generated.length}\n`;
+        resultText += `• Processing Time: ${summary.processing_time_seconds}s\n\n`;
+        resultText += `🔧 **Rules Applied:** ${summary.rules_applied}\n\n`;
+        resultText += `📥 **Generation ID:** ${generationId}\n\n`;
+        resultText += `Use the download options in the right panel to get your generated file!`;
+
+        return resultText;
+    };
+
+    // Merge file generation processing with regular processed files for the sidebar
+    const allProcessedFiles = React.useMemo(() => {
+        return [...fileGenerationProcessing, ...processedFiles];
+    }, [fileGenerationProcessing, processedFiles]);
+
     // Process handlers
     const handleReconciliation = async (reconciliationConfig) => {
         if (!selectedTemplate || !areAllFilesSelected()) {
@@ -101,10 +264,9 @@ const MainApp = () => {
             return;
         }
 
-        // Handle file generation separately (no API call needed)
+        // Handle file generation separately
         if (selectedTemplate.category.includes('ai-generation')) {
-            addMessage('system', '✅ File generation process initiated!', true);
-            return;
+            return handleFileGeneration(reconciliationConfig);
         }
 
         // Build process config
@@ -211,74 +373,107 @@ const MainApp = () => {
             // Determine process type
             const deltaRecord = processedFiles.find(f => f.delta_id === resultId);
             const reconRecord = processedFiles.find(f => f.reconciliation_id === resultId);
+            const generationRecord = processedFiles.find(f => f.generation_id === resultId);
 
-            const processType = deltaRecord ? 'delta-generation' : 'reconciliation';
+            let processType = 'unknown';
+            if (deltaRecord) processType = 'delta-generation';
+            else if (reconRecord) processType = 'reconciliation';
+            else if (generationRecord) processType = 'file-generation';
 
             addMessage('system', '🔍 Fetching detailed results...', true);
 
-            const result = await getDetailedResults(resultId, processType);
+            if (processType === 'file-generation') {
+                // Handle file generation results
+                const {apiService} = await import('./services/api');
+                const result = await apiService.getGenerationResults(resultId);
 
-            if (result.success) {
-                setTimeout(() => {
-                    if (result.type === 'delta') {
-                        // Handle delta results
-                        const categories = messageService.getDeltaTableCategories();
+                if (result.data) {
+                    // Display file generation results
+                    const previewData = result.data.slice(0, 10);
+                    let detailsMessage = `📄 **Generated File Details**\n\n`;
+                    detailsMessage += `📊 **Total Records:** ${result.data.length.toLocaleString()}\n`;
+                    detailsMessage += `📋 **Columns:** ${Object.keys(result.data[0] || {}).join(', ')}\n\n`;
+                    detailsMessage += `🔍 **Preview (First 10 rows):**\n`;
 
-                        Object.entries(result.data).forEach(([category, data]) => {
-                            if (data.length > 0) {
-                                const categoryInfo = categories[category];
-                                const tableData = messageService.createTableData(
-                                    `${categoryInfo.name} (${data.length} total)`,
-                                    data,
-                                    categoryInfo.color,
-                                    data.length
-                                );
-
-                                const tableMessage = {
-                                    id: Date.now() + Math.random() + category,
-                                    type: 'table',
-                                    content: tableData.title,
-                                    tableData,
-                                    timestamp: new Date()
-                                };
-                                setMessages(prev => [...prev, tableMessage]);
-                            }
-                        });
-
-                        const summaryText = messageService.formatDetailedResultsSummary('delta', result.data);
-                        addMessage('result', summaryText, true);
-
-                    } else {
-                        // Handle reconciliation results
-                        const categories = messageService.getReconciliationTableCategories();
-
-                        Object.entries(result.data).forEach(([category, data]) => {
-                            if (data.length > 0) {
-                                const categoryInfo = categories[category];
-                                const tableData = messageService.createTableData(
-                                    `${categoryInfo.name} (${data.length} records)`,
-                                    data,
-                                    categoryInfo.color,
-                                    data.length
-                                );
-
-                                const tableMessage = {
-                                    id: Date.now() + Math.random(),
-                                    type: 'table',
-                                    content: tableData.title,
-                                    tableData,
-                                    timestamp: new Date()
-                                };
-                                setMessages(prev => [...prev, tableMessage]);
-                            }
-                        });
-
-                        const summaryText = messageService.formatDetailedResultsSummary('reconciliation', result.data);
-                        addMessage('result', summaryText, true);
+                    // Create a simple preview table
+                    if (previewData.length > 0) {
+                        const headers = Object.keys(previewData[0]);
+                        const tableData = previewData.map(row =>
+                            headers.map(header => row[header] || '').join(' | ')
+                        ).join('\n');
+                        detailsMessage += `\n${headers.join(' | ')}\n${'-'.repeat(headers.join(' | ').length)}\n${tableData}`;
                     }
-                }, 1500);
+
+                    addMessage('result', detailsMessage, true);
+                } else {
+                    addMessage('error', 'Could not retrieve file generation details', false);
+                }
             } else {
-                addMessage('error', messageService.getErrorMessage(result.error, 'Failed to fetch detailed results'), false);
+                // Handle delta/reconciliation results
+                const result = await getDetailedResults(resultId, processType);
+
+                if (result.success) {
+                    setTimeout(() => {
+                        if (result.type === 'delta') {
+                            // Handle delta results (existing logic)
+                            const categories = messageService.getDeltaTableCategories();
+
+                            Object.entries(result.data).forEach(([category, data]) => {
+                                if (data.length > 0) {
+                                    const categoryInfo = categories[category];
+                                    const tableData = messageService.createTableData(
+                                        `${categoryInfo.name} (${data.length} total)`,
+                                        data,
+                                        categoryInfo.color,
+                                        data.length
+                                    );
+
+                                    const tableMessage = {
+                                        id: Date.now() + Math.random() + category,
+                                        type: 'table',
+                                        content: tableData.title,
+                                        tableData,
+                                        timestamp: new Date()
+                                    };
+                                    setMessages(prev => [...prev, tableMessage]);
+                                }
+                            });
+
+                            const summaryText = messageService.formatDetailedResultsSummary('delta', result.data);
+                            addMessage('result', summaryText, true);
+
+                        } else {
+                            // Handle reconciliation results (existing logic)
+                            const categories = messageService.getReconciliationTableCategories();
+
+                            Object.entries(result.data).forEach(([category, data]) => {
+                                if (data.length > 0) {
+                                    const categoryInfo = categories[category];
+                                    const tableData = messageService.createTableData(
+                                        `${categoryInfo.name} (${data.length} records)`,
+                                        data,
+                                        categoryInfo.color,
+                                        data.length
+                                    );
+
+                                    const tableMessage = {
+                                        id: Date.now() + Math.random(),
+                                        type: 'table',
+                                        content: tableData.title,
+                                        tableData,
+                                        timestamp: new Date()
+                                    };
+                                    setMessages(prev => [...prev, tableMessage]);
+                                }
+                            });
+
+                            const summaryText = messageService.formatDetailedResultsSummary('reconciliation', result.data);
+                            addMessage('result', summaryText, true);
+                        }
+                    }, 1500);
+                } else {
+                    addMessage('error', messageService.getErrorMessage(result.error, 'Failed to fetch detailed results'), false);
+                }
             }
 
         } catch (error) {
@@ -292,16 +487,36 @@ const MainApp = () => {
         try {
             // Determine process type
             const deltaRecord = processedFiles.find(f => f.delta_id === resultId);
-            const processType = deltaRecord ? 'delta-generation' : 'reconciliation';
+            const generationRecord = processedFiles.find(f => f.generation_id === resultId);
+
+            let processType = 'reconciliation';
+            if (deltaRecord) processType = 'delta-generation';
+            else if (generationRecord) processType = 'file-generation';
 
             addMessage('system', `📥 Preparing ${resultType.replace('_', ' ')} download...`, true);
 
-            const result = await downloadResults(resultId, resultType, processType);
+            if (processType === 'file-generation') {
+                // Handle file generation downloads
+                const {deltaApiService} = await import('./services/deltaApiService');
+                const result = await deltaApiService.downloadFileGenerationResults(
+                    resultId,
+                    resultType === 'all_excel' ? 'excel' : 'csv'
+                );
 
-            if (result.success) {
-                addMessage('system', `✅ ${result.message}`, true);
+                if (result.success) {
+                    addMessage('system', `✅ File downloaded: ${result.filename}`, true);
+                } else {
+                    addMessage('error', 'Download failed', false);
+                }
             } else {
-                addMessage('error', messageService.getErrorMessage(result.error, 'Download failed'), false);
+                // Handle delta/reconciliation downloads
+                const result = await downloadResults(resultId, resultType, processType);
+
+                if (result.success) {
+                    addMessage('system', `✅ ${result.message}`, true);
+                } else {
+                    addMessage('error', messageService.getErrorMessage(result.error, 'Download failed'), false);
+                }
             }
 
         } catch (error) {
@@ -342,10 +557,6 @@ const MainApp = () => {
         }
     };
 
-    // Debug what we're passing to LeftSidebar
-    console.log('handleFileUpload type:', typeof handleFileUpload);
-    console.log('handleFileUpload:', handleFileUpload);
-
     return (
         <div className="flex h-screen bg-gray-50 overflow-hidden">
             <LeftSidebar
@@ -369,7 +580,8 @@ const MainApp = () => {
                 onMouseDown={() => setIsResizing('left')}
             >
                 <div className="absolute inset-0 w-2 -translate-x-0.5"></div>
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-8 bg-gray-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                <div
+                    className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-8 bg-gray-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
             </div>
 
             <ChatInterface
@@ -377,7 +589,7 @@ const MainApp = () => {
                 currentInput={currentInput || ''}
                 setCurrentInput={setCurrentInput}
                 isProcessing={isProcessing}
-                isAnalyzingColumns={false} // Moved to service layer
+                isAnalyzingColumns={false}
                 selectedFiles={selectedFiles}
                 selectedTemplate={selectedTemplate}
                 requiredFiles={requiredFiles}
@@ -395,12 +607,13 @@ const MainApp = () => {
                 onMouseDown={() => setIsResizing('right')}
             >
                 <div className="absolute inset-0 w-2 -translate-x-0.5"></div>
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-8 bg-gray-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                <div
+                    className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-8 bg-gray-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
             </div>
 
             <RightSidebar
-                processedFiles={processedFiles}
-                autoRefreshInterval={null} // Handled in service layer
+                processedFiles={allProcessedFiles}
+                autoRefreshInterval={null}
                 onRefreshProcessedFiles={loadProcessedFiles}
                 onDownloadResults={handleDownloadResults}
                 onDisplayDetailedResults={displayDetailedResults}
@@ -415,10 +628,10 @@ const App = () => {
     return (
         <Router>
             <Routes>
-                <Route path="/" element={<MainApp />} />
-                <Route path="/viewer/:fileId" element={<ViewerPage />} />
-                <Route path="/file-library" element={<FileLibraryPage />} />
-                <Route path="/recent-results" element={<RecentResultsPage />} />
+                <Route path="/" element={<MainApp/>}/>
+                <Route path="/viewer/:fileId" element={<ViewerPage/>}/>
+                <Route path="/file-library" element={<FileLibraryPage/>}/>
+                <Route path="/recent-results" element={<RecentResultsPage/>}/>
             </Routes>
         </Router>
     );

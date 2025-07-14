@@ -1,4 +1,4 @@
-# backend/app/routes/recent_results_routes.py - Get Recent Delta and Reconciliation Results
+# backend/app/routes/recent_results_routes.py - Fixed File Generator Support
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -15,14 +15,17 @@ router = APIRouter(prefix="/recent-results", tags=["recent-results"])
 
 class RecentResultInfo(BaseModel):
     """Information about a recent result"""
-    id: str  # delta_id or reconciliation_id
-    process_type: str  # 'delta' or 'reconciliation'
+    id: str  # delta_id, reconciliation_id, or generation_id
+    process_type: str  # 'delta', 'reconciliation', or 'file_generation'
     status: str  # 'completed', 'processing', 'failed'
     created_at: str  # ISO datetime string
     file_a: Optional[str] = None
     file_b: Optional[str] = None
+    source_file: Optional[str] = None  # For file generation
+    output_filename: Optional[str] = None  # For file generation
     summary: Optional[Dict[str, Any]] = None
     processing_time_seconds: Optional[float] = None
+    row_multiplication_factor: Optional[int] = None  # For file generation
 
 
 class RecentResultsResponse(BaseModel):
@@ -35,7 +38,7 @@ class RecentResultsResponse(BaseModel):
 
 @router.get("/list", response_model=RecentResultsResponse)
 async def get_recent_results(limit: int = 5):
-    """Get recent Delta Generation and Reconciliation results"""
+    """Get recent Delta Generation, Reconciliation, and File Generation results"""
 
     try:
         recent_results = []
@@ -129,8 +132,122 @@ async def get_recent_results(limit: int = 5):
         except Exception as e:
             logger.error(f"Error retrieving reconciliation results: {e}")
 
+        # Get File Generation results
+        try:
+            from app.routes.file_generator import generation_storage
+
+            for generation_id, generation_data in generation_storage.items():
+                try:
+                    # Safely access rules and output_data
+                    rules = generation_data.get("rules")
+                    output_data = generation_data.get("output_data")
+                    source_filename = generation_data.get("source_filename", "Unknown Source File")
+                    timestamp = generation_data.get("timestamp", datetime.now())
+
+                    # Calculate metrics safely
+                    total_output_records = len(output_data) if output_data is not None else 0
+                    total_input_records = 0
+                    row_multiplication_factor = 1
+                    columns_generated = []
+                    rules_description = "AI File Generation"
+                    output_filename = "generated_file.csv"
+
+                    # Extract information from rules if available
+                    if rules:
+                        try:
+                            # Handle different rule object types
+                            if hasattr(rules, 'row_multiplication'):
+                                if rules.row_multiplication and rules.row_multiplication.enabled:
+                                    row_multiplication_factor = rules.row_multiplication.count
+                            elif isinstance(rules, dict):
+                                row_mult = rules.get('row_multiplication', {})
+                                if row_mult.get('enabled', False):
+                                    row_multiplication_factor = row_mult.get('count', 1)
+
+                            # Get output filename
+                            if hasattr(rules, 'output_filename'):
+                                output_filename = rules.output_filename
+                            elif isinstance(rules, dict):
+                                output_filename = rules.get('output_filename', 'generated_file.csv')
+
+                            # Get description
+                            if hasattr(rules, 'description'):
+                                rules_description = rules.description
+                            elif isinstance(rules, dict):
+                                rules_description = rules.get('description', 'AI File Generation')
+
+                        except Exception as rule_error:
+                            logger.warning(f"Error processing rules for generation {generation_id}: {rule_error}")
+
+                    # Calculate input records
+                    if row_multiplication_factor > 1 and total_output_records > 0:
+                        total_input_records = total_output_records // row_multiplication_factor
+                    else:
+                        total_input_records = total_output_records
+
+                    # Get columns if available
+                    if output_data is not None:
+                        try:
+                            if hasattr(output_data, 'columns'):
+                                columns_generated = output_data.columns.tolist()
+                            elif hasattr(output_data, 'keys'):
+                                columns_generated = list(output_data.keys())
+                        except:
+                            pass
+
+                    # Build summary
+                    summary = {
+                        "total_input_records": total_input_records,
+                        "total_output_records": total_output_records,
+                        "row_multiplication_factor": row_multiplication_factor,
+                        "columns_generated": columns_generated,
+                        "rules_description": rules_description
+                    }
+
+                    recent_results.append(RecentResultInfo(
+                        id=generation_id,
+                        process_type="file_generation",
+                        status="completed",
+                        created_at=timestamp.isoformat() if hasattr(timestamp, 'isoformat') else str(timestamp),
+                        source_file=source_filename,
+                        output_filename=output_filename,
+                        summary=summary,
+                        processing_time_seconds=None,  # Not stored in current generation structure
+                        row_multiplication_factor=row_multiplication_factor
+                    ))
+
+                except Exception as gen_error:
+                    logger.error(f"Error processing generation result {generation_id}: {gen_error}")
+                    # Add a basic entry even if we can't process all details
+                    recent_results.append(RecentResultInfo(
+                        id=generation_id,
+                        process_type="file_generation",
+                        status="completed",
+                        created_at=datetime.now().isoformat(),
+                        source_file="Unknown Source",
+                        output_filename="generated_file.csv",
+                        summary={
+                            "total_input_records": 0,
+                            "total_output_records": 0,
+                            "row_multiplication_factor": 1,
+                            "columns_generated": [],
+                            "rules_description": "AI File Generation"
+                        },
+                        processing_time_seconds=None,
+                        row_multiplication_factor=1
+                    ))
+
+        except ImportError as e:
+            logger.warning(f"Could not import file generator storage: {e}")
+        except Exception as e:
+            logger.error(f"Error retrieving file generation results: {e}")
+
         # Sort by timestamp (newest first) and limit
-        recent_results.sort(key=lambda x: x.created_at, reverse=True)
+        try:
+            recent_results.sort(key=lambda x: x.created_at, reverse=True)
+        except Exception as sort_error:
+            logger.warning(f"Error sorting results: {sort_error}")
+
         limited_results = recent_results[:limit]
 
         return RecentResultsResponse(
@@ -221,6 +338,91 @@ async def get_reconciliation_result_summary(recon_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get reconciliation summary: {str(e)}")
 
 
+@router.get("/file-generation/{generation_id}/summary")
+async def get_file_generation_result_summary(generation_id: str):
+    """Get summary for a specific file generation result"""
+
+    try:
+        from app.routes.file_generator import generation_storage
+
+        if generation_id not in generation_storage:
+            raise HTTPException(status_code=404, detail="Generation ID not found")
+
+        generation_data = generation_storage[generation_id]
+
+        # Safely extract data
+        rules = generation_data.get("rules")
+        output_data = generation_data.get("output_data")
+        source_filename = generation_data.get("source_filename", "Unknown")
+        timestamp = generation_data.get("timestamp", datetime.now())
+
+        # Calculate metrics safely
+        total_output_records = len(output_data) if output_data is not None else 0
+        row_multiplication_factor = 1
+        columns_generated = []
+        rules_description = "AI File Generation"
+        output_filename = "generated_file.csv"
+
+        # Extract rule information safely
+        if rules:
+            try:
+                if hasattr(rules, 'row_multiplication') and rules.row_multiplication:
+                    if rules.row_multiplication.enabled:
+                        row_multiplication_factor = rules.row_multiplication.count
+                elif isinstance(rules, dict):
+                    row_mult = rules.get('row_multiplication', {})
+                    if row_mult.get('enabled', False):
+                        row_multiplication_factor = row_mult.get('count', 1)
+
+                if hasattr(rules, 'output_filename'):
+                    output_filename = rules.output_filename
+                elif isinstance(rules, dict):
+                    output_filename = rules.get('output_filename', 'generated_file.csv')
+
+                if hasattr(rules, 'description'):
+                    rules_description = rules.description
+                elif isinstance(rules, dict):
+                    rules_description = rules.get('description', 'AI File Generation')
+            except:
+                pass
+
+        # Calculate input records
+        total_input_records = total_output_records // row_multiplication_factor if row_multiplication_factor > 1 else total_output_records
+
+        # Get columns
+        if output_data is not None:
+            try:
+                if hasattr(output_data, 'columns'):
+                    columns_generated = output_data.columns.tolist()
+                elif hasattr(output_data, 'keys'):
+                    columns_generated = list(output_data.keys())
+            except:
+                pass
+
+        return {
+            "success": True,
+            "generation_id": generation_id,
+            "process_type": "file_generation",
+            "status": "completed",
+            "timestamp": timestamp.isoformat() if hasattr(timestamp, 'isoformat') else str(timestamp),
+            "summary": {
+                "total_input_records": total_input_records,
+                "total_output_records": total_output_records,
+                "row_multiplication_factor": row_multiplication_factor,
+                "columns_generated": columns_generated,
+                "rules_description": rules_description,
+                "source_filename": source_filename,
+                "output_filename": output_filename
+            }
+        }
+
+    except ImportError:
+        raise HTTPException(status_code=500, detail="File generator storage not available")
+    except Exception as e:
+        logger.error(f"Error getting file generation summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get file generation summary: {str(e)}")
+
+
 @router.delete("/clear-old")
 async def clear_old_results(keep_count: int = 10):
     """Clear old results, keeping only the most recent ones"""
@@ -274,6 +476,32 @@ async def clear_old_results(keep_count: int = 10):
         except ImportError:
             pass
 
+        # Clear old file generation results
+        try:
+            from app.routes.file_generator import generation_storage
+
+            if len(generation_storage) > keep_count:
+                # Sort by timestamp and keep only recent ones
+                try:
+                    sorted_generations = sorted(
+                        generation_storage.items(),
+                        key=lambda x: x[1].get("timestamp", datetime.now()),
+                        reverse=True
+                    )
+
+                    # Keep only the most recent
+                    to_keep = dict(sorted_generations[:keep_count])
+                    to_delete = len(generation_storage) - len(to_keep)
+
+                    generation_storage.clear()
+                    generation_storage.update(to_keep)
+                    deleted_count += to_delete
+                except Exception as clear_error:
+                    logger.warning(f"Error clearing file generation results: {clear_error}")
+
+        except ImportError:
+            pass
+
         return {
             "success": True,
             "message": f"Cleared {deleted_count} old results, kept {keep_count} most recent",
@@ -292,6 +520,7 @@ async def recent_results_health_check():
     try:
         delta_count = 0
         recon_count = 0
+        generation_count = 0
 
         try:
             from app.routes.delta_routes import delta_storage
@@ -305,18 +534,26 @@ async def recent_results_health_check():
         except ImportError:
             pass
 
+        try:
+            from app.routes.file_generator import generation_storage
+            generation_count = len(generation_storage)
+        except ImportError:
+            pass
+
         return {
             "status": "healthy",
             "service": "recent_results",
             "available_delta_results": delta_count,
             "available_reconciliation_results": recon_count,
-            "total_results": delta_count + recon_count,
+            "available_file_generation_results": generation_count,
+            "total_results": delta_count + recon_count + generation_count,
             "features": [
                 "recent_results_listing",
                 "cross_process_aggregation",
                 "timestamp_sorting",
                 "result_summaries",
-                "old_results_cleanup"
+                "old_results_cleanup",
+                "file_generation_support"
             ]
         }
 
