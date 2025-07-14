@@ -1,7 +1,8 @@
-// src/components/LeftSidebar.jsx - Enhanced with File Library Button
+// src/components/LeftSidebar.jsx - Enhanced with Reusable File Upload Modal
 import React, {useRef, useState, useEffect} from 'react';
 import {CheckCircle, Eye, FileText, RefreshCw, Upload, AlertCircle, X, Sheet, Trash2, AlertTriangle, ExternalLink, FolderOpen} from 'lucide-react';
 import { apiService } from '../services/api';
+import FileUploadModal from './FileUploadModal';
 
 const LeftSidebar = ({
                          files,
@@ -22,6 +23,10 @@ const LeftSidebar = ({
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [fileToDelete, setFileToDelete] = useState(null);
     const [deleteInProgress, setDeleteInProgress] = useState(false);
+
+    // File upload modal states
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const [selectedFileForUpload, setSelectedFileForUpload] = useState(null);
 
     const openFileViewer = (fileId) => {
         const viewerUrl = `/viewer/${fileId}`;
@@ -85,6 +90,46 @@ const LeftSidebar = ({
         setFileToDelete(null);
     };
 
+    // Handle upload modal confirmation
+    const handleUploadConfirm = async (uploadConfig) => {
+        const { file, sheetName, customName } = uploadConfig;
+
+        // Close modal
+        setShowUploadModal(false);
+        setSelectedFileForUpload(null);
+
+        try {
+            // Use the enhanced upload method with the original onFileUpload flow
+            let uploadResult;
+            if (sheetName) {
+                uploadResult = await apiService.uploadFileWithOptions(file, sheetName, customName);
+            } else {
+                uploadResult = await apiService.uploadFileWithOptions(file, '', customName);
+            }
+
+            // Call the original onFileUpload callback if it expects a result
+            if (onFileUpload) {
+                await onFileUpload(file);
+            }
+        } catch (error) {
+            console.error('Error in file upload:', error);
+            // Call the original onFileUpload even on error to maintain existing error handling
+            if (onFileUpload) {
+                try {
+                    await onFileUpload(file);
+                } catch (originalError) {
+                    console.error('Original upload handler error:', originalError);
+                }
+            }
+        }
+    };
+
+    // Handle upload modal cancellation
+    const handleUploadCancel = () => {
+        setShowUploadModal(false);
+        setSelectedFileForUpload(null);
+    };
+
     const handleFileInputChange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -92,12 +137,9 @@ const LeftSidebar = ({
         // Clear the input
         event.target.value = '';
 
-        // Call the upload handler with just the file
-        try {
-            await onFileUpload(file);
-        } catch (error) {
-            console.error('Error in file upload:', error);
-        }
+        // Set file for upload modal and open modal
+        setSelectedFileForUpload(file);
+        setShowUploadModal(true);
     };
 
     const handleFileSelection = (fileKey, file) => {
@@ -661,6 +703,15 @@ const LeftSidebar = ({
                     </div>
                 </div>
             )}
+
+            {/* File Upload Modal */}
+            <FileUploadModal
+                isOpen={showUploadModal}
+                file={selectedFileForUpload}
+                onUpload={handleUploadConfirm}
+                onCancel={handleUploadCancel}
+                existingFiles={files}
+            />
         </>
     );
 };
