@@ -12,14 +12,23 @@ const LeftSidebar = ({
                          requiredFiles,
                          currentInput,
                          uploadProgress,
+                         uploadingFileName, // NEW: Current uploading file name
+                         isFileNewlyAdded, // NEW: Function to check if file is newly added
                          onFileUpload,
                          onTemplateSelect,
                          onRefreshFiles,
                          width = 320
                      }) => {
     const fileInputRef = useRef(null);
+    const [showUploadModal, setShowUploadModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [fileToDelete, setFileToDelete] = useState(null);
+    const [uploadFile, setUploadFile] = useState(null);
+    const [availableSheets, setAvailableSheets] = useState([]);
+    const [selectedSheet, setSelectedSheet] = useState('');
+    const [customFileName, setCustomFileName] = useState('');
+    const [loadingSheets, setLoadingSheets] = useState(false);
+    const [nameError, setNameError] = useState('');
     const [deleteInProgress, setDeleteInProgress] = useState(false);
 
     // Upload success notification state (removed)
@@ -102,33 +111,15 @@ const LeftSidebar = ({
     };
 
     const handleFileInputChange = async (event) => {
-    console.log('handleFileInputChange called with event:', event);
+        const file = event.target.files[0];
+        if (!file) return;
 
-    // Check if event and event.target exist
-    if (!event || !event.target || !event.target.files) {
-        console.error('Invalid event object:', event);
-        return;
-    }
+        // Clear the input
+        event.target.value = '';
 
-    const file = event.target.files[0];
-    console.log('File selected:', file);
-
-    if (!file) {
-        console.log('No file selected');
-        return;
-    }
-
-    // Clear the input
-    event.target.value = '';
-
-    try {
-        // Call the upload handler with just the file
-        console.log('Calling onFileUpload with file:', file);
-        await onFileUpload(file);
-    } catch (error) {
-        console.error('Error calling onFileUpload:', error);
-    }
-};
+        // NEW: Use the enhanced onFileUpload prop instead of modal for better UX
+        await onFileUpload(event);
+    };
 
     const handleFileSelection = (fileKey, file) => {
         setSelectedFiles(prev => ({
@@ -293,14 +284,14 @@ const LeftSidebar = ({
                 className="w-80 bg-gradient-to-br from-slate-50 to-blue-50 border-r border-slate-200 flex flex-col shadow-lg h-screen"
                 style={{width: `${width}px`}}
             >
-                {/* Upload Progress Indicator */}
+                {/* NEW: Upload Progress Indicator */}
                 {uploadProgress && (
                     <div className="p-3 bg-blue-50 border-b border-blue-200 animate-pulse">
                         <div className="flex items-center space-x-3">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                             <div className="flex-1">
                                 <div className="text-sm font-medium text-blue-900">
-                                    Uploading file...
+                                    Uploading "{uploadingFileName || 'File'}"
                                 </div>
                                 <div className="w-full bg-blue-200 rounded-full h-1.5 mt-1">
                                     <div className="bg-blue-600 h-1.5 rounded-full animate-pulse" style={{ width: '60%' }}></div>
@@ -423,29 +414,7 @@ const LeftSidebar = ({
                             <input
                                 type="file"
                                 ref={fileInputRef}
-                                onChange={<input
-    type="file"
-    ref={fileInputRef}
-    onChange={(event) => {
-        console.log('File input onChange triggered');
-        console.log('Event:', event);
-        console.log('Event target:', event.target);
-        console.log('Files:', event.target?.files);
-
-        const file = event.target?.files?.[0];
-        if (file) {
-            console.log('File selected:', file.name);
-            // Clear input
-            event.target.value = '';
-            // Call upload
-            onFileUpload(file).catch(console.error);
-        } else {
-            console.log('No file found');
-        }
-    }}
-    accept=".csv,.xlsx,.xls"
-    className="hidden"
-/>}
+                                onChange={handleFileInputChange}
                                 accept=".csv,.xlsx,.xls"
                                 className="hidden"
                             />
