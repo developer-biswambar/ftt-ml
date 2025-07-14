@@ -66,8 +66,8 @@ const MainApp = () => {
     }, [initializeChat]);
 
     // File upload handler
-    const handleFileUpload = async (event) => {
-        const file = event.target.files[0];
+    const handleFileUpload = async (file) => {
+        // const file = file.target.files[0];
         if (!file) return;
 
         addMessage('system', messageService.getUploadProgressMessage(file.name), true);
@@ -307,6 +307,10 @@ const MainApp = () => {
             addMessage('error', messageService.getErrorMessage(error.message, 'Download failed'), false);
         }
     };
+
+    // Debug what we're passing to LeftSidebar
+    console.log('handleFileUpload type:', typeof handleFileUpload);
+    console.log('handleFileUpload:', handleFileUpload);
 
     return (
         <div className="flex h-screen bg-gray-50 overflow-hidden">
