@@ -38,9 +38,9 @@ class FileManagementService {
 
     async getFiles() {
         try {
-            if (this.cache.has('files')) {
-                return this.cache.get('files');
-            }
+            // if (this.cache.has('files')) {
+            //     return this.cache.get('files');
+            // }
 
             const data = await apiService.getFiles();
             if (data.success) {

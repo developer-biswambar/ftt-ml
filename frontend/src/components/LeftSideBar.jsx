@@ -94,33 +94,30 @@ const LeftSidebar = ({
     const handleUploadConfirm = async (uploadConfig) => {
         const { file, sheetName, customName } = uploadConfig;
 
-        // Close modal
+        // Close modal first
         setShowUploadModal(false);
         setSelectedFileForUpload(null);
 
         try {
-            // Use the enhanced upload method with the original onFileUpload flow
-            let uploadResult;
+            // Use ONLY the enhanced upload method - don't call the original onFileUpload
             if (sheetName) {
-                uploadResult = await apiService.uploadFileWithOptions(file, sheetName, customName);
+                await apiService.uploadFileWithOptions(file, sheetName, customName);
             } else {
-                uploadResult = await apiService.uploadFileWithOptions(file, '', customName);
+                await apiService.uploadFileWithOptions(file, '', customName);
             }
 
-            // Call the original onFileUpload callback if it expects a result
-            if (onFileUpload) {
-                await onFileUpload(file);
+            // Refresh the file list to show the new file
+            if (onRefreshFiles) {
+                await onRefreshFiles();
             }
+
+            // Note: We don't call onFileUpload here anymore to avoid duplicate uploads
+            // The onFileUpload was designed for the old flow where it handled the actual upload
+            // Now we handle the upload directly with apiService.uploadFileWithOptions
+
         } catch (error) {
             console.error('Error in file upload:', error);
-            // Call the original onFileUpload even on error to maintain existing error handling
-            if (onFileUpload) {
-                try {
-                    await onFileUpload(file);
-                } catch (originalError) {
-                    console.error('Original upload handler error:', originalError);
-                }
-            }
+            // You could add error message display here if needed
         }
     };
 
