@@ -1,4 +1,4 @@
-// src/App.jsx - Updated with File Library Route
+// src/App.jsx - Updated with Recent Results Route
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { messageService } from './services/messageService';
@@ -16,6 +16,7 @@ import ChatInterface from './components/ChatInterface';
 import RightSidebar from './components/RightSideBar';
 import ViewerPage from './pages/ViewerPage';
 import FileLibraryPage from './pages/FileLibraryPage';
+import RecentResultsPage from './pages/RecentResultsPage';
 
 const MainApp = () => {
     // All state management is now handled by custom hooks
@@ -325,6 +326,22 @@ const MainApp = () => {
         }
     };
 
+    // Function to open Recent Results in new tab
+    const openRecentResults = () => {
+        const recentResultsUrl = '/recent-results';
+        const newWindow = window.open(
+            recentResultsUrl,
+            'recent_results',
+            'toolbar=yes,scrollbars=yes,resizable=yes,width=1600,height=1000,menubar=yes,location=yes,directories=no,status=yes'
+        );
+
+        if (newWindow) {
+            newWindow.focus();
+        } else {
+            window.open(recentResultsUrl, '_blank');
+        }
+    };
+
     // Debug what we're passing to LeftSidebar
     console.log('handleFileUpload type:', typeof handleFileUpload);
     console.log('handleFileUpload:', handleFileUpload);
@@ -387,6 +404,7 @@ const MainApp = () => {
                 onRefreshProcessedFiles={loadProcessedFiles}
                 onDownloadResults={handleDownloadResults}
                 onDisplayDetailedResults={displayDetailedResults}
+                onOpenRecentResults={openRecentResults}
                 width={rightPanelWidth}
             />
         </div>
@@ -400,6 +418,7 @@ const App = () => {
                 <Route path="/" element={<MainApp />} />
                 <Route path="/viewer/:fileId" element={<ViewerPage />} />
                 <Route path="/file-library" element={<FileLibraryPage />} />
+                <Route path="/recent-results" element={<RecentResultsPage />} />
             </Routes>
         </Router>
     );

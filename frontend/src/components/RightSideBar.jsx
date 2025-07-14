@@ -15,7 +15,9 @@ import {
     Save,
     Server,
     X,
-    Loader
+    Loader,
+    ExternalLink,
+    History
 } from 'lucide-react';
 
 const RightSidebar = ({
@@ -24,6 +26,7 @@ const RightSidebar = ({
                           onRefreshProcessedFiles,
                           onDownloadResults,
                           onDisplayDetailedResults,
+                          onOpenRecentResults,
                           width = 320,
                           onProcessedFilesUpdate
                       }) => {
@@ -36,30 +39,97 @@ const RightSidebar = ({
     const [loadingRecentResults, setLoadingRecentResults] = useState(false);
     const [localProcessedFiles, setLocalProcessedFiles] = useState(processedFiles);
 
-    // Load recent results on component mount and when processedFiles is empty
+    // Load recent results on component mount and merge with processedFiles
     useEffect(() => {
-        if (processedFiles.length === 0 && !loadingRecentResults) {
-            loadRecentResults();
-        } else {
-            setLocalProcessedFiles(processedFiles);
-        }
+        const mergeResults = async () => {
+            if (processedFiles.length === 0 && !loadingRecentResults) {
+                // No current processed files, load from server
+                await loadRecentResults();
+            } else {
+                // Merge current processed files with recent results from server
+                try {
+                    const { deltaApiService } = await import('../services/deltaApiService');
+                    const recentResults = await deltaApiService.loadRecentResultsForSidebar(10);
+
+                    // Create a merged list, avoiding duplicates
+                    const mergedResults = [...processedFiles];
+
+                    // Add recent results that aren't already in processedFiles
+                    recentResults.forEach(recentResult => {
+                        const existsInProcessed = processedFiles.some(pf =>
+                            (pf.delta_id && pf.delta_id === recentResult.delta_id) ||
+                            (pf.reconciliation_id && pf.reconciliation_id === recentResult.reconciliation_id) ||
+                            (pf.process_id && pf.process_id === recentResult.process_id) ||
+                            (pf.id && pf.id === recentResult.id)
+                        );
+
+                        if (!existsInProcessed) {
+                            mergedResults.push(recentResult);
+                        }
+                    });
+
+                    // Sort by creation date (newest first)
+                    mergedResults.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                    setLocalProcessedFiles(mergedResults);
+
+                    if (onProcessedFilesUpdate) {
+                        onProcessedFilesUpdate(mergedResults);
+                    }
+                } catch (error) {
+                    console.error('Error merging results:', error);
+                    // Fallback to just using processedFiles
+                    setLocalProcessedFiles(processedFiles);
+                }
+            }
+        };
+
+        mergeResults();
     }, [processedFiles]);
 
-    // Load recent results from server
+    // Load recent results from server and merge with existing if needed
     const loadRecentResults = async () => {
         setLoadingRecentResults(true);
         try {
             // Import deltaApiService dynamically
             const { deltaApiService } = await import('../services/deltaApiService');
 
-            const recentResults = await deltaApiService.loadRecentResultsForSidebar(5);
+            const recentResults = await deltaApiService.loadRecentResultsForSidebar(10);
 
             if (recentResults && recentResults.length > 0) {
-                setLocalProcessedFiles(recentResults);
+                // If we have current processedFiles, merge them
+                if (processedFiles.length > 0) {
+                    const mergedResults = [...processedFiles];
 
-                // If there's a callback to update parent component, call it
-                if (onProcessedFilesUpdate) {
-                    onProcessedFilesUpdate(recentResults);
+                    // Add recent results that aren't already in processedFiles
+                    recentResults.forEach(recentResult => {
+                        const existsInProcessed = processedFiles.some(pf =>
+                            (pf.delta_id && pf.delta_id === recentResult.delta_id) ||
+                            (pf.reconciliation_id && pf.reconciliation_id === recentResult.reconciliation_id) ||
+                            (pf.process_id && pf.process_id === recentResult.process_id) ||
+                            (pf.id && pf.id === recentResult.id)
+                        );
+
+                        if (!existsInProcessed) {
+                            mergedResults.push(recentResult);
+                        }
+                    });
+
+                    // Sort by creation date (newest first)
+                    mergedResults.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                    setLocalProcessedFiles(mergedResults);
+
+                    if (onProcessedFilesUpdate) {
+                        onProcessedFilesUpdate(mergedResults);
+                    }
+                } else {
+                    // No current processed files, just use recent results
+                    setLocalProcessedFiles(recentResults);
+
+                    if (onProcessedFilesUpdate) {
+                        onProcessedFilesUpdate(recentResults);
+                    }
                 }
             }
         } catch (error) {
@@ -69,12 +139,46 @@ const RightSidebar = ({
         }
     };
 
-    // Refresh function that combines local refresh with recent results loading
+    // Refresh function that combines local refresh with recent results loading and merges them
     const handleRefresh = async () => {
-        if (onRefreshProcessedFiles) {
-            await onRefreshProcessedFiles();
+        try {
+            // First refresh processed files if the function exists
+            if (onRefreshProcessedFiles) {
+                await onRefreshProcessedFiles();
+            }
+
+            // Then load recent results from server
+            const { deltaApiService } = await import('../services/deltaApiService');
+            const recentResults = await deltaApiService.loadRecentResultsForSidebar(10);
+
+            // Merge with current processedFiles
+            const mergedResults = [...(processedFiles || [])];
+
+            // Add recent results that aren't already in processedFiles
+            recentResults.forEach(recentResult => {
+                const existsInProcessed = mergedResults.some(pf =>
+                    (pf.delta_id && pf.delta_id === recentResult.delta_id) ||
+                    (pf.reconciliation_id && pf.reconciliation_id === recentResult.reconciliation_id) ||
+                    (pf.process_id && pf.process_id === recentResult.process_id) ||
+                    (pf.id && pf.id === recentResult.id)
+                );
+
+                if (!existsInProcessed) {
+                    mergedResults.push(recentResult);
+                }
+            });
+
+            // Sort by creation date (newest first)
+            mergedResults.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            setLocalProcessedFiles(mergedResults);
+
+            if (onProcessedFilesUpdate) {
+                onProcessedFilesUpdate(mergedResults);
+            }
+        } catch (error) {
+            console.error('Error during refresh:', error);
         }
-        await loadRecentResults();
     };
 
     // Helper function to get process type icon and color
@@ -308,6 +412,21 @@ const RightSidebar = ({
                     <p className="text-xs text-gray-500 mt-1">
                         {autoRefreshInterval ? 'Auto-updating every 3 seconds' : localProcessedFiles.length > 0 ? `Showing ${localProcessedFiles.length} recent results` : 'Recent processes & downloads'}
                     </p>
+
+                    {/* View All Results Button */}
+                    {localProcessedFiles.length > 0 && (
+                        <div className="mt-3">
+                            <button
+                                onClick={onOpenRecentResults}
+                                className="w-full inline-flex items-center justify-center px-3 py-2 border border-blue-300 shadow-sm text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+                                title="Open detailed results view in new tab"
+                            >
+                                <History className="w-4 h-4 mr-2" />
+                                <span>View All Results</span>
+                                <ExternalLink className="w-3 h-3 ml-2" />
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Results List */}
@@ -324,7 +443,7 @@ const RightSidebar = ({
                             <p className="text-sm">No recent processes</p>
                             <p className="text-xs mt-1">Start a process to see results here</p>
                             <button
-                                onClick={loadRecentResults}
+                                onClick={handleRefresh}
                                 className="mt-3 px-3 py-1 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors"
                             >
                                 Check for Recent Results
@@ -549,7 +668,7 @@ const RightSidebar = ({
                                     <span>All Results</span>
                                 </button>
                                 <button
-                                    onClick={loadRecentResults}
+                                    onClick={handleRefresh}
                                     className="px-3 py-2 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-all duration-200 flex items-center justify-center space-x-1"
                                     title="Refresh recent results"
                                 >
