@@ -181,13 +181,15 @@ async def upload_file(
                     df = pd.read_excel(
                         io.BytesIO(content),
                         sheet_name=sheet_name,
-                        engine='openpyxl' if file.filename.lower().endswith('.xlsx') else 'xlrd'
+                        engine='openpyxl'
+                        # if file.filename.lower().endswith('.xlsx') else 'xlrd'
                     )
                 else:
                     # Use first sheet if no sheet specified
                     df = pd.read_excel(
                         io.BytesIO(content),
-                        engine='openpyxl' if file.filename.lower().endswith('.xlsx') else 'xlrd'
+                        engine='openpyxl'
+                        # if file.filename.lower().endswith('.xlsx') else 'xlrd'
                     )
 
         except Exception as e:
