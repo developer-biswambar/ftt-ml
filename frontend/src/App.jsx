@@ -1,4 +1,4 @@
-// src/App.jsx - Refactored with separated services
+// src/App.jsx - Updated with File Library Route
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { messageService } from './services/messageService';
@@ -15,6 +15,7 @@ import LeftSidebar from './components/LeftSidebar';
 import ChatInterface from './components/ChatInterface';
 import RightSidebar from './components/RightSideBar';
 import ViewerPage from './pages/ViewerPage';
+import FileLibraryPage from './pages/FileLibraryPage';
 
 const MainApp = () => {
     // All state management is now handled by custom hooks
@@ -308,6 +309,22 @@ const MainApp = () => {
         }
     };
 
+    // Function to open File Library in new tab
+    const openFileLibrary = () => {
+        const fileLibraryUrl = '/file-library';
+        const newWindow = window.open(
+            fileLibraryUrl,
+            'file_library',
+            'toolbar=yes,scrollbars=yes,resizable=yes,width=1600,height=1000,menubar=yes,location=yes,directories=no,status=yes'
+        );
+
+        if (newWindow) {
+            newWindow.focus();
+        } else {
+            window.open(fileLibraryUrl, '_blank');
+        }
+    };
+
     // Debug what we're passing to LeftSidebar
     console.log('handleFileUpload type:', typeof handleFileUpload);
     console.log('handleFileUpload:', handleFileUpload);
@@ -326,6 +343,7 @@ const MainApp = () => {
                 onFileUpload={handleFileUpload}
                 onTemplateSelect={onTemplateSelect}
                 onRefreshFiles={loadFiles}
+                onOpenFileLibrary={openFileLibrary}
                 width={leftPanelWidth}
             />
 
@@ -381,6 +399,7 @@ const App = () => {
             <Routes>
                 <Route path="/" element={<MainApp />} />
                 <Route path="/viewer/:fileId" element={<ViewerPage />} />
+                <Route path="/file-library" element={<FileLibraryPage />} />
             </Routes>
         </Router>
     );

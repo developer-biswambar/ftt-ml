@@ -1,6 +1,6 @@
-// src/components/LeftSidebar.jsx - Enhanced with Upload Animations and Improved File Management
+// src/components/LeftSidebar.jsx - Enhanced with File Library Button
 import React, {useRef, useState, useEffect} from 'react';
-import {CheckCircle, Eye, FileText, RefreshCw, Upload, AlertCircle, X, Sheet, Trash2, AlertTriangle} from 'lucide-react';
+import {CheckCircle, Eye, FileText, RefreshCw, Upload, AlertCircle, X, Sheet, Trash2, AlertTriangle, ExternalLink, FolderOpen} from 'lucide-react';
 import { apiService } from '../services/api';
 
 const LeftSidebar = ({
@@ -15,29 +15,13 @@ const LeftSidebar = ({
                          onFileUpload,
                          onTemplateSelect,
                          onRefreshFiles,
+                         onOpenFileLibrary,
                          width = 320
                      }) => {
     const fileInputRef = useRef(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [fileToDelete, setFileToDelete] = useState(null);
     const [deleteInProgress, setDeleteInProgress] = useState(false);
-
-    // Upload success notification state (removed)
-    // const [showUploadSuccess, setShowUploadSuccess] = useState(null);
-    // const [lastFileCount, setLastFileCount] = useState(files.length);
-
-    // Detect when a new file is added (removed)
-    // useEffect(() => {
-    //     if (files.length > lastFileCount) {
-    //         const newFile = files[files.length - 1];
-    //         setShowUploadSuccess(newFile);
-    //
-    //         setTimeout(() => {
-    //             setShowUploadSuccess(null);
-    //         }, 4000);
-    //     }
-    //     setLastFileCount(files.length);
-    // }, [files.length, lastFileCount]);
 
     const openFileViewer = (fileId) => {
         const viewerUrl = `/viewer/${fileId}`;
@@ -204,16 +188,11 @@ const LeftSidebar = ({
         const isExcel = file.filename.toLowerCase().endsWith('.xlsx') || file.filename.toLowerCase().endsWith('.xls');
         const fileInUse = isFileInUse(file);
 
-        // Check if this file is newly added (removed)
-        // const isNew = isFileNewlyAdded && isFileNewlyAdded(file.file_id);
-
         return (
             <div
                 key={file.file_id}
                 className="group bg-white/70 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-white hover:shadow-sm transition-all duration-200"
             >
-                {/* New file indicator animations - REMOVED */}
-
                 <div className="p-2">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2 flex-1 min-w-0">
@@ -236,7 +215,6 @@ const LeftSidebar = ({
                                             In Use
                                         </span>
                                     )}
-                                    {/* New indicator - REMOVED */}
                                 </div>
                                 <div className="text-xs text-slate-500">
                                     {file.total_rows?.toLocaleString()} rows • {file.columns?.length} cols
@@ -298,8 +276,6 @@ const LeftSidebar = ({
                         </div>
                     </div>
                 )}
-
-                {/* Upload Success Notification - REMOVED */}
 
                 {/* Header */}
                 <div className="p-4 border-b border-slate-200 bg-white/80 backdrop-blur-sm flex-shrink-0">
@@ -436,13 +412,25 @@ const LeftSidebar = ({
                                 <span className="text-xs text-slate-600">
                                     {files.length} file{files.length !== 1 ? 's' : ''} available
                                 </span>
-                                <button
-                                    onClick={onRefreshFiles}
-                                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center space-x-1 transition-colors duration-200"
-                                >
-                                    <RefreshCw size={12}/>
-                                    <span>Refresh</span>
-                                </button>
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={onRefreshFiles}
+                                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center space-x-1 transition-colors duration-200"
+                                    >
+                                        <RefreshCw size={12}/>
+                                        <span>Refresh</span>
+                                    </button>
+                                    {onOpenFileLibrary && (
+                                        <button
+                                            onClick={onOpenFileLibrary}
+                                            className="text-xs text-green-600 hover:text-green-800 flex items-center space-x-1 transition-colors duration-200"
+                                            title="Open File Library in new tab"
+                                        >
+                                            <ExternalLink size={12}/>
+                                            <span>Library</span>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -450,11 +438,24 @@ const LeftSidebar = ({
                     {/* Step 3: File Library */}
                     <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                         <div className="p-3 pb-2 flex-shrink-0">
-                            <div className="flex items-center space-x-2">
-                                <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                                    <span className="text-green-600 text-xs font-bold">3</span>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                                        <span className="text-green-600 text-xs font-bold">3</span>
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-slate-700">File Library</h3>
                                 </div>
-                                <h3 className="text-sm font-semibold text-slate-700">File Library</h3>
+                                {onOpenFileLibrary && files.length > 0 && (
+                                    <button
+                                        onClick={onOpenFileLibrary}
+                                        className="flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition-colors duration-200"
+                                        title="Open full File Library in new tab"
+                                    >
+                                        <FolderOpen size={12}/>
+                                        <span>Open Full Library</span>
+                                        <ExternalLink size={10}/>
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -464,6 +465,14 @@ const LeftSidebar = ({
                                     <FileText size={28} className="mx-auto mb-2 opacity-50"/>
                                     <p className="text-sm">No files uploaded yet</p>
                                     <p className="text-xs">Upload CSV or Excel files to get started</p>
+                                    {onOpenFileLibrary && (
+                                        <button
+                                            onClick={onOpenFileLibrary}
+                                            className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                                        >
+                                            Open File Library
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="space-y-2">
