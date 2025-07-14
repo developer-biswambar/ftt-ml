@@ -1,5 +1,5 @@
-// src/components/LeftSidebar.jsx - Enhanced with Delete Feature
-import React, {useRef, useState} from 'react';
+// src/components/LeftSidebar.jsx - Enhanced with Upload Animations and Improved File Management
+import React, {useRef, useState, useEffect} from 'react';
 import {CheckCircle, Eye, FileText, RefreshCw, Upload, AlertCircle, X, Sheet, Trash2, AlertTriangle} from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -12,6 +12,8 @@ const LeftSidebar = ({
                          requiredFiles,
                          currentInput,
                          uploadProgress,
+                         uploadingFileName, // NEW: Current uploading file name
+                         isFileNewlyAdded, // NEW: Function to check if file is newly added
                          onFileUpload,
                          onTemplateSelect,
                          onRefreshFiles,
@@ -28,6 +30,23 @@ const LeftSidebar = ({
     const [loadingSheets, setLoadingSheets] = useState(false);
     const [nameError, setNameError] = useState('');
     const [deleteInProgress, setDeleteInProgress] = useState(false);
+
+    // Upload success notification state (removed)
+    // const [showUploadSuccess, setShowUploadSuccess] = useState(null);
+    // const [lastFileCount, setLastFileCount] = useState(files.length);
+
+    // Detect when a new file is added (removed)
+    // useEffect(() => {
+    //     if (files.length > lastFileCount) {
+    //         const newFile = files[files.length - 1];
+    //         setShowUploadSuccess(newFile);
+    //
+    //         setTimeout(() => {
+    //             setShowUploadSuccess(null);
+    //         }, 4000);
+    //     }
+    //     setLastFileCount(files.length);
+    // }, [files.length, lastFileCount]);
 
     const openFileViewer = (fileId) => {
         const viewerUrl = `/viewer/${fileId}`;
@@ -98,142 +117,8 @@ const LeftSidebar = ({
         // Clear the input
         event.target.value = '';
 
-        const isExcel = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
-
-        if (isExcel) {
-            // Show modal for Excel files to select sheet and name
-            setUploadFile(file);
-            setCustomFileName(file.name.replace(/\.(xlsx|xls)$/i, ''));
-            setSelectedSheet('');
-            setNameError('');
-            setShowUploadModal(true);
-            await loadExcelSheets(file);
-        } else {
-            // For CSV, show modal to allow name customization
-            const baseName = file.name.replace(/\.csv$/i, '');
-            setUploadFile(file);
-            setCustomFileName(baseName);
-            setSelectedSheet(''); // No sheet for CSV
-            setAvailableSheets([]);
-            setNameError('');
-            setShowUploadModal(true);
-        }
-    };
-
-    const loadExcelSheets = async (file) => {
-        setLoadingSheets(true);
-        try {
-            // Use API service to analyze Excel sheets
-            const result = await apiService.analyzeExcelSheets(file);
-
-            if (result.success && result.sheets && result.sheets.length > 0) {
-                setAvailableSheets(result.sheets);
-                setSelectedSheet(result.sheets[0].sheet_name);
-            } else {
-                // Fallback to common sheet names if analysis fails
-                setAvailableSheets([
-                    { sheet_name: 'Sheet1', row_count: 0, column_count: 0 },
-                    { sheet_name: 'Data', row_count: 0, column_count: 0 },
-                    { sheet_name: 'Main', row_count: 0, column_count: 0 }
-                ]);
-                setSelectedSheet('Sheet1');
-            }
-        } catch (error) {
-            console.error('Error loading sheets:', error);
-            // Fallback to common sheet names
-            setAvailableSheets([
-                { sheet_name: 'Sheet1', row_count: 0, column_count: 0 },
-                { sheet_name: 'Data', row_count: 0, column_count: 0 },
-                { sheet_name: 'Main', row_count: 0, column_count: 0 }
-            ]);
-            setSelectedSheet('Sheet1');
-        } finally {
-            setLoadingSheets(false);
-        }
-    };
-
-    const validateFileName = async (name) => {
-        if (!name.trim()) {
-            return 'File name is required';
-        }
-        if (name.length < 3) {
-            return 'File name must be at least 3 characters';
-        }
-        if (name.length > 100) {
-            return 'File name must be less than 100 characters';
-        }
-        if (!/^[a-zA-Z0-9_\-\s.]+$/.test(name)) {
-            return 'File name can only contain letters, numbers, spaces, dots, hyphens and underscores';
-        }
-
-        try {
-            // Use API service to validate file name
-            const result = await apiService.validateFileName(name.trim());
-            if (!result.isValid) {
-                return result.error || 'File name already exists';
-            }
-        } catch (error) {
-            console.error('Error validating file name:', error);
-            // Fallback to local validation
-            const existingFile = files.find(f =>
-                (f.custom_name && f.custom_name.toLowerCase() === name.trim().toLowerCase()) ||
-                f.filename.toLowerCase() === name.trim().toLowerCase()
-            );
-            if (existingFile) {
-                return 'A file with this name already exists';
-            }
-        }
-
-        return '';
-    };
-
-    const handleModalUpload = async () => {
-        if (!uploadFile) return;
-
-        const finalName = customFileName.trim() || uploadFile.name.replace(/\.(csv|xlsx|xls)$/i, '');
-
-        // Validate file name
-        const nameValidationError = await validateFileName(finalName);
-        if (nameValidationError) {
-            setNameError(nameValidationError);
-            return;
-        }
-
-        try {
-            // Use the enhanced API service upload method
-            const result = await apiService.uploadFileWithOptions(
-                uploadFile,
-                selectedSheet,
-                finalName
-            );
-
-            if (result.success) {
-                // Refresh the file list
-                await onRefreshFiles();
-
-                // Close modal and reset state
-                setShowUploadModal(false);
-                setUploadFile(null);
-                setCustomFileName('');
-                setSelectedSheet('');
-                setAvailableSheets([]);
-                setNameError('');
-            } else {
-                throw new Error(result.message || 'Upload failed');
-            }
-        } catch (error) {
-            console.error('Upload error:', error);
-            setNameError('Upload failed: ' + error.message);
-        }
-    };
-
-    const closeModal = () => {
-        setShowUploadModal(false);
-        setUploadFile(null);
-        setCustomFileName('');
-        setSelectedSheet('');
-        setAvailableSheets([]);
-        setNameError('');
+        // NEW: Use the enhanced onFileUpload prop instead of modal for better UX
+        await onFileUpload(event);
     };
 
     const handleFileSelection = (fileKey, file) => {
@@ -324,11 +209,16 @@ const LeftSidebar = ({
         const isExcel = file.filename.toLowerCase().endsWith('.xlsx') || file.filename.toLowerCase().endsWith('.xls');
         const fileInUse = isFileInUse(file);
 
+        // Check if this file is newly added (removed)
+        // const isNew = isFileNewlyAdded && isFileNewlyAdded(file.file_id);
+
         return (
             <div
                 key={file.file_id}
                 className="group bg-white/70 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-white hover:shadow-sm transition-all duration-200"
             >
+                {/* New file indicator animations - REMOVED */}
+
                 <div className="p-2">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2 flex-1 min-w-0">
@@ -351,6 +241,7 @@ const LeftSidebar = ({
                                             In Use
                                         </span>
                                     )}
+                                    {/* New indicator - REMOVED */}
                                 </div>
                                 <div className="text-xs text-slate-500">
                                     {file.total_rows?.toLocaleString()} rows • {file.columns?.length} cols
@@ -393,6 +284,28 @@ const LeftSidebar = ({
                 className="w-80 bg-gradient-to-br from-slate-50 to-blue-50 border-r border-slate-200 flex flex-col shadow-lg h-screen"
                 style={{width: `${width}px`}}
             >
+                {/* NEW: Upload Progress Indicator */}
+                {uploadProgress && (
+                    <div className="p-3 bg-blue-50 border-b border-blue-200 animate-pulse">
+                        <div className="flex items-center space-x-3">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                            <div className="flex-1">
+                                <div className="text-sm font-medium text-blue-900">
+                                    Uploading "{uploadingFileName || 'File'}"
+                                </div>
+                                <div className="w-full bg-blue-200 rounded-full h-1.5 mt-1">
+                                    <div className="bg-blue-600 h-1.5 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                                </div>
+                                <div className="text-xs text-blue-700 mt-1">
+                                    Processing file content...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Upload Success Notification - REMOVED */}
+
                 {/* Header */}
                 <div className="p-4 border-b border-slate-200 bg-white/80 backdrop-blur-sm flex-shrink-0">
                     <div className="flex items-center space-x-3">
@@ -659,116 +572,6 @@ const LeftSidebar = ({
                     )}
                 </div>
             </div>
-
-            {/* Upload Modal */}
-            {showUploadModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-gray-800">Upload Configuration</h3>
-                            <button
-                                onClick={closeModal}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <div className="space-y-4">
-                            {/* File Name Input */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    File Name
-                                </label>
-                                <input
-                                    type="text"
-                                    value={customFileName}
-                                    onChange={(e) => {
-                                        setCustomFileName(e.target.value);
-                                        setNameError('');
-                                    }}
-                                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="Enter custom file name"
-                                />
-                                {nameError && (
-                                    <p className="text-red-500 text-xs mt-1">{nameError}</p>
-                                )}
-                            </div>
-
-                            {/* Sheet Selection (Excel only) */}
-                            {uploadFile && (uploadFile.name.toLowerCase().endsWith('.xlsx') || uploadFile.name.toLowerCase().endsWith('.xls')) && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Select Sheet
-                                    </label>
-                                    {loadingSheets ? (
-                                        <div className="flex items-center space-x-2 p-2 bg-blue-50 rounded-md">
-                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-blue-600"></div>
-                                            <span className="text-sm text-blue-700">Loading sheets...</span>
-                                        </div>
-                                    ) : (
-                                        <select
-                                            value={selectedSheet}
-                                            onChange={(e) => setSelectedSheet(e.target.value)}
-                                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        >
-                                            <option value="">Select a sheet</option>
-                                            {availableSheets.map((sheet, index) => (
-                                                <option key={`${sheet.sheet_name}-${index}`} value={sheet.sheet_name}>
-                                                    {sheet.sheet_name}
-                                                    {sheet.row_count > 0 ? ` (${sheet.row_count.toLocaleString()} rows, ${sheet.column_count} cols)` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    )}
-                                    {selectedSheet && availableSheets.length > 0 && (
-                                        <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                                            <strong>Selected Sheet Info:</strong>
-                                            {(() => {
-                                                const sheet = availableSheets.find(s => s.sheet_name === selectedSheet);
-                                                return sheet ? (
-                                                    <div>
-                                                        {sheet.sheet_name} - {sheet.row_count?.toLocaleString() || 0} rows, {sheet.column_count || 0} columns
-                                                    </div>
-                                                ) : (
-                                                    <div>No details available</div>
-                                                );
-                                            })()}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* File Info */}
-                            <div className="bg-gray-50 p-3 rounded-md">
-                                <div className="flex items-center space-x-2 mb-1">
-                                    <span className="text-lg">{getFileTypeIcon(uploadFile?.name || '')}</span>
-                                    <span className="text-sm font-medium text-gray-800">{uploadFile?.name}</span>
-                                </div>
-                                <p className="text-xs text-gray-600">
-                                    Size: {uploadFile && (uploadFile.size / 1024 / 1024).toFixed(2)} MB
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex space-x-3 mt-6">
-                            <button
-                                onClick={closeModal}
-                                className="flex-1 px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleModalUpload}
-                                disabled={!customFileName.trim() || (uploadFile?.name.toLowerCase().endsWith('.xlsx') && !selectedSheet) || uploadProgress === true}
-                                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {uploadProgress === true ? 'Uploading...' : 'Upload'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Delete Confirmation Modal */}
             {showDeleteModal && fileToDelete && (

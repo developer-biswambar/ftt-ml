@@ -676,7 +676,7 @@ const RightSidebar = ({
                                 ) : (
                                     <>
                                         <Save size={16} />
-                                        <span>Save to Server</span>
+                                        <span>Save File to Server</span>
                                     </>
                                 )}
                             </button>
