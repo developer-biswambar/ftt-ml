@@ -755,7 +755,7 @@ export const apiService = {
     getRecentResults: async (limit = 5) => {
         try {
             const response = await api.get('/recent-results/list', {
-                params: { limit: limit }
+                params: {limit: limit}
             });
             return response.data;
         } catch (error) {
@@ -787,7 +787,7 @@ export const apiService = {
     clearOldResults: async (keepCount = 10) => {
         try {
             const response = await api.delete('/recent-results/clear-old', {
-                params: { keep_count: keepCount }
+                params: {keep_count: keepCount}
             });
             return response.data;
         } catch (error) {
@@ -859,7 +859,7 @@ export const apiService = {
     downloadSavedFile: async (savedFileId, format = 'csv') => {
         try {
             const response = await api.get(`/save-results/download/${savedFileId}`, {
-                params: { format: format },
+                params: {format: format},
                 responseType: 'blob'
             });
 
@@ -867,7 +867,7 @@ export const apiService = {
             const blob = response.data;
             const contentDisposition = response.headers['content-disposition'];
             const filename = contentDisposition?.split('filename=')[1]?.replace(/"/g, '') ||
-                           `saved_file_${savedFileId}.${format}`;
+                `saved_file_${savedFileId}.${format}`;
 
             // Trigger download
             const url = window.URL.createObjectURL(blob);
@@ -879,7 +879,7 @@ export const apiService = {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
-            return { success: true, filename };
+            return {success: true, filename};
         } catch (error) {
             console.error('Error downloading saved file:', error);
             throw error;
@@ -1052,7 +1052,7 @@ export const apiService = {
 
     adaptRuleToFiles: (savedRule, fileColumns) => {
         // Adapt a saved rule to work with new files
-        const adaptedConfig = { ...savedRule.rule_config };
+        const adaptedConfig = {...savedRule.rule_config};
 
         // The rule structure is already file-agnostic, but we might need to
         // validate that required columns exist in the new files
@@ -1080,6 +1080,199 @@ export const apiService = {
                     });
                 }
             });
+        }
+
+        return {
+            adaptedConfig,
+            warnings,
+            errors
+        };
+    },
+    // Extended API service methods for Delta Rule Management
+// Add these methods to your existing apiService object in api.js
+
+// ===========================================
+// DELTA RULE MANAGEMENT OPERATIONS
+// ===========================================
+    saveDeltaRule: async (ruleData, metadata) => {
+        const response = await api.post('/delta-rules/save', {
+            metadata: metadata,
+            rule_config: ruleData
+        });
+        return response.data;
+    },
+
+    listDeltaRules: async (filters = {}) => {
+        const params = new URLSearchParams();
+        if (filters.category) params.append('category', filters.category);
+        if (filters.template_id) params.append('template_id', filters.template_id);
+        if (filters.limit) params.append('limit', filters.limit.toString());
+        if (filters.offset) params.append('offset', filters.offset.toString());
+
+        const response = await api.get(`/delta-rules/list?${params}`);
+        return response.data;
+    },
+
+    getDeltaRulesByTemplate: async (templateId) => {
+        const response = await api.get(`/delta-rules/template/${templateId}`);
+        return response.data;
+    },
+
+    getDeltaRule: async (ruleId) => {
+        const response = await api.get(`/delta-rules/${ruleId}`);
+        return response.data;
+    },
+
+    updateDeltaRule: async (ruleId, updates) => {
+        const response = await api.put(`/delta-rules/${ruleId}`, updates);
+        return response.data;
+    },
+
+    deleteDeltaRule: async (ruleId) => {
+        const response = await api.delete(`/delta-rules/${ruleId}`);
+        return response.data;
+    },
+
+    markDeltaRuleAsUsed: async (ruleId) => {
+        const response = await api.post(`/delta-rules/${ruleId}/use`);
+        return response.data;
+    },
+
+    searchDeltaRules: async (searchFilters) => {
+        const response = await api.post('/delta-rules/search', searchFilters);
+        return response.data;
+    },
+
+    getDeltaRuleCategories: async () => {
+        const response = await api.get('/delta-rules/categories/list');
+        return response.data;
+    },
+
+    getDeltaRuleManagementHealth: async () => {
+        const response = await api.get('/delta-rules/health');
+        return response.data;
+    },
+
+// Helper functions for delta rule management
+    validateDeltaRuleMetadata: (metadata) => {
+        const errors = [];
+
+        if (!metadata.name || metadata.name.trim().length < 3) {
+            errors.push('Rule name must be at least 3 characters long');
+        }
+
+        if (metadata.name && metadata.name.length > 100) {
+            errors.push('Rule name must be less than 100 characters');
+        }
+
+        if (metadata.description && metadata.description.length > 500) {
+            errors.push('Description must be less than 500 characters');
+        }
+
+        if (metadata.tags && metadata.tags.length > 10) {
+            errors.push('Maximum 10 tags allowed');
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors
+        };
+    },
+
+    createDeltaRuleFromConfig: (config, selectedTemplate, metadata = {}) => {
+        // Create a clean rule configuration without file-specific data
+        const ruleConfig = {
+            Files: config.Files || [],
+            KeyRules: config.KeyRules || [],
+            ComparisonRules: config.ComparisonRules || [],
+            selected_columns_file_a: config.selected_columns_file_a || [],
+            selected_columns_file_b: config.selected_columns_file_b || [],
+            user_requirements: config.user_requirements || 'Generate delta between older and newer files using configured key and comparison rules'
+        };
+
+        const ruleMetadata = {
+            name: metadata.name || `${selectedTemplate?.name || 'Delta'} Rule - ${new Date().toLocaleDateString()}`,
+            description: metadata.description || `Delta generation rule for ${selectedTemplate?.name || 'file comparison'}`,
+            category: metadata.category || 'delta',
+            tags: metadata.tags || [selectedTemplate?.category || 'general', 'delta'],
+            template_id: selectedTemplate?.id,
+            template_name: selectedTemplate?.name,
+            rule_type: 'delta_generation'
+        };
+
+        return {
+            ruleConfig,
+            ruleMetadata
+        };
+    },
+
+    adaptDeltaRuleToFiles: (savedRule, fileColumns) => {
+        // Adapt a saved delta rule to work with new files
+        const adaptedConfig = {...savedRule.rule_config};
+        const warnings = [];
+        const errors = [];
+
+        // Get available columns for both files
+        const fileKeys = Object.keys(fileColumns);
+        const columnsA = fileColumns[fileKeys[0]] || [];
+        const columnsB = fileColumns[fileKeys[1]] || [];
+
+        // Check key rules for missing columns
+        if (adaptedConfig.KeyRules) {
+            adaptedConfig.KeyRules.forEach((rule, index) => {
+                if (rule.LeftFileColumn && !columnsA.includes(rule.LeftFileColumn)) {
+                    warnings.push(`Key rule ${index + 1}: Column "${rule.LeftFileColumn}" not found in older file`);
+                }
+                if (rule.RightFileColumn && !columnsB.includes(rule.RightFileColumn)) {
+                    warnings.push(`Key rule ${index + 1}: Column "${rule.RightFileColumn}" not found in newer file`);
+                }
+            });
+        }
+
+        // Check comparison rules for missing columns
+        if (adaptedConfig.ComparisonRules) {
+            adaptedConfig.ComparisonRules.forEach((rule, index) => {
+                if (rule.LeftFileColumn && !columnsA.includes(rule.LeftFileColumn)) {
+                    warnings.push(`Comparison rule ${index + 1}: Column "${rule.LeftFileColumn}" not found in older file`);
+                }
+                if (rule.RightFileColumn && !columnsB.includes(rule.RightFileColumn)) {
+                    warnings.push(`Comparison rule ${index + 1}: Column "${rule.RightFileColumn}" not found in newer file`);
+                }
+            });
+        }
+
+        // Adapt column selections - keep only columns that exist in new files
+        if (adaptedConfig.selected_columns_file_a) {
+            const validColumnsA = adaptedConfig.selected_columns_file_a.filter(col => columnsA.includes(col));
+            const missingColumnsA = adaptedConfig.selected_columns_file_a.filter(col => !columnsA.includes(col));
+
+            adaptedConfig.selected_columns_file_a = validColumnsA;
+
+            if (missingColumnsA.length > 0) {
+                warnings.push(`Older file: Result columns not found - ${missingColumnsA.join(', ')}`);
+            }
+        }
+
+        if (adaptedConfig.selected_columns_file_b) {
+            const validColumnsB = adaptedConfig.selected_columns_file_b.filter(col => columnsB.includes(col));
+            const missingColumnsB = adaptedConfig.selected_columns_file_b.filter(col => !columnsB.includes(col));
+
+            adaptedConfig.selected_columns_file_b = validColumnsB;
+
+            if (missingColumnsB.length > 0) {
+                warnings.push(`Newer file: Result columns not found - ${missingColumnsB.join(', ')}`);
+            }
+        }
+
+        // Ensure we have at least some column selections if none are valid
+        if (!adaptedConfig.selected_columns_file_a || adaptedConfig.selected_columns_file_a.length === 0) {
+            adaptedConfig.selected_columns_file_a = columnsA.slice(0, Math.min(5, columnsA.length));
+            warnings.push('Auto-selected first 5 columns for older file as no valid selections found');
+        }
+
+        if (!adaptedConfig.selected_columns_file_b || adaptedConfig.selected_columns_file_b.length === 0) {
+            adaptedConfig.selected_columns_file_b = columnsB.slice(0, Math.min(5, columnsB.length));
+            warnings.push('Auto-selected first 5 columns for newer file as no valid selections found');
         }
 
         return {
