@@ -137,28 +137,43 @@ class DeltaProcessor:
         return errors
 
     def create_composite_key(self, df: pd.DataFrame, key_columns: List[str], rules: List[DeltaKeyRule]) -> pd.Series:
-        """Create composite key for matching records"""
+        """Create composite key for matching records with proper NaN handling"""
         keys = []
         for i, col in enumerate(key_columns):
             if i < len(rules):
                 rule = rules[i]
+                # Handle NaN values first by converting to string representation
+                series_data = df[col].fillna('__NULL__')  # Replace NaN with placeholder
+
                 if rule.MatchType == "case_insensitive":
-                    keys.append(df[col].astype(str).str.lower().str.strip())
+                    keys.append(series_data.astype(str).str.lower().str.strip())
                 elif rule.MatchType == "numeric_tolerance":
                     # For numeric tolerance, we still need exact key matching
-                    keys.append(df[col].astype(str).str.strip())
+                    keys.append(series_data.astype(str).str.strip())
                 else:
-                    keys.append(df[col].astype(str).str.strip())
+                    keys.append(series_data.astype(str).str.strip())
             else:
-                keys.append(df[col].astype(str).str.strip())
+                # Handle NaN values for columns without specific rules
+                series_data = df[col].fillna('__NULL__')
+                keys.append(series_data.astype(str).str.strip())
 
         # Create composite key by joining all key components
         composite_keys = []
         for idx in range(len(df)):
             key_parts = [str(keys[j].iloc[idx]) for j in range(len(keys))]
-            composite_keys.append('|'.join(key_parts))
+            composite_key = '|'.join(key_parts)
+            composite_keys.append(composite_key)
 
-        return pd.Series(composite_keys, index=df.index)
+        composite_series = pd.Series(composite_keys, index=df.index)
+
+        # Debug: Check for duplicates and log them
+        duplicates = composite_series.duplicated()
+        if duplicates.any():
+            duplicate_keys = composite_series[duplicates].unique()
+            logger.warning(f"Found {len(duplicate_keys)} duplicate composite keys: {duplicate_keys[:5]}...")
+            self.warnings.append(f"Found {len(duplicate_keys)} duplicate composite keys in data")
+
+        return composite_series
 
     def compare_records(self, row_a: pd.Series, row_b: pd.Series, comparison_rules: List[DeltaComparisonRule]) -> tuple[
         bool, List[str]]:
@@ -237,6 +252,10 @@ class DeltaProcessor:
         df_a_work['_composite_key'] = self.create_composite_key(df_a_work, key_columns_a, key_rules)
         df_b_work['_composite_key'] = self.create_composite_key(df_b_work, key_columns_b, key_rules)
 
+        # Reset index to ensure uniqueness before operations
+        df_a_work = df_a_work.reset_index(drop=True)
+        df_b_work = df_b_work.reset_index(drop=True)
+
         # Create sets for faster lookup
         keys_a = set(df_a_work['_composite_key'])
         keys_b = set(df_b_work['_composite_key'])
@@ -247,16 +266,45 @@ class DeltaProcessor:
         deleted_records = []
         newly_added_records = []
 
-        # Create lookup dictionaries
-        dict_a = df_a_work.set_index('_composite_key').to_dict('index')
-        dict_b = df_b_work.set_index('_composite_key').to_dict('index')
+        # Create lookup dictionaries using iterrows instead of set_index to avoid duplicate index issues
+        dict_a = {}
+        dict_b = {}
+
+        # Build lookup dictionaries manually to handle potential duplicates
+        for idx, row in df_a_work.iterrows():
+            composite_key = row['_composite_key']
+            if composite_key not in dict_a:
+                dict_a[composite_key] = []
+            dict_a[composite_key].append(row.to_dict())
+
+        for idx, row in df_b_work.iterrows():
+            composite_key = row['_composite_key']
+            if composite_key not in dict_b:
+                dict_b[composite_key] = []
+            dict_b[composite_key].append(row.to_dict())
+
+        # Check for duplicate keys and handle them
+        duplicates_a = [k for k, v in dict_a.items() if len(v) > 1]
+        duplicates_b = [k for k, v in dict_b.items() if len(v) > 1]
+
+        if duplicates_a:
+            logger.warning(f"Found duplicate composite keys in File A: {duplicates_a[:5]}...")
+            self.warnings.append(f"Found {len(duplicates_a)} duplicate composite keys in File A")
+
+        if duplicates_b:
+            logger.warning(f"Found duplicate composite keys in File B: {duplicates_b[:5]}...")
+            self.warnings.append(f"Found {len(duplicates_b)} duplicate composite keys in File B")
 
         # Process records that exist in both files (same composite key)
         common_keys = keys_a.intersection(keys_b)
 
         for key in common_keys:
-            row_a = pd.Series(dict_a[key])
-            row_b = pd.Series(dict_b[key])
+            # Handle potential duplicates by taking the first occurrence
+            row_a_dict = dict_a[key][0] if dict_a[key] else {}
+            row_b_dict = dict_b[key][0] if dict_b[key] else {}
+
+            row_a = pd.Series(row_a_dict)
+            row_b = pd.Series(row_b_dict)
 
             # Compare optional fields using comparison rules
             if comparison_rules:
@@ -289,7 +337,8 @@ class DeltaProcessor:
         # Process records only in File A (older) - DELETED
         deleted_keys = keys_a - keys_b
         for key in deleted_keys:
-            row_a = pd.Series(dict_a[key])
+            row_a_dict = dict_a[key][0] if dict_a[key] else {}
+            row_a = pd.Series(row_a_dict)
             record = {}
             for col in df_a_work.columns:
                 if not col.startswith('_'):
@@ -305,7 +354,8 @@ class DeltaProcessor:
         # Process records only in File B (newer) - NEWLY ADDED
         new_keys = keys_b - keys_a
         for key in new_keys:
-            row_b = pd.Series(dict_b[key])
+            row_b_dict = dict_b[key][0] if dict_b[key] else {}
+            row_b = pd.Series(row_b_dict)
             record = {}
             # Add empty FileA columns for consistency
             for col in df_a_work.columns:
@@ -509,6 +559,8 @@ async def get_delta_results(
         return data_list[start_idx:end_idx]
 
     def clean_dataframe(df):
+        # Ensure we have a clean DataFrame with unique index
+        df = df.reset_index(drop=True)
         # Replace NaN with None (which becomes null in JSON)
         df = df.replace({np.nan: None})
         # Replace infinite values with None
