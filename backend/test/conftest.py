@@ -5,13 +5,30 @@ import io
 import os
 import tempfile
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from typing import Dict, Any
 
 # Import your FastAPI routers
 from fastapi import FastAPI
-from app.routes.file_routes import router as file_router
-from app.routes.viewer_routes import router as viewer_router
+
+# Import routers safely
+try:
+    from app.routes.file_routes import router as file_router
+
+    HAS_FILE_ROUTES = True
+except ImportError as e:
+    print(f"Warning: Could not import file_routes: {e}")
+    file_router = None
+    HAS_FILE_ROUTES = False
+
+try:
+    from app.routes.viewer_routes import router as viewer_router
+
+    HAS_VIEWER_ROUTES = True
+except ImportError as e:
+    print(f"Warning: Could not import viewer_routes: {e}")
+    viewer_router = None
+    HAS_VIEWER_ROUTES = False
 
 # Mock storage for testing
 test_uploaded_files: Dict[str, Dict[str, Any]] = {}
@@ -21,8 +38,13 @@ test_uploaded_files: Dict[str, Dict[str, Any]] = {}
 def app():
     """Create FastAPI app instance for testing"""
     test_app = FastAPI(title="Test App")
-    test_app.include_router(file_router)
-    test_app.include_router(viewer_router)
+
+    if HAS_FILE_ROUTES and file_router:
+        test_app.include_router(file_router)
+
+    if HAS_VIEWER_ROUTES and viewer_router:
+        test_app.include_router(viewer_router)
+
     return test_app
 
 
@@ -35,12 +57,21 @@ def client(app):
 @pytest.fixture(autouse=True)
 def mock_storage():
     """Mock the storage service for all tests"""
-    # Patch both the original module and the imported reference
-    with patch('app.services.storage_service.uploaded_files', test_uploaded_files), \
-            patch('app.routes.file_routes.uploaded_files', test_uploaded_files), \
-            patch('app.routes.viewer_routes.uploaded_files', test_uploaded_files):
-        test_uploaded_files.clear()  # Clear storage before each test
-        yield test_uploaded_files
+    test_uploaded_files.clear()  # Clear storage before each test
+
+    # Patch where uploaded_files is actually used (in the route files)
+    # not where it's defined (in the storage service)
+    try:
+        with patch('app.routes.file_routes.uploaded_files', test_uploaded_files):
+            try:
+                with patch('app.routes.viewer_routes.uploaded_files', test_uploaded_files):
+                    yield test_uploaded_files
+            except ImportError:
+                yield test_uploaded_files
+    except ImportError:
+        # Fallback if route imports fail
+        with patch('app.services.storage_service.uploaded_files', test_uploaded_files):
+            yield test_uploaded_files
 
 
 @pytest.fixture
@@ -196,7 +227,8 @@ pytest_markers = [
     "csv: CSV file specific tests",
     "error: Error handling tests",
     "validation: Validation tests",
-    "viewer: File viewer related tests"
+    "viewer: File viewer related tests",
+    "save_results: Save results related tests"
 ]
 
 
