@@ -130,7 +130,7 @@ const FileLibraryPage = () => {
         setUploadProgress(true);
 
         try {
-            const response = await apiService.uploadFile(
+            const response = await apiService.uploadFileWithOptions(
                 uploadConfig.file,
                 uploadConfig.sheetName,
                 uploadConfig.customName
