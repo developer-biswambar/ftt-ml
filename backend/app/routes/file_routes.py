@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/files", tags=["files"])
 
-
+class FileIDsRequest(BaseModel):
+    file_ids: List[str]  # Use UUID if you want validation, else use str
 # Pydantic models for sheet handling
 class SheetInfo(BaseModel):
     sheet_name: str
@@ -430,6 +431,12 @@ async def delete_file(file_id: str):
         "success": True,
         "message": f"File {file_info['filename']} deleted successfully"
     }
+@router.post("/bulk-delete")
+async def bulk_delete(request:FileIDsRequest):
+    file_ids = request.file_ids
+
+    for file_id in file_ids:
+        await delete_file(file_id)
 
 
 @router.get("/{file_id}/preview")

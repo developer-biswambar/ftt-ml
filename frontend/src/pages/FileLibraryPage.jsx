@@ -1,4 +1,4 @@
-// src/pages/FileLibraryPage.jsx - Complete Fixed File Library Page
+// src/pages/FileLibraryPage.jsx - Updated with FileUploadModal and Multiple File Support
 import React, { useState, useEffect, useRef } from 'react';
 import {
     Upload,
@@ -28,6 +28,7 @@ import {
     Info
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import FileUploadModal from '../components/FileUploadModal';
 
 const FileLibraryPage = () => {
     const [files, setFiles] = useState([]);
@@ -45,6 +46,14 @@ const FileLibraryPage = () => {
     const [deleteInProgress, setDeleteInProgress] = useState(false);
     const [showUploadSuccess, setShowUploadSuccess] = useState(null);
     const [selectedFiles, setSelectedFiles] = useState(new Set());
+
+    // File Upload Modal State
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const [currentUploadFile, setCurrentUploadFile] = useState(null);
+    const [pendingFiles, setPendingFiles] = useState([]);
+    const [uploadQueue, setUploadQueue] = useState([]);
+    const [currentUploadIndex, setCurrentUploadIndex] = useState(0);
+    const [isProcessingQueue, setIsProcessingQueue] = useState(false);
 
     const fileInputRef = useRef(null);
 
@@ -80,38 +89,121 @@ const FileLibraryPage = () => {
         }
     };
 
-    const handleFileUpload = async (file) => {
-        if (!file) return;
+    const handleFileInputChange = async (event) => {
+        const selectedFiles = Array.from(event.target.files);
+        if (selectedFiles.length === 0) return;
 
+        // Clear the input
+        event.target.value = '';
+
+        // Check file count limit
+        if (selectedFiles.length > 5) {
+            setError('You can upload a maximum of 5 files at once.');
+            return;
+        }
+
+        // Validate file types
+        const invalidFiles = selectedFiles.filter(file =>
+            !apiService.isExcelFile(file) && !file.name.toLowerCase().endsWith('.csv')
+        );
+
+        if (invalidFiles.length > 0) {
+            setError(`Invalid file types: ${invalidFiles.map(f => f.name).join(', ')}. Only CSV and Excel files are supported.`);
+            return;
+        }
+
+        // If single file, show modal immediately
+        if (selectedFiles.length === 1) {
+            setCurrentUploadFile(selectedFiles[0]);
+            setShowUploadModal(true);
+        } else {
+            // Multiple files - set up queue
+            setUploadQueue(selectedFiles);
+            setCurrentUploadIndex(0);
+            setCurrentUploadFile(selectedFiles[0]);
+            setShowUploadModal(true);
+        }
+    };
+
+    const handleUploadConfirm = async (uploadConfig) => {
+        setShowUploadModal(false);
         setUploadProgress(true);
 
         try {
-            const response = await apiService.uploadFile(file);
+            const response = await apiService.uploadFile(
+                uploadConfig.file,
+                uploadConfig.sheetName,
+                uploadConfig.customName
+            );
 
             if (response.success) {
                 setShowUploadSuccess(response.data);
                 setTimeout(() => setShowUploadSuccess(null), 4000);
 
+                // If there are more files in queue, process next
+                if (uploadQueue.length > 1 && currentUploadIndex < uploadQueue.length - 1) {
+                    const nextIndex = currentUploadIndex + 1;
+                    setCurrentUploadIndex(nextIndex);
+                    setCurrentUploadFile(uploadQueue[nextIndex]);
+
+                    // Small delay before showing next modal
+                    setTimeout(() => {
+                        setShowUploadModal(true);
+                    }, 500);
+                } else {
+                    // All files processed, clear queue
+                    setUploadQueue([]);
+                    setCurrentUploadIndex(0);
+                    setCurrentUploadFile(null);
+                }
+
                 // Refresh file list
                 await loadFiles();
             } else {
                 setError(response.message || 'Upload failed');
+                // Stop processing queue on error
+                setUploadQueue([]);
+                setCurrentUploadIndex(0);
+                setCurrentUploadFile(null);
             }
         } catch (err) {
             setError(err.message || 'Upload failed');
+            // Stop processing queue on error
+            setUploadQueue([]);
+            setCurrentUploadIndex(0);
+            setCurrentUploadFile(null);
         } finally {
             setUploadProgress(false);
         }
     };
 
-    const handleFileInputChange = async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
+    const handleUploadCancel = () => {
+        setShowUploadModal(false);
 
-        // Clear the input
-        event.target.value = '';
+        // If there are more files in queue, ask user what to do
+        if (uploadQueue.length > 1 && currentUploadIndex < uploadQueue.length - 1) {
+            const remainingFiles = uploadQueue.length - currentUploadIndex - 1;
+            const continueWithNext = window.confirm(
+                `You have ${remainingFiles} more file(s) to upload. Do you want to continue with the next file?`
+            );
 
-        await handleFileUpload(file);
+            if (continueWithNext) {
+                const nextIndex = currentUploadIndex + 1;
+                setCurrentUploadIndex(nextIndex);
+                setCurrentUploadFile(uploadQueue[nextIndex]);
+                setShowUploadModal(true);
+            } else {
+                // Cancel entire queue
+                setUploadQueue([]);
+                setCurrentUploadIndex(0);
+                setCurrentUploadFile(null);
+            }
+        } else {
+            // Single file or last file, just clear
+            setUploadQueue([]);
+            setCurrentUploadIndex(0);
+            setCurrentUploadFile(null);
+        }
     };
 
     const openFileViewer = (fileId) => {
@@ -589,6 +681,11 @@ const FileLibraryPage = () => {
                                 <p className="text-sm text-emerald-700">
                                     <span className="font-medium">{showUploadSuccess.custom_name || showUploadSuccess.filename}</span>
                                     {' '}- {showUploadSuccess.total_rows?.toLocaleString()} rows processed
+                                    {uploadQueue.length > 1 && (
+                                        <span className="ml-2 text-xs bg-emerald-200 text-emerald-800 px-2 py-1 rounded-full">
+                                            {currentUploadIndex + 1} of {uploadQueue.length}
+                                        </span>
+                                    )}
                                 </p>
                             </div>
                         </div>
@@ -630,6 +727,7 @@ const FileLibraryPage = () => {
                                 ref={fileInputRef}
                                 onChange={handleFileInputChange}
                                 accept=".csv,.xlsx,.xls"
+                                multiple
                                 className="hidden"
                             />
                             <button
@@ -640,12 +738,15 @@ const FileLibraryPage = () => {
                                 {uploadProgress ? (
                                     <>
                                         <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                                        <span className="font-medium">Uploading...</span>
+                                        <span className="font-medium">Processing...</span>
                                     </>
                                 ) : (
                                     <>
                                         <Upload size={18} className="group-hover:scale-110 transition-transform duration-200" />
-                                        <span className="font-medium">Upload File</span>
+                                        <span className="font-medium">Upload Files</span>
+                                        <span className="text-xs bg-white bg-opacity-20 px-2 py-1 rounded-full">
+                                            Max 5
+                                        </span>
                                     </>
                                 )}
                             </button>
@@ -767,6 +868,38 @@ const FileLibraryPage = () => {
                         </div>
                     </div>
 
+                    {/* Upload Queue Status */}
+                    {uploadQueue.length > 1 && (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                        <Upload className="text-blue-600" size={16} />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900">
+                                            Upload Queue: {currentUploadIndex + 1} of {uploadQueue.length}
+                                        </p>
+                                        <p className="text-xs text-gray-600">
+                                            {uploadQueue.length - currentUploadIndex - 1} files remaining
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                                        <div
+                                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                            style={{ width: `${((currentUploadIndex + 1) / uploadQueue.length) * 100}%` }}
+                                        ></div>
+                                    </div>
+                                    <span className="text-xs text-gray-600 font-medium">
+                                        {Math.round(((currentUploadIndex + 1) / uploadQueue.length) * 100)}%
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Bulk Actions */}
                     {filteredAndSortedFiles.length > 0 && (
                         <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
@@ -807,7 +940,7 @@ const FileLibraryPage = () => {
                             }
                         </p>
                         <p className="text-sm text-gray-500 mb-4">
-                            💡 Tip: Double-click any file to open it in the viewer
+                            💡 Tip: You can upload up to 5 files at once • Double-click any file to open it in the viewer
                         </p>
                         {files.length === 0 && (
                             <button
@@ -815,7 +948,7 @@ const FileLibraryPage = () => {
                                 className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg"
                             >
                                 <Upload size={18} />
-                                <span className="font-medium">Upload Your First File</span>
+                                <span className="font-medium">Upload Your First Files</span>
                             </button>
                         )}
                     </div>
@@ -868,6 +1001,15 @@ const FileLibraryPage = () => {
                     </div>
                 )}
             </div>
+
+            {/* File Upload Modal */}
+            <FileUploadModal
+                isOpen={showUploadModal}
+                file={currentUploadFile}
+                onUpload={handleUploadConfirm}
+                onCancel={handleUploadCancel}
+                existingFiles={files}
+            />
 
             {/* Delete Confirmation Modal */}
             {showDeleteModal && fileToDelete && (

@@ -1,5 +1,4 @@
 from typing import List, Optional, Union, Dict, Any
-
 from pydantic import BaseModel, Field
 
 
@@ -36,7 +35,7 @@ class FileRule(BaseModel):
 class ReconciliationRule(BaseModel):
     LeftFileColumn: str
     RightFileColumn: str
-    MatchType: str
+    MatchType: str  # Now supports: "equals", "tolerance", "date_equals"
     ToleranceValue: Optional[float] = None
 
 

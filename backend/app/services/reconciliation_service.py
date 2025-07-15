@@ -2,9 +2,10 @@ import io
 import re
 from functools import lru_cache
 from typing import Dict, List, Optional, Set, Tuple
-
 import pandas as pd
 from fastapi import UploadFile, HTTPException
+from datetime import datetime
+import numpy as np
 
 from app.models.recon_models import PatternCondition, FileRule, ExtractRule, FilterRule, ReconciliationRule
 
@@ -17,6 +18,7 @@ class OptimizedFileProcessor:
         self.errors = []
         self.warnings = []
         self._pattern_cache = {}  # Cache compiled regex patterns
+        self._date_cache = {}  # Cache parsed dates for performance
 
     def read_file(self, file: UploadFile, sheet_name: Optional[str] = None) -> pd.DataFrame:
         """Read CSV or Excel file into DataFrame with optimized settings"""
@@ -39,6 +41,179 @@ class OptimizedFileProcessor:
                 raise ValueError(f"Unsupported file format: {file.filename}")
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error reading file {file.filename}: {str(e)}")
+
+    def _normalize_date_value(self, value) -> Optional[datetime]:
+        """
+        Normalize date value to datetime object, handling all Excel date formats.
+        Returns only the date part (ignoring time components).
+        """
+        if pd.isna(value) or value is None:
+            return None
+
+        # Convert to string for caching key
+        cache_key = str(value)
+        if cache_key in self._date_cache:
+            return self._date_cache[cache_key]
+
+        parsed_date = None
+
+        try:
+            # Handle different input types
+            if isinstance(value, (datetime, pd.Timestamp)):
+                # Already a datetime, just extract date part
+                parsed_date = value.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif isinstance(value, (int, float)):
+                # Handle Excel serial date numbers
+                if 1 <= value <= 2958465:  # Valid Excel date range (1900-01-01 to 9999-12-31)
+                    # Excel serial date (days since 1900-01-01, accounting for Excel's leap year bug)
+                    if value >= 60:  # After Feb 28, 1900
+                        excel_epoch = datetime(1899, 12, 30)  # Account for Excel's 1900 leap year bug
+                    else:
+                        excel_epoch = datetime(1899, 12, 31)
+                    parsed_date = excel_epoch + pd.Timedelta(days=value)
+                    parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            else:
+                # String parsing with comprehensive format support
+                value_str = str(value).strip()
+
+                # Try pandas date parsing first (handles most formats automatically)
+                try:
+                    parsed_date = pd.to_datetime(value_str, dayfirst=False, errors='raise')
+                    if isinstance(parsed_date, pd.Timestamp):
+                        parsed_date = parsed_date.to_pydatetime()
+                    parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                except:
+                    # Try with dayfirst=True for DD/MM/YYYY formats
+                    try:
+                        parsed_date = pd.to_datetime(value_str, dayfirst=True, errors='raise')
+                        if isinstance(parsed_date, pd.Timestamp):
+                            parsed_date = parsed_date.to_pydatetime()
+                        parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                    except:
+                        # Manual parsing for specific Excel formats
+                        date_formats = [
+                            # Standard numeric formats
+                            '%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d', '%Y/%m/%d',
+                            '%d-%m-%Y', '%m-%d-%Y', '%d.%m.%Y', '%m.%d.%Y',
+
+                            # Month name formats (covers "10-Jul-2025" style)
+                            '%d %b %Y', '%d %B %Y', '%b %d, %Y', '%B %d, %Y',
+                            '%d-%b-%Y', '%d-%B-%Y', '%b-%d-%Y', '%B-%d-%Y',
+                            '%d.%b.%Y', '%d.%B.%Y', '%b.%d.%Y', '%B.%d.%Y',
+                            '%d/%b/%Y', '%d/%B/%Y', '%b/%d/%Y', '%B/%d/%Y',
+
+                            # Additional month name variations
+                            '%b %d %Y', '%B %d %Y', '%d %b, %Y', '%d %B, %Y',
+                            '%b-%d-%Y', '%B-%d-%Y', '%b.%d.%Y', '%B.%d.%Y',
+                            '%b/%d/%Y', '%B/%d/%Y',
+
+                            # Compact formats
+                            '%Y%m%d', '%d%m%Y', '%m%d%Y',
+
+                            # 2-digit year formats
+                            '%d/%m/%y', '%m/%d/%y', '%y-%m-%d', '%y/%m/%d',
+                            '%d-%m-%y', '%m-%d-%y', '%d.%m.%y', '%m.%d.%y',
+                            '%d-%b-%y', '%d-%B-%y', '%b-%d-%y', '%B-%d-%y',
+
+                            # With time components (will be ignored)
+                            '%d/%m/%Y %H:%M:%S', '%m/%d/%Y %H:%M:%S',
+                            '%Y-%m-%d %H:%M:%S', '%Y/%m/%d %H:%M:%S',
+                            '%d-%m-%Y %H:%M:%S', '%m-%d-%Y %H:%M:%S',
+                            '%d-%b-%Y %H:%M:%S', '%d-%B-%Y %H:%M:%S',
+                            '%b-%d-%Y %H:%M:%S', '%B-%d-%Y %H:%M:%S',
+                            '%d/%m/%Y %H:%M', '%m/%d/%Y %H:%M',
+                            '%Y-%m-%d %H:%M', '%Y/%m/%d %H:%M',
+                            '%d-%m-%Y %H:%M', '%m-%d-%Y %H:%M',
+                            '%d-%b-%Y %H:%M', '%d-%B-%Y %H:%M',
+                            '%b-%d-%Y %H:%M', '%B-%d-%Y %H:%M',
+                        ]
+
+                        for fmt in date_formats:
+                            try:
+                                parsed_date = datetime.strptime(value_str, fmt)
+                                # Always set time to 00:00:00 for date-only comparison
+                                parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                                break
+                            except ValueError:
+                                continue
+
+        except Exception as e:
+            # If all parsing fails, return None
+            self.warnings.append(f"Could not parse date value: {value} - {str(e)}")
+            parsed_date = None
+
+        # Cache the result
+        self._date_cache[cache_key] = parsed_date
+        return parsed_date
+
+    def _is_date_value(self, value) -> bool:
+        """Check if a value appears to be a date"""
+        if pd.isna(value) or value is None:
+            return False
+
+        # Quick check for obvious date types
+        if isinstance(value, (datetime, pd.Timestamp)):
+            return True
+
+        # Check if it's an Excel serial date number
+        if isinstance(value, (int, float)):
+            return 1 <= value <= 2958465  # Valid Excel date range
+
+        # Check string patterns
+        value_str = str(value).strip()
+
+        # Common date patterns
+        date_patterns = [
+            r'^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$',  # DD/MM/YYYY or MM/DD/YYYY
+            r'^\d{4}[/-]\d{1,2}[/-]\d{1,2}$',  # YYYY-MM-DD or YYYY/MM/DD
+            r'^\d{1,2}\.\d{1,2}\.\d{2,4}$',  # DD.MM.YYYY
+            r'^\d{8}$',  # YYYYMMDD
+            r'^\d{1,2}\s+\w+\s+\d{2,4}$',  # DD Month YYYY
+            r'^\w+\s+\d{1,2},?\s+\d{2,4}$',  # Month DD, YYYY
+            r'^\d{1,2}[-/\.]\w+[-/\.]\d{2,4}$',  # DD-MMM-YYYY (like "10-Jul-2025")
+            r'^\w+[-/\.]\d{1,2}[-/\.]\d{2,4}$',  # MMM-DD-YYYY (like "Jul-10-2025")
+            r'^\d{1,2}\s+\w+,?\s+\d{2,4}$',  # DD MMM YYYY (like "10 Jul 2025")
+            r'^\w+\s+\d{1,2}[,\s]+\d{2,4}$',  # MMM DD, YYYY (like "Jul 10, 2025")
+        ]
+
+        for pattern in date_patterns:
+            if re.match(pattern, value_str):
+                return True
+
+        return False
+
+    def _check_date_equals_match(self, val_a, val_b) -> bool:
+        """Check if two values match as dates (exact date comparison, ignoring time)"""
+        date_a = self._normalize_date_value(val_a)
+        date_b = self._normalize_date_value(val_b)
+
+        # Both must be valid dates or both None/NaN
+        if date_a is None and date_b is None:
+            return True
+        if date_a is None or date_b is None:
+            return False
+
+        # Compare only the date parts
+        return date_a.date() == date_b.date()
+
+    def _check_equals_with_auto_date_detection(self, val_a, val_b) -> bool:
+        """Check equality with automatic date detection"""
+        # First try regular equality
+        if pd.isna(val_a) and pd.isna(val_b):
+            return True
+        if pd.isna(val_a) or pd.isna(val_b):
+            return False
+
+        # Try exact match first
+        if val_a == val_b:
+            return True
+
+        # If both values look like dates, try date comparison
+        if self._is_date_value(val_a) and self._is_date_value(val_b):
+            return self._check_date_equals_match(val_a, val_b)
+
+        # Convert to strings and compare
+        return str(val_a).strip() == str(val_b).strip()
 
     def validate_rules_against_columns(self, df: pd.DataFrame, file_rule: FileRule) -> List[str]:
         """Validate that all columns mentioned in rules exist in the DataFrame"""
@@ -258,13 +433,15 @@ class OptimizedFileProcessor:
 
     def create_optimized_match_keys(self, df: pd.DataFrame,
                                     recon_rules: List[ReconciliationRule],
-                                    file_prefix: str) -> pd.DataFrame:
+                                    file_prefix: str) -> Tuple[
+        pd.DataFrame, List[ReconciliationRule], List[ReconciliationRule]]:
         """Create optimized match keys for faster reconciliation"""
         df_work = df.copy()
 
-        # Create composite match key for exact matches
+        # Create composite match key for exact matches (excluding date_equals and tolerance)
         exact_match_cols = []
         tolerance_rules = []
+        date_rules = []
 
         for rule in recon_rules:
             col_name = rule.LeftFileColumn if file_prefix == 'A' else rule.RightFileColumn
@@ -273,29 +450,31 @@ class OptimizedFileProcessor:
                 exact_match_cols.append(col_name)
             elif rule.MatchType.lower() == "tolerance":
                 tolerance_rules.append(rule)
+            elif rule.MatchType.lower() == "date_equals":
+                date_rules.append(rule)
 
-        # Create composite key for exact matches
+        # Create composite key for exact matches only (dates and tolerance handled separately)
         if exact_match_cols:
             df_work['_match_key'] = df_work[exact_match_cols].astype(str).agg('|'.join, axis=1)
         else:
             df_work['_match_key'] = df_work.index.astype(str)
 
-        return df_work, tolerance_rules
+        return df_work, tolerance_rules, date_rules
 
     def reconcile_files_optimized(self, df_a: pd.DataFrame, df_b: pd.DataFrame,
                                   recon_rules: List[ReconciliationRule],
                                   selected_columns_a: Optional[List[str]] = None,
                                   selected_columns_b: Optional[List[str]] = None) -> Dict[str, pd.DataFrame]:
-        """Optimized reconciliation using hash-based matching for large datasets"""
+        """Optimized reconciliation using hash-based matching for large datasets with date support"""
 
-        # Create working copies with indices
-        df_a_work, tolerance_rules_a = self.create_optimized_match_keys(df_a, recon_rules, 'A')
-        df_b_work, tolerance_rules_b = self.create_optimized_match_keys(df_b, recon_rules, 'B')
+        # Create working copies with indices and separate rule types
+        df_a_work, tolerance_rules_a, date_rules_a = self.create_optimized_match_keys(df_a, recon_rules, 'A')
+        df_b_work, tolerance_rules_b, date_rules_b = self.create_optimized_match_keys(df_b, recon_rules, 'B')
 
         df_a_work['_orig_index_a'] = range(len(df_a_work))
         df_b_work['_orig_index_b'] = range(len(df_b_work))
 
-        # Group by match key for faster lookups
+        # Group by match key for faster lookups (only for exact matches)
         grouped_b = df_b_work.groupby('_match_key')
 
         matched_indices_a = set()
@@ -322,18 +501,30 @@ class OptimizedFileProcessor:
                         if row_b['_orig_index_b'] in matched_indices_b:
                             continue
 
-                        # Check tolerance rules if any
-                        tolerance_match = True
-                        for rule in recon_rules:
-                            if rule.MatchType.lower() == "tolerance":
-                                val_a = row_a[rule.LeftFileColumn]
-                                val_b = row_b[rule.RightFileColumn]
+                        # Check all reconciliation rules
+                        all_rules_match = True
 
+                        for rule in recon_rules:
+                            val_a = row_a[rule.LeftFileColumn]
+                            val_b = row_b[rule.RightFileColumn]
+
+                            if rule.MatchType.lower() == "equals":
+                                # Use auto-detection for equals
+                                if not self._check_equals_with_auto_date_detection(val_a, val_b):
+                                    all_rules_match = False
+                                    break
+                            elif rule.MatchType.lower() == "date_equals":
+                                # Explicit date matching
+                                if not self._check_date_equals_match(val_a, val_b):
+                                    all_rules_match = False
+                                    break
+                            elif rule.MatchType.lower() == "tolerance":
+                                # Tolerance matching
                                 if not self._check_tolerance_match(val_a, val_b, rule.ToleranceValue):
-                                    tolerance_match = False
+                                    all_rules_match = False
                                     break
 
-                        if tolerance_match:
+                        if all_rules_match:
                             matched_indices_a.add(row_a['_orig_index_a'])
                             matched_indices_b.add(row_b['_orig_index_b'])
 

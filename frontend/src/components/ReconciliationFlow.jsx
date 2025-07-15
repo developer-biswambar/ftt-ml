@@ -55,7 +55,7 @@ const ReconciliationFlow = ({
     const steps = [
         { id: 'rule_management', title: 'Load/Save Rules', icon: Save },
         { id: 'file_selection', title: 'File Selection', icon: FileText },
-        { id: 'extraction_rules', title: 'Data Extraction', icon: Target },
+        { id: 'extraction_rules', title: 'Data Parsing', icon: Target },
         { id: 'filter_rules', title: 'Data Filtering', icon: Filter },
         { id: 'reconciliation_rules', title: 'Matching Rules', icon: Settings },
         { id: 'result_columns', title: 'Result Columns', icon: Columns },
@@ -516,7 +516,7 @@ const ReconciliationFlow = ({
                             })}
                         </div>
                         <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-                            <p>✅ Files are ready for reconciliation configuration. Click "Next" to proceed with data extraction rules.</p>
+                            <p>✅ Files are ready for reconciliation configuration. Click "Next" to proceed with Data Parsing rules.</p>
                         </div>
                     </div>
                 );
@@ -525,7 +525,7 @@ const ReconciliationFlow = ({
                 return (
                     <div className="space-y-6">
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-800">Data Extraction Rules</h3>
+                            <h3 className="text-lg font-semibold text-gray-800">Data Parsing Rules</h3>
                             <p className="text-sm text-gray-600">Define how to extract and transform data from each file.</p>
                         </div>
                         {config.Files.map((file, fileIndex) => {
@@ -807,7 +807,7 @@ const ReconciliationFlow = ({
                                                     >
                                                         <option value="equals">Exact Match</option>
                                                         <option value="tolerance">Tolerance Match</option>
-                                                        <option value="fuzzy">Fuzzy Match</option>
+                                                        <option value="date_equals">Date Match</option>
                                                         <option value="contains">Contains</option>
                                                         <option value="percentage">Percentage Match</option>
                                                     </select>
