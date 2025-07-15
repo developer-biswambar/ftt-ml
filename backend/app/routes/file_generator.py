@@ -2,7 +2,6 @@ import io
 import json
 import os
 import re
-import uuid
 from datetime import datetime
 from typing import List, Any, Optional, Union
 
@@ -12,6 +11,8 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import StreamingResponse
 from openai import OpenAI
 from pydantic import BaseModel
+
+from app.utils.uuid_generator import generate_uuid
 
 # Initialize OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -554,7 +555,7 @@ async def generate_file_from_rules(
         output_df = generator.apply_transformation_rules(df, rules)
 
         # Generate unique ID for this generation
-        generation_id = str(uuid.uuid4())
+        generation_id = generate_uuid('file-generator')
 
         # Store results
         generation_storage[generation_id] = {

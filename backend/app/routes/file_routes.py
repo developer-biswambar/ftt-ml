@@ -2,14 +2,15 @@
 import io
 import logging
 import os
-import uuid
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import List
 
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import UploadFile, File, HTTPException, APIRouter, BackgroundTasks, Form
 from pydantic import BaseModel
+
+from app.utils.uuid_generator import generate_uuid
 
 # Load environment variables
 load_dotenv()
@@ -148,7 +149,7 @@ async def upload_file(
         # Get max file size from environment
         max_file_size = int(os.getenv("MAX_FILE_SIZE", "100")) * 1024 * 1024
 
-        file_id = str(uuid.uuid4())
+        file_id = generate_uuid('file')
 
         # Log file upload start
         logger.info(f"Starting upload of file: {file.filename}")

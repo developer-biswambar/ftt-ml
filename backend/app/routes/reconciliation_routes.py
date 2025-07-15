@@ -1,7 +1,6 @@
 import io
 import json
 import logging
-import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
@@ -12,6 +11,7 @@ from pydantic import BaseModel
 
 from app.models.recon_models import ReconciliationResponse, ReconciliationSummary, OptimizedRulesConfig
 from app.services.reconciliation_service import OptimizedFileProcessor, optimized_reconciliation_storage
+from app.utils.uuid_generator import generate_uuid
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -306,7 +306,7 @@ async def _process_reconciliation_core(
     )
 
     # Generate reconciliation ID
-    recon_id = str(uuid.uuid4())
+    recon_id = generate_uuid('recon')
 
     # Store results with optimized storage
     storage_success = optimized_reconciliation_storage.store_results(recon_id, reconciliation_results)

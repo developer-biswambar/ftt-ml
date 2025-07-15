@@ -234,10 +234,6 @@ const FileGeneratorFlow = ({
             setGenerationResult(result);
 
             if (result.success) {
-                // Get preview data
-                const preview = await apiService.previewGeneratedFile(result.generation_id, 8);
-                setPreviewData(preview);
-
                 const summary = result.summary;
                 let successMessage = '🎉 **File Generation Complete!**\n\n';
                 successMessage += `📊 **Summary:**\n`;
@@ -256,7 +252,7 @@ const FileGeneratorFlow = ({
                     successMessage += `⚠️ **Warnings:**\n${result.warnings.map(w => `• ${w}`).join('\n')}\n\n`;
                 }
 
-                successMessage += '📥 Use the download buttons below to get your generated file!';
+                successMessage += '📥 Your file is ready for download!';
                 onSendMessage('success', successMessage);
                 setCurrentStep('download');
             } else {
@@ -603,53 +599,27 @@ const FileGeneratorFlow = ({
 
             {currentStep === 'download' && (
                 <div className="space-y-4">
-                    {/* Enhanced Preview */}
-                    {previewData && (
-                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                            <div className="flex items-center justify-between mb-2">
-                                <h4 className="font-medium text-blue-900">Preview Generated File</h4>
-                                {previewData.row_multiplication && previewData.row_multiplication.enabled && (
-                                    <div
-                                        className="flex items-center space-x-1 bg-blue-200 text-blue-900 px-2 py-1 rounded-full text-xs">
-                                        <Layers size={12}/>
-                                        <span>{previewData.row_multiplication.count}x Multiplied</span>
+                    {/* Generation Complete Message */}
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <div className="flex items-center space-x-2 mb-2">
+                            <CheckCircle className="text-green-600" size={16}/>
+                            <span className="font-medium text-green-800">File Generation Complete!</span>
+                        </div>
+                        <p className="text-sm text-green-700">
+                            Your file has been successfully generated and is ready for download.
+                        </p>
+                        {generationResult?.summary && (
+                            <div className="mt-2 text-sm text-green-800 space-y-1">
+                                <div>📊 <strong>Records:</strong> {generationResult.summary.total_output_records.toLocaleString()} generated from {generationResult.summary.total_input_records.toLocaleString()} source records</div>
+                                {generationResult.summary.row_multiplication_factor > 1 && (
+                                    <div className="flex items-center space-x-2">
+                                        <Layers size={14}/>
+                                        <span><strong>Multiplication:</strong> {generationResult.summary.row_multiplication_factor}x rows per source</span>
                                     </div>
                                 )}
                             </div>
-                            <div className="text-sm text-blue-800 mb-3">
-                                Showing {previewData.showing_records} of {previewData.total_records.toLocaleString()} records
-                                {previewData.row_multiplication?.enabled && (
-                                    <span> (expanded from {Math.floor(previewData.total_records / previewData.row_multiplication.count).toLocaleString()} source rows)</span>
-                                )}
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-xs border-collapse">
-                                    <thead>
-                                    <tr className="bg-blue-100">
-                                        {previewData.columns.map(col => (
-                                            <th key={col}
-                                                className="border border-blue-200 px-2 py-1 text-left font-medium text-blue-900">
-                                                {col}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    {previewData.preview_data.slice(0, 5).map((row, idx) => (
-                                        <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-blue-25'}`}>
-                                            {previewData.columns.map(col => (
-                                                <td key={col}
-                                                    className="border border-blue-200 px-2 py-1 text-blue-800">
-                                                    {row[col] || ''}
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
 
                     {/* Download Options */}
                     <div className="grid grid-cols-2 gap-3">

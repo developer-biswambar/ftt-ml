@@ -1,12 +1,12 @@
 # backend/app/routes/rule_management_routes.py
-import json
 import logging
-import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+
+from app.utils.uuid_generator import generate_uuid
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ def apply_rule_to_files(rule_config: Dict[str, Any], file_columns: Dict[str, Lis
 async def save_rule(request: CreateRuleRequest):
     """Save a new reconciliation rule"""
     try:
-        rule_id = str(uuid.uuid4())
+        rule_id = generate_uuid('rule')
         timestamp = datetime.now().isoformat()
 
         # Sanitize the rule config to remove file-specific references

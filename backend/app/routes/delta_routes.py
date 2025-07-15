@@ -11,6 +11,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from app.utils.uuid_generator import generate_uuid
+
 # Setup logging
 logger = logging.getLogger(__name__)
 
@@ -433,7 +435,7 @@ async def process_delta_generation(request: JSONDeltaRequest):
         )
 
         # Generate delta ID
-        delta_id = str(uuid.uuid4())
+        delta_id = generate_uuid('delta')
 
         # Store results
         delta_storage[delta_id] = {

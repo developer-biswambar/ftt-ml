@@ -1,16 +1,15 @@
 # backend/app/routes/save_results_routes.py - Save Results to Server Storage
 import io
-import json
 import logging
-import uuid
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 
 import pandas as pd
-import numpy as np
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+from app.utils.uuid_generator import generate_uuid
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -242,7 +241,7 @@ async def save_results_to_server(request: SaveResultsRequest):
         )
 
         # Generate saved file ID
-        saved_file_id = str(uuid.uuid4())
+        saved_file_id = generate_uuid('saved_result')
 
         # Save DataFrame to storage
         saved_file_info = saver.save_dataframe_to_storage(
