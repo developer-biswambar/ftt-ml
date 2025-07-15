@@ -261,9 +261,9 @@ async def get_file_stats(file_id: str):
             "filename": file_info.get("filename", "Unknown File"),
             "total_rows": len(df),
             "total_columns": len(df.columns),
-            "memory_usage": df.memory_usage(deep=True).sum(),
-            "column_types": df.dtypes.astype(str).to_dict(),
-            "null_counts": df.isnull().sum().to_dict(),
+            "memory_usage": int(df.memory_usage(deep=True).sum()),  # Convert to Python int
+            "column_types": {col: str(dtype) for col, dtype in df.dtypes.items()},  # Explicit conversion
+            "null_counts": {col: int(count) for col, count in df.isnull().sum().items()},
             "numeric_columns": list(df.select_dtypes(include=['number']).columns),
             "text_columns": list(df.select_dtypes(include=['object']).columns),
             "datetime_columns": list(df.select_dtypes(include=['datetime']).columns)
