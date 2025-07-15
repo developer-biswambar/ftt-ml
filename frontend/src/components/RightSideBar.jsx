@@ -18,7 +18,9 @@ import {
     ExternalLink,
     History,
     Zap,
-    Layers
+    Layers,
+    ChevronDown,
+    ChevronRight
 } from 'lucide-react';
 import {useEffect, useState} from "react";
 
@@ -40,6 +42,9 @@ const RightSidebar = ({
     const [saveInProgress, setSaveInProgress] = useState(false);
     const [loadingRecentResults, setLoadingRecentResults] = useState(false);
     const [localProcessedFiles, setLocalProcessedFiles] = useState(processedFiles);
+
+    // State for tracking expanded results
+    const [expandedResults, setExpandedResults] = useState(new Set());
 
     // Load recent results on component mount and merge with processedFiles
     useEffect(() => {
@@ -89,6 +94,19 @@ const RightSidebar = ({
 
         mergeResults();
     }, [processedFiles]);
+
+    // Function to toggle expanded state for a result
+    const toggleExpanded = (resultId) => {
+        setExpandedResults(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(resultId)) {
+                newSet.delete(resultId);
+            } else {
+                newSet.add(resultId);
+            }
+            return newSet;
+        });
+    };
 
     // Load recent results from server and merge with existing if needed
     const loadRecentResults = async () => {
@@ -452,7 +470,7 @@ const RightSidebar = ({
 
                     {/* View All Results Button */}
                     {localProcessedFiles.length > 0 && (
-                        <div className="mt-3">
+                        <div className="mt-3 space-y-2">
                             <button
                                 onClick={onOpenRecentResults}
                                 className="w-full inline-flex items-center justify-center px-3 py-2 border border-blue-300 shadow-sm text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
@@ -461,6 +479,49 @@ const RightSidebar = ({
                                 <History className="w-4 h-4 mr-2"/>
                                 <span>View All Results</span>
                                 <ExternalLink className="w-3 h-3 ml-2"/>
+                            </button>
+
+                            {/* Expand/Collapse All Toggle Button */}
+                            <button
+                                onClick={() => {
+                                    const allIds = localProcessedFiles.map(file => getProcessTypeInfo(file).id);
+                                    const allExpanded = allIds.every(id => expandedResults.has(id));
+
+                                    if (allExpanded) {
+                                        // All are expanded, so collapse all
+                                        setExpandedResults(new Set());
+                                    } else {
+                                        // Not all are expanded, so expand all
+                                        setExpandedResults(new Set(allIds));
+                                    }
+                                }}
+                                className="w-full inline-flex items-center justify-center px-2 py-1.5 border border-gray-300 shadow-sm text-xs leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+                                title={(() => {
+                                    const allIds = localProcessedFiles.map(file => getProcessTypeInfo(file).id);
+                                    const allExpanded = allIds.every(id => expandedResults.has(id));
+                                    return allExpanded ? "Collapse all results" : "Expand all results";
+                                })()}
+                            >
+                                {(() => {
+                                    const allIds = localProcessedFiles.map(file => getProcessTypeInfo(file).id);
+                                    const allExpanded = allIds.every(id => expandedResults.has(id));
+
+                                    if (allExpanded) {
+                                        return (
+                                            <>
+                                                <ChevronRight className="w-3 h-3 mr-1"/>
+                                                <span>Collapse All</span>
+                                            </>
+                                        );
+                                    } else {
+                                        return (
+                                            <>
+                                                <ChevronDown className="w-3 h-3 mr-1"/>
+                                                <span>Expand All</span>
+                                            </>
+                                        );
+                                    }
+                                })()}
                             </button>
                         </div>
                     )}
@@ -493,206 +554,279 @@ const RightSidebar = ({
                                 const ProcessIcon = processInfo.icon;
                                 const summaryStats = getSummaryStats(processedFile);
                                 const downloadOptions = getDownloadOptions(processedFile);
+                                const isExpanded = expandedResults.has(processInfo.id);
 
                                 return (
                                     <div
                                         key={processInfo.id}
-                                        className="border border-gray-200 rounded-lg p-3 hover:border-gray-300 transition-all duration-200 hover:shadow-md transform hover:scale-[1.02]"
+                                        className="border border-gray-200 rounded-lg hover:border-gray-300 transition-all duration-200 hover:shadow-md"
                                     >
-                                        {/* Status Header */}
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center space-x-2">
-                                                <ProcessIcon size={16} className={`text-${processInfo.color}-500`}/>
-                                                <span
-                                                    className="text-xs font-medium text-gray-600">{processInfo.label}</span>
-                                                {processedFile.status === 'completed' &&
-                                                    <CheckCircle size={16} className="text-green-500"/>}
-                                                {processedFile.status === 'processing' && (
-                                                    <div className="flex items-center space-x-1">
-                                                        <Clock size={16} className="text-blue-500 animate-pulse"/>
-                                                        <div
-                                                            className="w-1 h-1 bg-blue-500 rounded-full animate-bounce"></div>
+                                        {/* Collapsible Header */}
+                                        <div
+                                            className="p-3 cursor-pointer"
+                                            onClick={() => toggleExpanded(processInfo.id)}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center space-x-2 flex-1">
+                                                    {/* Expand/Collapse Icon */}
+                                                    {isExpanded ? (
+                                                        <ChevronDown size={16} className="text-gray-400"/>
+                                                    ) : (
+                                                        <ChevronRight size={16} className="text-gray-400"/>
+                                                    )}
+
+                                                    <ProcessIcon size={16} className={`text-${processInfo.color}-500`}/>
+
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center space-x-2">
+                                                            <span className="text-sm font-medium text-gray-800 truncate">
+                                                                {processInfo.label}
+                                                            </span>
+
+                                                            {/* Status Icon */}
+                                                            {processedFile.status === 'completed' && (
+                                                                <CheckCircle size={14} className="text-green-500 flex-shrink-0"/>
+                                                            )}
+                                                            {processedFile.status === 'processing' && (
+                                                                <Clock size={14} className="text-blue-500 animate-pulse flex-shrink-0"/>
+                                                            )}
+                                                            {processedFile.status === 'failed' && (
+                                                                <AlertCircle size={14} className="text-red-500 flex-shrink-0"/>
+                                                            )}
+                                                        </div>
+
+                                                        {/* ID and Time */}
+                                                        <div className="text-xs text-gray-500 mt-1">
+                                                            <div className="truncate">
+                                                                ID: {processInfo.id.slice(-8)} • {new Date(processedFile.created_at).toLocaleString('en-US', {
+                                                                    month: 'short',
+                                                                    day: 'numeric',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Quick Stats Preview */}
+                                                {(processedFile.status === 'completed' || !processedFile.status) && (
+                                                    <div className="text-xs text-gray-600 ml-2 flex-shrink-0">
+                                                        <div className="text-right">
+                                                            <div className={`text-${summaryStats.stat1.color}-600`}>
+                                                                {summaryStats.stat1.value}
+                                                            </div>
+                                                            <div className="text-gray-400">
+                                                                {summaryStats.stat1.label}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 )}
-                                                {processedFile.status === 'failed' &&
-                                                    <AlertCircle size={16} className="text-red-500"/>}
-                                            </div>
-                                            <div className="text-xs text-gray-400">
-                                                ID: {processInfo.id.slice(-8)}
                                             </div>
                                         </div>
 
-                                        {/* File Names */}
-                                        <div className="text-xs text-gray-600 mb-2">
-                                            <div className="truncate" title={processedFile.file_a}>
-                                                📄 {processInfo.type === 'delta' ? 'Older' : 'A'}: {processedFile.file_a}
-                                            </div>
-                                            {processedFile.file_b && (
-                                                <div className="truncate" title={processedFile.file_b}>
-                                                    📄 {processInfo.type === 'delta' ? 'Newer' : 'B'}: {processedFile.file_b}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Results Summary (if completed) */}
-                                        {(processedFile.status === 'completed' || !processedFile.status) && (
-                                            <>
-                                                <div className="text-xs text-gray-600 mb-3 bg-gray-50 p-2 rounded">
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <div className={`text-${summaryStats.stat1.color}-600`}>
-                                                            ✅ {summaryStats.stat1.label}: {summaryStats.stat1.value}
-                                                        </div>
-                                                        <div className={`text-${summaryStats.stat2.color}-600`}>
-                                                            🎯 {summaryStats.stat2.label}: {summaryStats.stat2.value}
-                                                        </div>
-                                                        <div className={`text-${summaryStats.stat3.color}-600`}>
-                                                            📊 {summaryStats.stat3.label}: {summaryStats.stat3.value}
-                                                        </div>
-                                                        <div className={`text-${summaryStats.stat4.color}-600`}>
-                                                            ⚠️ {summaryStats.stat4.label}: {summaryStats.stat4.value}
-                                                        </div>
+                                        {/* Expanded Content */}
+                                        {isExpanded && (
+                                            <div className="px-3 pb-3 border-t border-gray-100 pt-3">
+                                                {/* Full File Names */}
+                                                <div className="text-xs text-gray-600 mb-3">
+                                                    <div className="truncate" title={processedFile.file_a}>
+                                                        📄 {processInfo.type === 'delta' ? 'Older' : 'A'}: {processedFile.file_a}
                                                     </div>
+                                                    {processedFile.file_b && (
+                                                        <div className="truncate" title={processedFile.file_b}>
+                                                            📄 {processInfo.type === 'delta' ? 'Newer' : 'B'}: {processedFile.file_b}
+                                                        </div>
+                                                    )}
                                                 </div>
 
-                                                {/* Action Buttons Section */}
-                                                <div className="space-y-2">
-                                                    {/* Display Options */}
-                                                    <div className="grid grid-cols-2 gap-1">
-                                                        <button
-                                                            onClick={() => onDisplayDetailedResults && onDisplayDetailedResults(processInfo.id)}
-                                                            className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1"
-                                                            title="Display detailed results in chat"
-                                                        >
-                                                            <Eye size={10}/>
-                                                            <span>View Details</span>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => console.log('Show summary chart for', processInfo.id)}
-                                                            className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1"
-                                                            title="Show summary statistics"
-                                                        >
-                                                            <BarChart3 size={10}/>
-                                                            <span>Summary</span>
-                                                        </button>
-                                                    </div>
+                                                {/* Process ID */}
+                                                <div className="text-xs text-gray-400 mb-3">
+                                                    ID: {processInfo.id}
+                                                </div>
 
-                                                    {/* Download & Save Options */}
-                                                    <div className="space-y-1">
-                                                        <div className="text-xs text-gray-500 font-medium">Download &
-                                                            Save Options:
+                                                {/* Results Summary (if completed) */}
+                                                {(processedFile.status === 'completed' || !processedFile.status) && (
+                                                    <>
+                                                        <div className="text-xs text-gray-600 mb-3 bg-gray-50 p-2 rounded">
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <div className={`text-${summaryStats.stat1.color}-600`}>
+                                                                    ✅ {summaryStats.stat1.label}: {summaryStats.stat1.value}
+                                                                </div>
+                                                                <div className={`text-${summaryStats.stat2.color}-600`}>
+                                                                    🎯 {summaryStats.stat2.label}: {summaryStats.stat2.value}
+                                                                </div>
+                                                                <div className={`text-${summaryStats.stat3.color}-600`}>
+                                                                    📊 {summaryStats.stat3.label}: {summaryStats.stat3.value}
+                                                                </div>
+                                                                <div className={`text-${summaryStats.stat4.color}-600`}>
+                                                                    ⚠️ {summaryStats.stat4.label}: {summaryStats.stat4.value}
+                                                                </div>
+                                                            </div>
                                                         </div>
 
-                                                        {/* Primary Downloads/Saves */}
-                                                        <div className="space-y-1">
-                                                            {downloadOptions.primary.map((option) => {
-                                                                const OptionIcon = option.icon;
-                                                                return (
-                                                                    <div key={option.key}
-                                                                         className="grid grid-cols-2 gap-1">
-                                                                        <button
-                                                                            onClick={() => onDownloadResults(processInfo.id, option.key)}
-                                                                            className={`px-2 py-1 text-xs bg-${option.color}-100 text-${option.color}-700 rounded hover:bg-${option.color}-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1`}
-                                                                            title={`Download ${option.label}`}
-                                                                        >
-                                                                            <OptionIcon size={10}/>
-                                                                            <span>{option.label}</span>
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => handleSaveToServer(processInfo.id, option.key, processedFile)}
-                                                                            className={`px-2 py-1 text-xs bg-${option.color}-50 text-${option.color}-600 border border-${option.color}-200 rounded hover:bg-${option.color}-100 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1`}
-                                                                            title={`Save ${option.label} to Server`}
-                                                                        >
-                                                                            <Server size={10}/>
-                                                                            <span>Save</span>
-                                                                        </button>
+                                                        {/* Action Buttons Section */}
+                                                        <div className="space-y-2">
+                                                            {/* Display Options */}
+                                                            <div className="grid grid-cols-2 gap-1">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onDisplayDetailedResults && onDisplayDetailedResults(processInfo.id);
+                                                                    }}
+                                                                    className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1"
+                                                                    title="Display detailed results in chat"
+                                                                >
+                                                                    <Eye size={10}/>
+                                                                    <span>View Details</span>
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        console.log('Show summary chart for', processInfo.id);
+                                                                    }}
+                                                                    className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1"
+                                                                    title="Show summary statistics"
+                                                                >
+                                                                    <BarChart3 size={10}/>
+                                                                    <span>Summary</span>
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Download & Save Options */}
+                                                            <div className="space-y-1">
+                                                                <div className="text-xs text-gray-500 font-medium">Download &
+                                                                    Save Options:
+                                                                </div>
+
+                                                                {/* Primary Downloads/Saves */}
+                                                                <div className="space-y-1">
+                                                                    {downloadOptions.primary.map((option) => {
+                                                                        const OptionIcon = option.icon;
+                                                                        return (
+                                                                            <div key={option.key}
+                                                                                 className="grid grid-cols-2 gap-1">
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        onDownloadResults(processInfo.id, option.key);
+                                                                                    }}
+                                                                                    className={`px-2 py-1 text-xs bg-${option.color}-100 text-${option.color}-700 rounded hover:bg-${option.color}-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1`}
+                                                                                    title={`Download ${option.label}`}
+                                                                                >
+                                                                                    <OptionIcon size={10}/>
+                                                                                    <span>{option.label}</span>
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleSaveToServer(processInfo.id, option.key, processedFile);
+                                                                                    }}
+                                                                                    className={`px-2 py-1 text-xs bg-${option.color}-50 text-${option.color}-600 border border-${option.color}-200 rounded hover:bg-${option.color}-100 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1`}
+                                                                                    title={`Save ${option.label} to Server`}
+                                                                                >
+                                                                                    <Server size={10}/>
+                                                                                    <span>Save</span>
+                                                                                </button>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+
+                                                                {/* Secondary Downloads/Saves */}
+                                                                {downloadOptions.secondary.length > 0 && (
+                                                                    <div className="space-y-1 mt-1">
+                                                                        {downloadOptions.secondary.map((option) => {
+                                                                            const OptionIcon = option.icon;
+                                                                            return (
+                                                                                <div key={option.key}
+                                                                                     className="grid grid-cols-2 gap-1">
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            onDownloadResults(processInfo.id, option.key);
+                                                                                        }}
+                                                                                        className={`px-2 py-1 text-xs bg-${option.color}-100 text-${option.color}-700 rounded hover:bg-${option.color}-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1`}
+                                                                                        title={`Download ${option.label}`}
+                                                                                    >
+                                                                                        <OptionIcon size={10}/>
+                                                                                        <span>{option.label}</span>
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleSaveToServer(processInfo.id, option.key, processedFile);
+                                                                                        }}
+                                                                                        className={`px-2 py-1 text-xs bg-${option.color}-50 text-${option.color}-600 border border-${option.color}-200 rounded hover:bg-${option.color}-100 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1`}
+                                                                                        title={`Save ${option.label} to Server`}
+                                                                                    >
+                                                                                        <Server size={10}/>
+                                                                                        <span>Save</span>
+                                                                                    </button>
+                                                                                </div>
+                                                                            );
+                                                                        })}
                                                                     </div>
-                                                                );
-                                                            })}
+                                                                )}
+
+                                                                {/* Extra Downloads */}
+                                                                {downloadOptions.extra.length > 0 && (
+                                                                    <div className="grid grid-cols-1 gap-1 mt-1">
+                                                                        {downloadOptions.extra.map((option) => {
+                                                                            const OptionIcon = option.icon;
+                                                                            return (
+                                                                                <button
+                                                                                    key={option.key}
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        onDownloadResults(processInfo.id, option.key);
+                                                                                    }}
+                                                                                    className={`px-2 py-1 text-xs bg-${option.color}-100 text-${option.color}-700 rounded hover:bg-${option.color}-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1`}
+                                                                                    title={`Download ${option.label}`}
+                                                                                >
+                                                                                    <OptionIcon size={10}/>
+                                                                                    <span>{option.label}</span>
+                                                                                </button>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
+                                                    </>
+                                                )}
 
-                                                        {/* Secondary Downloads/Saves */}
-                                                        {downloadOptions.secondary.length > 0 && (
-                                                            <div className="space-y-1 mt-1">
-                                                                {downloadOptions.secondary.map((option) => {
-                                                                    const OptionIcon = option.icon;
-                                                                    return (
-                                                                        <div key={option.key}
-                                                                             className="grid grid-cols-2 gap-1">
-                                                                            <button
-                                                                                onClick={() => onDownloadResults(processInfo.id, option.key)}
-                                                                                className={`px-2 py-1 text-xs bg-${option.color}-100 text-${option.color}-700 rounded hover:bg-${option.color}-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1`}
-                                                                                title={`Download ${option.label}`}
-                                                                            >
-                                                                                <OptionIcon size={10}/>
-                                                                                <span>{option.label}</span>
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => handleSaveToServer(processInfo.id, option.key, processedFile)}
-                                                                                className={`px-2 py-1 text-xs bg-${option.color}-50 text-${option.color}-600 border border-${option.color}-200 rounded hover:bg-${option.color}-100 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1`}
-                                                                                title={`Save ${option.label} to Server`}
-                                                                            >
-                                                                                <Server size={10}/>
-                                                                                <span>Save</span>
-                                                                            </button>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )}
-
-                                                        {/* Extra Downloads */}
-                                                        {downloadOptions.extra.length > 0 && (
-                                                            <div className="grid grid-cols-1 gap-1 mt-1">
-                                                                {downloadOptions.extra.map((option) => {
-                                                                    const OptionIcon = option.icon;
-                                                                    return (
-                                                                        <button
-                                                                            key={option.key}
-                                                                            onClick={() => onDownloadResults(processInfo.id, option.key)}
-                                                                            className={`px-2 py-1 text-xs bg-${option.color}-100 text-${option.color}-700 rounded hover:bg-${option.color}-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1`}
-                                                                            title={`Download ${option.label}`}
-                                                                        >
-                                                                            <OptionIcon size={10}/>
-                                                                            <span>{option.label}</span>
-                                                                        </button>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {/* Processing Status (if processing) */}
-                                        {processedFile.status === 'processing' && (
-                                            <div
-                                                className="text-xs text-blue-600 bg-blue-50 p-2 rounded flex items-center space-x-2">
-                                                <div
-                                                    className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
-                                                <span>Processing {processInfo.label.toLowerCase()}...</span>
-                                            </div>
-                                        )}
-
-                                        {/* Error Status (if failed) */}
-                                        {processedFile.status === 'failed' && (
-                                            <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                                                <div className="flex items-center space-x-1">
-                                                    <AlertCircle size={12}/>
-                                                    <span>Process failed</span>
-                                                </div>
-                                                {processedFile.error && (
-                                                    <div className="mt-1 text-red-500">
-                                                        {processedFile.error}
+                                                {/* Processing Status (if processing) */}
+                                                {processedFile.status === 'processing' && (
+                                                    <div
+                                                        className="text-xs text-blue-600 bg-blue-50 p-2 rounded flex items-center space-x-2">
+                                                        <div
+                                                            className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                                                        <span>Processing {processInfo.label.toLowerCase()}...</span>
                                                     </div>
                                                 )}
+
+                                                {/* Error Status (if failed) */}
+                                                {processedFile.status === 'failed' && (
+                                                    <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                                                        <div className="flex items-center space-x-1">
+                                                            <AlertCircle size={12}/>
+                                                            <span>Process failed</span>
+                                                        </div>
+                                                        {processedFile.error && (
+                                                            <div className="mt-1 text-red-500">
+                                                                {processedFile.error}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Timestamp */}
+                                                <div className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-100">
+                                                    {new Date(processedFile.created_at).toLocaleString()}
+                                                </div>
                                             </div>
                                         )}
-
-                                        {/* Timestamp */}
-                                        <div className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-100">
-                                            {new Date(processedFile.created_at).toLocaleString()}
-                                        </div>
                                     </div>
                                 );
                             })}
