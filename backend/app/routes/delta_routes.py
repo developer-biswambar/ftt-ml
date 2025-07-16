@@ -31,7 +31,7 @@ class DeltaComparisonRule(BaseModel):
     """Delta generation rule for optional field comparison"""
     LeftFileColumn: str
     RightFileColumn: str
-    MatchType: str = "equals"  # equals, case_insensitive, numeric_tolerance
+    MatchType: str = "equals"  # equals, case_insensitive, numeric_tolerance, date_match
     ToleranceValue: Optional[float] = None
     IsKey: bool = False  # Always False for comparison fields
 
@@ -134,47 +134,6 @@ class DeltaProcessor:
 
         return errors
 
-    def create_composite_key(self, df: pd.DataFrame, key_columns: List[str], rules: List[DeltaKeyRule]) -> pd.Series:
-        """Create composite key for matching records with proper NaN handling"""
-        keys = []
-        for i, col in enumerate(key_columns):
-            if i < len(rules):
-                rule = rules[i]
-                # Handle NaN values first by converting to string representation
-                series_data = df[col].fillna('__NULL__')  # Replace NaN with placeholder
-
-                if rule.MatchType == "case_insensitive":
-                    keys.append(series_data.astype(str).str.lower().str.strip())
-                elif rule.MatchType == "numeric_tolerance":
-                    # For numeric tolerance, we still need exact key matching
-                    keys.append(series_data.astype(str).str.strip())
-                else:
-                    keys.append(series_data.astype(str).str.strip())
-            else:
-                # Handle NaN values for columns without specific rules
-                series_data = df[col].fillna('__NULL__')
-                keys.append(series_data.astype(str).str.strip())
-
-        # Create composite key by joining all key components
-        composite_keys = []
-        for idx in range(len(df)):
-            key_parts = [str(keys[j].iloc[idx]) for j in range(len(keys))]
-            composite_key = '|'.join(key_parts)
-            composite_keys.append(composite_key)
-
-        composite_series = pd.Series(composite_keys, index=df.index)
-
-        # Debug: Check for duplicates and log them
-        duplicates = composite_series.duplicated()
-        if duplicates.any():
-            duplicate_keys = composite_series[duplicates].unique()
-            logger.warning(f"Found {len(duplicate_keys)} duplicate composite keys: {duplicate_keys[:5]}...")
-            self.warnings.append(f"Found {len(duplicate_keys)} duplicate composite keys in data")
-
-        return composite_series
-
-    # Add these helper functions to your DeltaProcessor class
-
     def is_numeric(self, value):
         """Check if a value is numeric"""
         if pd.isna(value) or value is None:
@@ -194,6 +153,32 @@ class DeltaProcessor:
             return round(num, decimal_places)
         except (ValueError, TypeError):
             return value
+
+    def normalize_key_values(self, series_data):
+        """Normalize key values to handle numeric formatting differences"""
+        normalized_values = []
+
+        for value in series_data:
+            if pd.isna(value) or value is None:
+                normalized_values.append('__NULL__')
+            elif self.is_numeric(value):
+                # Normalize numeric values to remove .0 differences
+                try:
+                    num_val = float(value)
+                    # Convert to int if it's a whole number, otherwise keep as float
+                    if num_val.is_integer():
+                        normalized_values.append(str(int(num_val)))
+                    else:
+                        # Format to remove unnecessary trailing zeros
+                        normalized_values.append(f"{num_val:g}")
+                except (ValueError, TypeError):
+                    # If conversion fails, use string representation
+                    normalized_values.append(str(value).strip())
+            else:
+                # Non-numeric values - just convert to string and strip
+                normalized_values.append(str(value).strip())
+
+        return pd.Series(normalized_values, index=series_data.index)
 
     def parse_excel_date(self, value):
         """Parse Excel date in various formats"""
@@ -245,7 +230,72 @@ class DeltaProcessor:
             diff_days = abs((date_a_only - date_b_only).days)
             return diff_days <= tolerance_days
 
-    # Replace your existing compare_records method with this updated version:
+    def create_composite_key(self, df: pd.DataFrame, key_columns: List[str], rules: List[DeltaKeyRule]) -> pd.Series:
+        """Create composite key for matching records with proper numeric normalization"""
+        keys = []
+        for i, col in enumerate(key_columns):
+            if i < len(rules):
+                rule = rules[i]
+                # Handle NaN values first by converting to string representation
+                series_data = df[col].fillna('__NULL__')
+
+                if rule.MatchType == "case_insensitive":
+                    normalized_series = series_data.astype(str).str.lower().str.strip()
+                elif rule.MatchType == "numeric_tolerance":
+                    # For composite keys, we still need exact matching, but normalize numeric format
+                    normalized_series = self.normalize_key_values(series_data)
+                else:  # equals
+                    # Normalize numeric values to handle 50 vs 50.0 issue
+                    normalized_series = self.normalize_key_values(series_data)
+
+                keys.append(normalized_series)
+            else:
+                # Handle columns without specific rules
+                series_data = df[col].fillna('__NULL__')
+                normalized_series = self.normalize_key_values(series_data)
+                keys.append(normalized_series)
+
+        # Create composite key by joining all key components
+        composite_keys = []
+        for idx in range(len(df)):
+            key_parts = [str(keys[j].iloc[idx]) for j in range(len(keys))]
+            composite_key = '|'.join(key_parts)
+            composite_keys.append(composite_key)
+
+        composite_series = pd.Series(composite_keys, index=df.index)
+
+        # Debug: Check for duplicates and log them
+        duplicates = composite_series.duplicated()
+        if duplicates.any():
+            duplicate_keys = composite_series[duplicates].unique()
+            logger.warning(f"Found {len(duplicate_keys)} duplicate composite keys: {duplicate_keys[:5]}...")
+            self.warnings.append(f"Found {len(duplicate_keys)} duplicate composite keys in data")
+
+        return composite_series
+
+    def create_auto_comparison_rules(self, df_a, df_b, key_columns_a, key_columns_b):
+        """Create automatic comparison rules for all non-key columns"""
+        auto_rules = []
+
+        # Get all columns from both dataframes
+        all_columns_a = set(df_a.columns) - set(key_columns_a) - {'_composite_key'}
+        all_columns_b = set(df_b.columns) - set(key_columns_b) - {'_composite_key'}
+
+        # Find common columns to compare
+        common_columns = all_columns_a.intersection(all_columns_b)
+
+        for col in common_columns:
+            auto_rule = DeltaComparisonRule(
+                LeftFileColumn=col,
+                RightFileColumn=col,
+                MatchType="equals",
+                ToleranceValue=None,
+                IsKey=False
+            )
+            auto_rules.append(auto_rule)
+
+        return auto_rules
+
     def compare_records(self, row_a: pd.Series, row_b: pd.Series, comparison_rules: List[DeltaComparisonRule]) -> tuple[
         bool, List[str]]:
         """Compare two records based on comparison rules to determine if they are identical
@@ -312,51 +362,6 @@ class DeltaProcessor:
                 changes.append(f"{col_a}: '{val_a}' -> '{val_b}'")
 
         return len(changes) == 0, changes
-
-        # Also update the generate_delta method to fix the "no comparison rules" bug:
-        # Find this section in your generate_delta method (around lines 225-229):
-
-        # REPLACE THIS:
-        # if comparison_rules:
-        #     is_identical, changes = self.compare_records(row_a, row_b, comparison_rules)
-        # else:
-        #     # If no comparison rules, assume records are unchanged if keys match
-        #     is_identical = True
-        #     changes = []
-
-        # WITH THIS:
-        if comparison_rules:
-            is_identical, changes = self.compare_records(row_a, row_b, comparison_rules)
-        else:
-            # If no comparison rules, auto-create rules for all non-key columns
-            auto_comparison_rules = self.create_auto_comparison_rules(
-                df_a_work, df_b_work, key_columns_a, key_columns_b
-            )
-            is_identical, changes = self.compare_records(row_a, row_b, auto_comparison_rules)
-
-    # Add this new method to create auto comparison rules:
-    def create_auto_comparison_rules(self, df_a, df_b, key_columns_a, key_columns_b):
-        """Create automatic comparison rules for all non-key columns"""
-        auto_rules = []
-
-        # Get all columns from both dataframes
-        all_columns_a = set(df_a.columns) - set(key_columns_a) - {'_composite_key'}
-        all_columns_b = set(df_b.columns) - set(key_columns_b) - {'_composite_key'}
-
-        # Find common columns to compare
-        common_columns = all_columns_a.intersection(all_columns_b)
-
-        for col in common_columns:
-            auto_rule = DeltaComparisonRule(
-                LeftFileColumn=col,
-                RightFileColumn=col,
-                MatchType="equals",
-                ToleranceValue=None,
-                IsKey=False
-            )
-            auto_rules.append(auto_rule)
-
-        return auto_rules
 
     def generate_delta(self, df_a: pd.DataFrame, df_b: pd.DataFrame,
                        key_rules: List[DeltaKeyRule],
@@ -446,9 +451,11 @@ class DeltaProcessor:
             if comparison_rules:
                 is_identical, changes = self.compare_records(row_a, row_b, comparison_rules)
             else:
-                # If no comparison rules, assume records are unchanged if keys match
-                is_identical = True
-                changes = []
+                # If no comparison rules, auto-create rules for all non-key columns
+                auto_comparison_rules = self.create_auto_comparison_rules(
+                    df_a_work, df_b_work, key_columns_a, key_columns_b
+                )
+                is_identical, changes = self.compare_records(row_a, row_b, auto_comparison_rules)
 
             # Create base record with data from both files
             record = {}
@@ -631,8 +638,8 @@ async def process_delta_generation(request: JSONDeltaRequest):
             'newly_added': delta_results['newly_added'],
             'all_changes': delta_results['all_changes'],
             'timestamp': datetime.now(),
-            'file_a':file_0.file_id,
-            'file_b':file_1.file_id,
+            'file_a': file_0.file_id,
+            'file_b': file_1.file_id,
             'row_counts': {
                 'unchanged': len(delta_results['unchanged']),
                 'amended': len(delta_results['amended']),
@@ -910,6 +917,7 @@ async def delta_health_check():
         "active_deltas": storage_count,
         "features": [
             "composite_key_matching",
+            "numeric_normalization",
             "optional_field_comparison",
             "change_categorization",
             "amendment_tracking",
@@ -917,6 +925,10 @@ async def delta_health_check():
             "paginated_results",
             "streaming_downloads",
             "json_input_support",
-            "file_id_retrieval"
+            "file_id_retrieval",
+            "date_matching",
+            "case_insensitive_matching",
+            "numeric_tolerance_matching",
+            "auto_comparison_rules"
         ]
     }
