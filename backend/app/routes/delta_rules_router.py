@@ -1,11 +1,13 @@
 # Backend API endpoints for Delta Rule Management with In-Memory Storage
 # Add these endpoints to your FastAPI backend
 
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
 from datetime import datetime
-import uuid
+from typing import List, Optional, Dict, Any
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from app.utils.uuid_generator import generate_uuid
 
 # Router for delta rule management
 delta_rules_router = APIRouter(prefix="/delta-rules", tags=["delta-rules"])
@@ -64,7 +66,7 @@ class DeltaRuleResponse(BaseModel):
 def create_delta_rule_record(rule_data: DeltaRuleCreate, rule_id: str = None) -> Dict:
     """Create a delta rule record for in-memory storage"""
     if rule_id is None:
-        rule_id = str(uuid.uuid4())
+        rule_id = generate_uuid('delta_rule')
 
     return {
         "id": rule_id,
@@ -474,7 +476,7 @@ async def import_delta_rules(import_data: Dict[str, Any]):
         for rule_data in import_data["rules"]:
             try:
                 # Generate new ID to avoid conflicts
-                new_id = str(uuid.uuid4())
+                new_id = generate_uuid('delta_rule')
 
                 # Modify name to indicate import
                 if "name" in rule_data:
@@ -532,338 +534,11 @@ async def clear_delta_rules(confirm: bool = False):
         raise HTTPException(status_code=500, detail=f"Failed to clear delta rules: {str(e)}")
 
 
-# Include this router in your main FastAPI app:
-# app.include_router(delta_rules_router)
-
-# Example usage in main.py:
-"""
-from fastapi import FastAPI
-from delta_rules_endpoints import delta_rules_router
-
-app = FastAPI()
-app.include_router(delta_rules_router)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-"""  # Backend API endpoints for Delta Rule Management
-# Add these endpoints to your FastAPI backend
-
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-from datetime import datetime
-import uuid
-
-# Router for delta rule management
-delta_rules_router = APIRouter(prefix="/delta-rules", tags=["delta-rules"])
-
-
-# Pydantic models for Delta Rules
-class DeltaRuleMetadata(BaseModel):
-    name: str
-    description: Optional[str] = ""
-    category: str = "delta"
-    tags: List[str] = []
-    template_id: Optional[str] = None
-    template_name: Optional[str] = None
-    rule_type: str = "delta_generation"
-
-
-class DeltaRuleConfig(BaseModel):
-    Files: List[Dict[str, Any]] = []
-    KeyRules: List[Dict[str, Any]] = []
-    ComparisonRules: List[Dict[str, Any]] = []
-    selected_columns_file_a: List[str] = []
-    selected_columns_file_b: List[str] = []
-    user_requirements: str = "Generate delta between older and newer files using configured key and comparison rules"
-
-
-class DeltaRuleCreate(BaseModel):
-    metadata: DeltaRuleMetadata
-    rule_config: DeltaRuleConfig
-
-
-class DeltaRuleUpdate(BaseModel):
-    metadata: Optional[DeltaRuleMetadata] = None
-    rule_config: Optional[DeltaRuleConfig] = None
-
-
-class DeltaRuleResponse(BaseModel):
-    id: str
-    name: str
-    description: Optional[str]
-    category: str
-    tags: List[str]
-    template_id: Optional[str]
-    template_name: Optional[str]
-    rule_type: str
-    created_at: datetime
-    updated_at: datetime
-    usage_count: int = 0
-    last_used_at: Optional[datetime] = None
-    rule_config: DeltaRuleConfig
-
-
-# Database model (example using SQLAlchemy)
-"""
-from sqlalchemy import Column, String, Text, DateTime, Integer, JSON
-from sqlalchemy.ext.declarative import declarative_base
-
-Base = declarative_base()
-
-class DeltaRule(Base):
-    __tablename__ = "delta_rules"
-
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String(100), nullable=False)
-    description = Column(Text)
-    category = Column(String(50), default="delta")
-    tags = Column(JSON)  # Store as JSON array
-    template_id = Column(String)
-    template_name = Column(String)
-    rule_type = Column(String, default="delta_generation")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    usage_count = Column(Integer, default=0)
-    last_used_at = Column(DateTime)
-    rule_config = Column(JSON)  # Store the entire rule configuration as JSON
-"""
-
-
-# API Endpoints
-
-@delta_rules_router.post("/save", response_model=DeltaRuleResponse)
-async def save_delta_rule(rule_data: DeltaRuleCreate):
-    """Save a new delta generation rule"""
-    try:
-        # Validate the rule data
-        if not rule_data.metadata.name.strip():
-            raise HTTPException(status_code=400, detail="Rule name is required")
-
-        # Generate unique ID
-        rule_id = str(uuid.uuid4())
-
-        # Create the rule record in database
-        rule_record = {
-            "id": rule_id,
-            "name": rule_data.metadata.name,
-            "description": rule_data.metadata.description,
-            "category": rule_data.metadata.category,
-            "tags": rule_data.metadata.tags,
-            "template_id": rule_data.metadata.template_id,
-            "template_name": rule_data.metadata.template_name,
-            "rule_type": rule_data.metadata.rule_type,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
-            "usage_count": 0,
-            "last_used_at": None,
-            "rule_config": rule_data.rule_config.dict()
-        }
-
-        # Save to database (implement your database logic here)
-        # db.add(DeltaRule(**rule_record))
-        # db.commit()
-
-        return DeltaRuleResponse(**rule_record)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save delta rule: {str(e)}")
-
-
-@delta_rules_router.get("/list", response_model=List[DeltaRuleResponse])
-async def list_delta_rules(
-        category: Optional[str] = None,
-        template_id: Optional[str] = None,
-        limit: int = 50,
-        offset: int = 0
-):
-    """List delta generation rules with optional filtering"""
-    try:
-        # Build query based on filters
-        # query = db.query(DeltaRule)
-
-        # if category:
-        #     query = query.filter(DeltaRule.category == category)
-        # if template_id:
-        #     query = query.filter(DeltaRule.template_id == template_id)
-
-        # rules = query.offset(offset).limit(limit).all()
-
-        # For now, return empty list - implement your database query
-        rules = []
-
-        return [DeltaRuleResponse(**rule.__dict__) for rule in rules]
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list delta rules: {str(e)}")
-
-
-@delta_rules_router.get("/template/{template_id}", response_model=List[DeltaRuleResponse])
-async def get_delta_rules_by_template(template_id: str):
-    """Get delta rules for a specific template"""
-    try:
-        # rules = db.query(DeltaRule).filter(DeltaRule.template_id == template_id).all()
-        rules = []  # Implement your database query
-
-        return [DeltaRuleResponse(**rule.__dict__) for rule in rules]
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get delta rules by template: {str(e)}")
-
-
-@delta_rules_router.get("/{rule_id}", response_model=DeltaRuleResponse)
-async def get_delta_rule(rule_id: str):
-    """Get a specific delta rule by ID"""
-    try:
-        # rule = db.query(DeltaRule).filter(DeltaRule.id == rule_id).first()
-        # if not rule:
-        #     raise HTTPException(status_code=404, detail="Delta rule not found")
-
-        # For now, raise not found - implement your database query
-        raise HTTPException(status_code=404, detail="Delta rule not found")
-
-        # return DeltaRuleResponse(**rule.__dict__)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get delta rule: {str(e)}")
-
-
-@delta_rules_router.put("/{rule_id}", response_model=DeltaRuleResponse)
-async def update_delta_rule(rule_id: str, updates: DeltaRuleUpdate):
-    """Update an existing delta rule"""
-    try:
-        # rule = db.query(DeltaRule).filter(DeltaRule.id == rule_id).first()
-        # if not rule:
-        #     raise HTTPException(status_code=404, detail="Delta rule not found")
-
-        # if updates.metadata:
-        #     rule.name = updates.metadata.name or rule.name
-        #     rule.description = updates.metadata.description or rule.description
-        #     rule.category = updates.metadata.category or rule.category
-        #     rule.tags = updates.metadata.tags or rule.tags
-
-        # if updates.rule_config:
-        #     rule.rule_config = updates.rule_config.dict()
-
-        # rule.updated_at = datetime.utcnow()
-        # db.commit()
-
-        # For now, raise not found - implement your database logic
-        raise HTTPException(status_code=404, detail="Delta rule not found")
-
-        # return DeltaRuleResponse(**rule.__dict__)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update delta rule: {str(e)}")
-
-
-@delta_rules_router.delete("/{rule_id}")
-async def delete_delta_rule(rule_id: str):
-    """Delete a delta rule"""
-    try:
-        # rule = db.query(DeltaRule).filter(DeltaRule.id == rule_id).first()
-        # if not rule:
-        #     raise HTTPException(status_code=404, detail="Delta rule not found")
-
-        # db.delete(rule)
-        # db.commit()
-
-        # For now, raise not found - implement your database logic
-        raise HTTPException(status_code=404, detail="Delta rule not found")
-
-        # return {"message": "Delta rule deleted successfully"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete delta rule: {str(e)}")
-
-
-@delta_rules_router.post("/{rule_id}/use")
-async def mark_delta_rule_as_used(rule_id: str):
-    """Mark a delta rule as used (increment usage count)"""
-    try:
-        # rule = db.query(DeltaRule).filter(DeltaRule.id == rule_id).first()
-        # if not rule:
-        #     raise HTTPException(status_code=404, detail="Delta rule not found")
-
-        # rule.usage_count = rule.usage_count + 1
-        # rule.last_used_at = datetime.utcnow()
-        # db.commit()
-
-        # For now, raise not found - implement your database logic
-        raise HTTPException(status_code=404, detail="Delta rule not found")
-
-        # return {"message": "Delta rule usage updated"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update delta rule usage: {str(e)}")
-
-
-@delta_rules_router.post("/search", response_model=List[DeltaRuleResponse])
-async def search_delta_rules(search_filters: Dict[str, Any]):
-    """Search delta rules with complex filters"""
-    try:
-        # Implement search logic based on filters
-        # query = db.query(DeltaRule)
-
-        # if search_filters.get("name"):
-        #     query = query.filter(DeltaRule.name.ilike(f"%{search_filters['name']}%"))
-
-        # if search_filters.get("description"):
-        #     query = query.filter(DeltaRule.description.ilike(f"%{search_filters['description']}%"))
-
-        # if search_filters.get("category"):
-        #     query = query.filter(DeltaRule.category == search_filters["category"])
-
-        # if search_filters.get("tags"):
-        #     for tag in search_filters["tags"]:
-        #         query = query.filter(DeltaRule.tags.contains([tag]))
-
-        # rules = query.all()
-        rules = []  # Implement your search logic
-
-        return [DeltaRuleResponse(**rule.__dict__) for rule in rules]
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to search delta rules: {str(e)}")
-
-
-@delta_rules_router.get("/categories/list")
-async def get_delta_rule_categories():
-    """Get list of available delta rule categories"""
-    try:
-        # You can either return static categories or query from database
-        categories = [
-            "delta",
-            "financial",
-            "trading",
-            "data-comparison",
-            "validation",
-            "general",
-            "custom"
-        ]
-
-        return {"categories": categories}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get categories: {str(e)}")
-
-
 @delta_rules_router.get("/health")
 async def get_delta_rule_management_health():
     """Health check for delta rule management system"""
     try:
-        # Check database connectivity and basic functionality
-        # rule_count = db.query(DeltaRule).count()
-        rule_count = 0  # Implement your health check
+        rule_count = len(delta_rules_storage.values())
 
         return {
             "status": "healthy",
@@ -877,6 +552,3 @@ async def get_delta_rule_management_health():
             "error": str(e),
             "timestamp": datetime.utcnow()
         }
-
-# Include this router in your main FastAPI app:
-# app.include_router(delta_rules_router)
