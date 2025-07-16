@@ -48,28 +48,13 @@ async def get_recent_results(limit: int = 5):
             from app.routes.delta_routes import delta_storage
 
             for delta_id, delta_data in delta_storage.items():
-                # Get file information from storage
-                file_a_name = "Unknown File A"
-                file_b_name = "Unknown File B"
-
-                try:
-                    from app.services.storage_service import uploaded_files
-                    # Try to find file names - this is a best effort
-                    # In a real implementation, you'd store file references with results
-                    files = list(uploaded_files.values())
-                    if len(files) >= 2:
-                        file_a_name = files[0]["info"].get("custom_name") or files[0]["info"]["filename"]
-                        file_b_name = files[1]["info"].get("custom_name") or files[1]["info"]["filename"]
-                except:
-                    pass
-
                 recent_results.append(RecentResultInfo(
                     id=delta_id,
                     process_type="delta",
                     status="completed",
                     created_at=delta_data["timestamp"].isoformat(),
-                    file_a=file_a_name,
-                    file_b=file_b_name,
+                    file_a=delta_data['file_a'],
+                    file_b=delta_data['file_b'],
                     summary={
                         "unchanged_records": delta_data["row_counts"]["unchanged"],
                         "amended_records": delta_data["row_counts"]["amended"],

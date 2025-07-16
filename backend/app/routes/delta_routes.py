@@ -1,12 +1,10 @@
 import io
-import json
 import logging
-import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -495,6 +493,8 @@ async def process_delta_generation(request: JSONDeltaRequest):
             'newly_added': delta_results['newly_added'],
             'all_changes': delta_results['all_changes'],
             'timestamp': datetime.now(),
+            'file_a':file_0.file_id,
+            'file_b':file_1.file_id,
             'row_counts': {
                 'unchanged': len(delta_results['unchanged']),
                 'amended': len(delta_results['amended']),
