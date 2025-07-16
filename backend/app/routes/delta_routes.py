@@ -173,6 +173,79 @@ class DeltaProcessor:
 
         return composite_series
 
+    # Add these helper functions to your DeltaProcessor class
+
+    def is_numeric(self, value):
+        """Check if a value is numeric"""
+        if pd.isna(value) or value is None:
+            return False
+        try:
+            float(value)
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    def format_numeric_value(self, value, decimal_places=2):
+        """Format numeric value to specified decimal places"""
+        if not self.is_numeric(value):
+            return value
+        try:
+            num = float(value)
+            return round(num, decimal_places)
+        except (ValueError, TypeError):
+            return value
+
+    def parse_excel_date(self, value):
+        """Parse Excel date in various formats"""
+        if pd.isna(value) or value is None:
+            return None
+
+        # Handle Excel serial date numbers (days since 1900-01-01)
+        if self.is_numeric(value):
+            try:
+                # Excel serial date conversion
+                excel_epoch = pd.Timestamp('1900-01-01')
+                days_since_1900 = float(value)
+
+                # Excel incorrectly considers 1900 as a leap year, so adjust
+                adjusted_days = days_since_1900 - 2 if days_since_1900 > 59 else days_since_1900 - 1
+                date = excel_epoch + pd.Timedelta(days=adjusted_days)
+                return date
+            except:
+                return None
+
+        # Handle string dates
+        try:
+            # Try pandas to_datetime which handles most formats
+            date = pd.to_datetime(value, errors='coerce')
+            if pd.notna(date):
+                return date
+        except:
+            pass
+
+        return None
+
+    def compare_dates(self, date_a, date_b, tolerance_days=0):
+        """Compare two dates with optional tolerance"""
+        parsed_a = self.parse_excel_date(date_a)
+        parsed_b = self.parse_excel_date(date_b)
+
+        if parsed_a is None and parsed_b is None:
+            return True
+        if parsed_a is None or parsed_b is None:
+            return False
+
+        # Convert to date only for comparison (ignore time)
+        date_a_only = parsed_a.date() if hasattr(parsed_a, 'date') else parsed_a
+        date_b_only = parsed_b.date() if hasattr(parsed_b, 'date') else parsed_b
+
+        if tolerance_days == 0:
+            return date_a_only == date_b_only
+        else:
+            diff_days = abs((date_a_only - date_b_only).days)
+            return diff_days <= tolerance_days
+
+    # Replace your existing compare_records method with this updated version:
     def compare_records(self, row_a: pd.Series, row_b: pd.Series, comparison_rules: List[DeltaComparisonRule]) -> tuple[
         bool, List[str]]:
         """Compare two records based on comparison rules to determine if they are identical
@@ -198,27 +271,92 @@ class DeltaProcessor:
 
             if rule.MatchType == "case_insensitive":
                 values_match = str(val_a).strip().lower() == str(val_b).strip().lower()
+
             elif rule.MatchType == "numeric_tolerance":
-                try:
-                    num_a = float(val_a)
-                    num_b = float(val_b)
-                    if rule.ToleranceValue is not None:
-                        if num_b != 0:
-                            percentage_diff = abs(num_a - num_b) / abs(num_b) * 100
-                            values_match = percentage_diff <= rule.ToleranceValue
+                if self.is_numeric(val_a) and self.is_numeric(val_b):
+                    try:
+                        num_a = float(val_a)
+                        num_b = float(val_b)
+                        if rule.ToleranceValue is not None:
+                            if num_b != 0:
+                                percentage_diff = abs(num_a - num_b) / abs(num_b) * 100
+                                values_match = percentage_diff <= rule.ToleranceValue
+                            else:
+                                values_match = num_a == 0
                         else:
-                            values_match = num_a == 0
-                    else:
-                        values_match = num_a == num_b
-                except (ValueError, TypeError):
+                            values_match = num_a == num_b
+                    except (ValueError, TypeError):
+                        # Fall back to string comparison if numeric fails
+                        values_match = str(val_a).strip() == str(val_b).strip()
+                else:
                     values_match = str(val_a).strip() == str(val_b).strip()
-            else:  # equals
-                values_match = str(val_a).strip() == str(val_b).strip()
+
+            elif rule.MatchType == "date_match":
+                tolerance_days = rule.ToleranceValue if rule.ToleranceValue is not None else 0
+                values_match = self.compare_dates(val_a, val_b, tolerance_days)
+
+            else:  # equals - FIXED to handle numeric values properly
+                if self.is_numeric(val_a) and self.is_numeric(val_b):
+                    # Compare as numbers to handle .0 differences
+                    try:
+                        num_a = self.format_numeric_value(val_a, 2)
+                        num_b = self.format_numeric_value(val_b, 2)
+                        values_match = num_a == num_b
+                    except:
+                        # Fall back to string comparison
+                        values_match = str(val_a).strip() == str(val_b).strip()
+                else:
+                    values_match = str(val_a).strip() == str(val_b).strip()
 
             if not values_match:
                 changes.append(f"{col_a}: '{val_a}' -> '{val_b}'")
 
         return len(changes) == 0, changes
+
+        # Also update the generate_delta method to fix the "no comparison rules" bug:
+        # Find this section in your generate_delta method (around lines 225-229):
+
+        # REPLACE THIS:
+        # if comparison_rules:
+        #     is_identical, changes = self.compare_records(row_a, row_b, comparison_rules)
+        # else:
+        #     # If no comparison rules, assume records are unchanged if keys match
+        #     is_identical = True
+        #     changes = []
+
+        # WITH THIS:
+        if comparison_rules:
+            is_identical, changes = self.compare_records(row_a, row_b, comparison_rules)
+        else:
+            # If no comparison rules, auto-create rules for all non-key columns
+            auto_comparison_rules = self.create_auto_comparison_rules(
+                df_a_work, df_b_work, key_columns_a, key_columns_b
+            )
+            is_identical, changes = self.compare_records(row_a, row_b, auto_comparison_rules)
+
+    # Add this new method to create auto comparison rules:
+    def create_auto_comparison_rules(self, df_a, df_b, key_columns_a, key_columns_b):
+        """Create automatic comparison rules for all non-key columns"""
+        auto_rules = []
+
+        # Get all columns from both dataframes
+        all_columns_a = set(df_a.columns) - set(key_columns_a) - {'_composite_key'}
+        all_columns_b = set(df_b.columns) - set(key_columns_b) - {'_composite_key'}
+
+        # Find common columns to compare
+        common_columns = all_columns_a.intersection(all_columns_b)
+
+        for col in common_columns:
+            auto_rule = DeltaComparisonRule(
+                LeftFileColumn=col,
+                RightFileColumn=col,
+                MatchType="equals",
+                ToleranceValue=None,
+                IsKey=False
+            )
+            auto_rules.append(auto_rule)
+
+        return auto_rules
 
     def generate_delta(self, df_a: pd.DataFrame, df_b: pd.DataFrame,
                        key_rules: List[DeltaKeyRule],
