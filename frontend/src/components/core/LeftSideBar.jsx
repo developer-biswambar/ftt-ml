@@ -1,8 +1,8 @@
 // src/components/LeftSidebar.jsx - Enhanced with Reusable File Upload Modal
 import React, {useRef, useState, useEffect} from 'react';
 import {CheckCircle, Eye, FileText, RefreshCw, Upload, AlertCircle, X, Sheet, Trash2, AlertTriangle, ExternalLink, FolderOpen} from 'lucide-react';
-import { apiService } from '../services/api';
-import FileUploadModal from './FileUploadModal';
+import { apiService } from '../../services/defaultApi.js';
+import FileUploadModal from '../../fileManagement/FileUploadModal.jsx';
 
 const LeftSidebar = ({
                          files,

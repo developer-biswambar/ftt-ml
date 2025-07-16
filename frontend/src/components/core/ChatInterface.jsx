@@ -1,9 +1,9 @@
 // src/components/ChatInterface.jsx - Enhanced with Delta Generation support
 import React, {useEffect, useRef, useState} from 'react';
 import {AlertCircle, CheckCircle, Eye, Send, Settings} from 'lucide-react';
-import ReconciliationFlow from './ReconciliationFlow';
-import FileGeneratorFlow from './FileGeneratorFlow';
-import DeltaGenerationFlow from './DeltaGenerationFlow';
+import ReconciliationFlow from '../recon/ReconciliationFlow.jsx';
+import FileGeneratorFlow from '../../fileManagement/FileGeneratorFlow.jsx';
+import DeltaGenerationFlow from '../delta/DeltaGenerationFlow.jsx';
 
 const TypingIndicator = ({message}) => {
     return (

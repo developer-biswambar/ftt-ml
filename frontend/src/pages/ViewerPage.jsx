@@ -1,9 +1,9 @@
 // src/pages/ViewerPage.jsx - Full page viewer component with enhanced title handling
 import React, {useEffect, useState} from 'react';
 import {useParams} from 'react-router-dom';
-import DataViewer from '../components/DataViewer';
+import DataViewer from '../components/viewer/DataViewer.jsx';
 import {AlertCircle} from 'lucide-react';
-import {apiService} from '../services/api';
+import {apiService} from '../services/defaultApi.js';
 
 const ViewerPage = () => {
     const {fileId} = useParams();

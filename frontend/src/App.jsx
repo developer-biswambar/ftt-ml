@@ -11,9 +11,9 @@ import {
     usePanelResize,
     useDocumentTitle
 } from './hooks/useAppState';
-import LeftSidebar from './components/LeftSidebar';
-import ChatInterface from './components/ChatInterface';
-import RightSidebar from './components/RightSideBar';
+import LeftSidebar from './components/core/LeftSideBar.jsx';
+import ChatInterface from './components/core/ChatInterface.jsx';
+import RightSidebar from './components/core/RightSideBar.jsx';
 import ViewerPage from './pages/ViewerPage';
 import FileLibraryPage from './pages/FileLibraryPage';
 import RecentResultsPage from './pages/RecentResultsPage';
@@ -127,7 +127,7 @@ const MainApp = () => {
             addMessage('system', `⚡ Starting AI File Generation...\n\n🧠 Analyzing your requirements and generating intelligent file transformations...`, true);
 
             // Import and use API service for file generation
-            const { apiService } = await import('./services/api');
+            const { apiService } = await import('./services/defaultApi.js');
 
             // Get the selected file data
             const selectedFile = selectedFiles.file_0;
@@ -384,7 +384,7 @@ const MainApp = () => {
 
             if (processType === 'file-generation') {
                 // Handle file generation results
-                const {apiService} = await import('./services/api');
+                const {apiService} = await import('./services/defaultApi.js');
                 const result = await apiService.getGenerationResults(resultId);
 
                 if (result.data) {

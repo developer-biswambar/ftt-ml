@@ -16,7 +16,7 @@ import {
     Save,
     Upload
 } from 'lucide-react';
-import DeltaRuleSaveLoad from './DeltaRuleSaveLoad';
+import DeltaRuleSaveLoad from './DeltaRuleSaveLoad.jsx';
 
 const DeltaGenerationFlow = ({
                                  files,

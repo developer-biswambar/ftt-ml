@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000';
 
-const api = axios.create({
+const defaultApi = axios.create({
     baseURL: API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
@@ -18,7 +18,7 @@ export const apiService = {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await api.post('files/upload', formData, {
+        const response = await defaultApi.post('files/upload', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
@@ -27,18 +27,18 @@ export const apiService = {
     },
 
     getFiles: async () => {
-        const response = await api.get('/files');
+        const response = await defaultApi.get('/files');
         return response.data;
     },
 
     getFileInfo: async (fileId) => {
-        const response = await api.get(`/files/${fileId}`);
+        const response = await defaultApi.get(`/files/${fileId}`);
         return response.data;
     },
 
     deleteFile: async (fileId) => {
         try {
-            const response = await api.delete(`/files/${fileId}`);
+            const response = await defaultApi.delete(`/files/${fileId}`);
             return response.data;
         } catch (error) {
             // Handle specific access control errors
@@ -84,7 +84,7 @@ export const apiService = {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await api.post('/files/analyze-sheets', formData, {
+        const response = await defaultApi.post('/files/analyze-sheets', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
@@ -93,7 +93,7 @@ export const apiService = {
     },
 
     validateFileName: async (filename) => {
-        const response = await api.post('/files/validate-name', {
+        const response = await defaultApi.post('/files/validate-name', {
             filename: filename
         });
         return response.data;
@@ -110,7 +110,7 @@ export const apiService = {
             formData.append('custom_name', customName);
         }
 
-        const response = await api.post('files/upload', formData, {
+        const response = await defaultApi.post('files/upload', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
@@ -122,17 +122,17 @@ export const apiService = {
     // VIEWER OPERATIONS
     // ===========================================
     getFileData: async (fileId, page = 1, pageSize = 1000) => {
-        const response = await api.get(`/files/${fileId}/data?page=${page}&page_size=${pageSize}`);
+        const response = await defaultApi.get(`/files/${fileId}/data?page=${page}&page_size=${pageSize}`);
         return response.data;
     },
 
     updateFileData: async (fileId, data) => {
-        const response = await api.put(`/files/${fileId}/data`, {data});
+        const response = await defaultApi.put(`/files/${fileId}/data`, {data});
         return response.data;
     },
 
     downloadModifiedFile: async (fileId, format = 'csv') => {
-        const response = await api.get(`/files/${fileId}/download?format=${format}`, {
+        const response = await defaultApi.get(`/files/${fileId}/download?format=${format}`, {
             responseType: 'blob'
         });
         return response;
@@ -147,7 +147,7 @@ export const apiService = {
         formData.append('user_prompt', userPrompt);
         if (sheetName) formData.append('sheet_name', sheetName);
 
-        const response = await api.post('/file-generator/validate-prompt', formData, {
+        const response = await defaultApi.post('/file-generator/validate-prompt', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
@@ -161,7 +161,7 @@ export const apiService = {
         formData.append('user_prompt', userPrompt);
         if (sheetName) formData.append('sheet_name', sheetName);
 
-        const response = await api.post('/file-generator/generate', formData, {
+        const response = await defaultApi.post('/file-generator/generate', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
@@ -170,29 +170,29 @@ export const apiService = {
     },
 
     getGenerationResults: async (generationId) => {
-        const response = await api.get(`/file-generator/results/${generationId}`);
+        const response = await defaultApi.get(`/file-generator/results/${generationId}`);
         return response.data;
     },
 
     downloadGeneratedFile: async (generationId, format = 'csv') => {
-        const response = await api.get(`/file-generator/download/${generationId}?format=${format}`, {
+        const response = await defaultApi.get(`/file-generator/download/${generationId}?format=${format}`, {
             responseType: 'blob'
         });
         return response;
     },
 
     previewGeneratedFile: async (generationId, limit = 10) => {
-        const response = await api.get(`/file-generator/preview/${generationId}?limit=${limit}`);
+        const response = await defaultApi.get(`/file-generator/preview/${generationId}?limit=${limit}`);
         return response.data;
     },
 
     listGenerations: async () => {
-        const response = await api.get('/file-generator/list-generations');
+        const response = await defaultApi.get('/file-generator/list-generations');
         return response.data;
     },
 
     deleteGeneration: async (generationId) => {
-        const response = await api.delete(`/file-generator/results/${generationId}`);
+        const response = await defaultApi.delete(`/file-generator/results/${generationId}`);
         return response.data;
     },
 
@@ -475,7 +475,7 @@ export const apiService = {
     // AI REGEX GENERATION OPERATIONS
     // ===========================================
     generateRegex: async (description, sampleText = '', columnName = '', context = null) => {
-        const response = await api.post('/api/regex/generate', {
+        const response = await defaultApi.post('/api/regex/generate', {
             description,
             sample_text: sampleText,
             column_name: columnName,
@@ -485,7 +485,7 @@ export const apiService = {
     },
 
     testRegex: async (regex, testText) => {
-        const response = await api.post('/api/regex/test', {
+        const response = await defaultApi.post('/api/regex/test', {
             regex,
             test_text: testText
         });
@@ -493,12 +493,12 @@ export const apiService = {
     },
 
     getCommonPatterns: async () => {
-        const response = await api.get('/api/regex/patterns');
+        const response = await defaultApi.get('/api/regex/patterns');
         return response.data;
     },
 
     getPatternSuggestions: async (description) => {
-        const response = await api.get(`/api/regex/suggestions?description=${encodeURIComponent(description)}`);
+        const response = await defaultApi.get(`/api/regex/suggestions?description=${encodeURIComponent(description)}`);
         return response.data;
     },
 
@@ -506,38 +506,38 @@ export const apiService = {
     // RECONCILIATION OPERATIONS
     // ===========================================
     getReconciliationTemplates: async () => {
-        const response = await api.get('/templates');
+        const response = await defaultApi.get('/templates');
         return response.data;
     },
 
     startReconciliation: async (reconciliationRequest) => {
-        const response = await api.post('/reconciliation/process/', reconciliationRequest);
+        const response = await defaultApi.post('/reconciliation/process/', reconciliationRequest);
         return response.data;
     },
 
     getReconciliationStatus: async (reconciliationId) => {
-        const response = await api.get(`/api/v1/reconcile/${reconciliationId}/status`);
+        const response = await defaultApi.get(`/api/v1/reconcile/${reconciliationId}/status`);
         return response.data;
     },
 
     getReconciliations: async (skip = 0, limit = 20) => {
-        const response = await api.get(`/api/v1/reconcile/?skip=${skip}&limit=${limit}`);
+        const response = await defaultApi.get(`/api/v1/reconcile/?skip=${skip}&limit=${limit}`);
         return response.data;
     },
 
     getReconciliationResult: async (reconciliation_id) => {
-        const response = await api.get(`/reconciliation/results/${reconciliation_id}`);
+        const response = await defaultApi.get(`/reconciliation/results/${reconciliation_id}`);
         return response.data;
     },
 
     downloadReconciliationResults: async (reconciliationId, format, result_type) => {
-        const response = await api.get(`reconciliation/download/${reconciliationId}?format=${format}&result_type=${result_type}`);
+        const response = await defaultApi.get(`reconciliation/download/${reconciliationId}?format=${format}&result_type=${result_type}`);
         return response.data;
     },
 
     analyzeColumns: async (fileAId, fileBId) => {
         const url = `/api/v1/reconcile/analyze-columns?file_a_id=${fileAId}&file_b_id=${fileBId}`;
-        const response = await api.post(url);
+        const response = await defaultApi.post(url);
         return response.data;
     },
 
@@ -611,7 +611,7 @@ export const apiService = {
         if (sheetName) {
             url += `&sheet=${encodeURIComponent(sheetName)}`;
         }
-        const response = await api.get(url);
+        const response = await defaultApi.get(url);
         return response.data;
     },
 
@@ -620,7 +620,7 @@ export const apiService = {
         if (sheetName) {
             url += `&sheet=${encodeURIComponent(sheetName)}`;
         }
-        const response = await api.get(url);
+        const response = await defaultApi.get(url);
         return response.data;
     },
 
@@ -629,7 +629,7 @@ export const apiService = {
         if (sheetName) {
             url += `&sheet=${encodeURIComponent(sheetName)}`;
         }
-        const response = await api.get(url, {
+        const response = await defaultApi.get(url, {
             responseType: 'blob'
         });
         return response;
@@ -644,7 +644,7 @@ export const apiService = {
         formData.append('file_b_id', fileBId);
         formData.append('rules', JSON.stringify(rules));
 
-        const response = await api.post('/reconciliation/process-from-storage', formData, {
+        const response = await defaultApi.post('/reconciliation/process-from-storage', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
@@ -657,7 +657,7 @@ export const apiService = {
     // ===========================================
     bulkDeleteFiles: async (fileIds) => {
         try {
-            const response = await api.post('/files/bulk-delete', {
+            const response = await defaultApi.post('/files/bulk-delete', {
                 file_ids: fileIds
             });
             return response.data;
@@ -679,7 +679,7 @@ export const apiService = {
     },
 
     bulkDownloadFiles: async (fileIds, format = 'csv') => {
-        const response = await api.post('/files/bulk-download', {
+        const response = await defaultApi.post('/files/bulk-download', {
             file_ids: fileIds,
             format: format
         }, {
@@ -692,12 +692,12 @@ export const apiService = {
     // FILE METADATA OPERATIONS
     // ===========================================
     updateFileMetadata: async (fileId, metadata) => {
-        const response = await api.put(`/files/${fileId}/metadata`, metadata);
+        const response = await defaultApi.put(`/files/${fileId}/metadata`, metadata);
         return response.data;
     },
 
     getFileStatistics: async (fileId) => {
-        const response = await api.get(`/files/${fileId}/statistics`);
+        const response = await defaultApi.get(`/files/${fileId}/statistics`);
         return response.data;
     },
 
@@ -706,7 +706,7 @@ export const apiService = {
         if (sheetName) {
             url += `?sheet=${encodeURIComponent(sheetName)}`;
         }
-        const response = await api.get(url);
+        const response = await defaultApi.get(url);
         return response.data;
     },
 
@@ -718,12 +718,12 @@ export const apiService = {
             q: query,
             ...filters
         });
-        const response = await api.get(`/files/search?${params}`);
+        const response = await defaultApi.get(`/files/search?${params}`);
         return response.data;
     },
 
     filterFilesByType: async (fileType = 'all') => {
-        const response = await api.get(`/files/filter?type=${fileType}`);
+        const response = await defaultApi.get(`/files/filter?type=${fileType}`);
         return response.data;
     },
 
@@ -731,7 +731,7 @@ export const apiService = {
     // IMPORT/EXPORT OPERATIONS
     // ===========================================
     exportFileList: async (format = 'json') => {
-        const response = await api.get(`/files/export?format=${format}`, {
+        const response = await defaultApi.get(`/files/export?format=${format}`, {
             responseType: format === 'json' ? 'json' : 'blob'
         });
         return response;
@@ -741,7 +741,7 @@ export const apiService = {
         const formData = new FormData();
         formData.append('config_file', configFile);
 
-        const response = await api.post('/files/import-config', formData, {
+        const response = await defaultApi.post('/files/import-config', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
@@ -754,7 +754,7 @@ export const apiService = {
     // ===========================================
     getRecentResults: async (limit = 5) => {
         try {
-            const response = await api.get('/recent-results/list', {
+            const response = await defaultApi.get('/recent-results/list', {
                 params: {limit: limit}
             });
             return response.data;
@@ -766,7 +766,7 @@ export const apiService = {
 
     getDeltaResultSummary: async (deltaId) => {
         try {
-            const response = await api.get(`/recent-results/delta/${deltaId}/summary`);
+            const response = await defaultApi.get(`/recent-results/delta/${deltaId}/summary`);
             return response.data;
         } catch (error) {
             console.error('Error getting delta result summary:', error);
@@ -776,7 +776,7 @@ export const apiService = {
 
     getReconciliationResultSummary: async (reconId) => {
         try {
-            const response = await api.get(`/recent-results/reconciliation/${reconId}/summary`);
+            const response = await defaultApi.get(`/recent-results/reconciliation/${reconId}/summary`);
             return response.data;
         } catch (error) {
             console.error('Error getting reconciliation result summary:', error);
@@ -786,7 +786,7 @@ export const apiService = {
 
     clearOldResults: async (keepCount = 10) => {
         try {
-            const response = await api.delete('/recent-results/clear-old', {
+            const response = await defaultApi.delete('/recent-results/clear-old', {
                 params: {keep_count: keepCount}
             });
             return response.data;
@@ -798,7 +798,7 @@ export const apiService = {
 
     getRecentResultsHealth: async () => {
         try {
-            const response = await api.get('/recent-results/health');
+            const response = await defaultApi.get('/recent-results/health');
             return response.data;
         } catch (error) {
             console.error('Error getting recent results health:', error);
@@ -811,7 +811,7 @@ export const apiService = {
     // ===========================================
     saveResultsToServer: async (resultId, resultType, processType, fileFormat = 'csv', customFilename = null, description = null) => {
         try {
-            const response = await api.post('/save-results/save', {
+            const response = await defaultApi.post('/save-results/save', {
                 result_id: resultId,
                 result_type: resultType,
                 process_type: processType,
@@ -828,7 +828,7 @@ export const apiService = {
 
     listSavedResults: async () => {
         try {
-            const response = await api.get('/save-results/list');
+            const response = await defaultApi.get('/save-results/list');
             return response.data;
         } catch (error) {
             console.error('Error listing saved results:', error);
@@ -838,7 +838,7 @@ export const apiService = {
 
     getSavedFileInfo: async (savedFileId) => {
         try {
-            const response = await api.get(`/save-results/info/${savedFileId}`);
+            const response = await defaultApi.get(`/save-results/info/${savedFileId}`);
             return response.data;
         } catch (error) {
             console.error('Error getting saved file info:', error);
@@ -848,7 +848,7 @@ export const apiService = {
 
     deleteSavedFile: async (savedFileId) => {
         try {
-            const response = await api.delete(`/save-results/delete/${savedFileId}`);
+            const response = await defaultApi.delete(`/save-results/delete/${savedFileId}`);
             return response.data;
         } catch (error) {
             console.error('Error deleting saved file:', error);
@@ -858,7 +858,7 @@ export const apiService = {
 
     downloadSavedFile: async (savedFileId, format = 'csv') => {
         try {
-            const response = await api.get(`/save-results/download/${savedFileId}`, {
+            const response = await defaultApi.get(`/save-results/download/${savedFileId}`, {
                 params: {format: format},
                 responseType: 'blob'
             });
@@ -888,7 +888,7 @@ export const apiService = {
 
     getSaveResultsHealth: async () => {
         try {
-            const response = await api.get('/save-results/health');
+            const response = await defaultApi.get('/save-results/health');
             return response.data;
         } catch (error) {
             console.error('Error getting save results health:', error);
@@ -903,7 +903,7 @@ export const apiService = {
         try {
             // Make a test call to check delete permissions
             // This could be a specific endpoint that checks permissions without actually deleting
-            const response = await api.get('/files/check-delete-access');
+            const response = await defaultApi.get('/files/check-delete-access');
             return response.data;
         } catch (error) {
             if (error.response?.status === 403) {
@@ -941,7 +941,7 @@ export const apiService = {
     // RULE MANAGEMENT OPERATIONS
     // ===========================================
     saveReconciliationRule: async (ruleData, metadata) => {
-        const response = await api.post('/rules/save', {
+        const response = await defaultApi.post('/rules/save', {
             metadata: metadata,
             rule_config: ruleData
         });
@@ -955,47 +955,47 @@ export const apiService = {
         if (filters.limit) params.append('limit', filters.limit.toString());
         if (filters.offset) params.append('offset', filters.offset.toString());
 
-        const response = await api.get(`/rules/list?${params}`);
+        const response = await defaultApi.get(`/rules/list?${params}`);
         return response.data;
     },
 
     getRulesByTemplate: async (templateId) => {
-        const response = await api.get(`/rules/template/${templateId}`);
+        const response = await defaultApi.get(`/rules/template/${templateId}`);
         return response.data;
     },
 
     getReconciliationRule: async (ruleId) => {
-        const response = await api.get(`/rules/${ruleId}`);
+        const response = await defaultApi.get(`/rules/${ruleId}`);
         return response.data;
     },
 
     updateReconciliationRule: async (ruleId, updates) => {
-        const response = await api.put(`/rules/${ruleId}`, updates);
+        const response = await defaultApi.put(`/rules/${ruleId}`, updates);
         return response.data;
     },
 
     deleteReconciliationRule: async (ruleId) => {
-        const response = await api.delete(`/rules/${ruleId}`);
+        const response = await defaultApi.delete(`/rules/${ruleId}`);
         return response.data;
     },
 
     markRuleAsUsed: async (ruleId) => {
-        const response = await api.post(`/rules/${ruleId}/use`);
+        const response = await defaultApi.post(`/rules/${ruleId}/use`);
         return response.data;
     },
 
     searchReconciliationRules: async (searchFilters) => {
-        const response = await api.post('/rules/search', searchFilters);
+        const response = await defaultApi.post('/rules/search', searchFilters);
         return response.data;
     },
 
     getRuleCategories: async () => {
-        const response = await api.get('/rules/categories/list');
+        const response = await defaultApi.get('/rules/categories/list');
         return response.data;
     },
 
     getRuleManagementHealth: async () => {
-        const response = await api.get('/rules/health');
+        const response = await defaultApi.get('/rules/health');
         return response.data;
     },
 
@@ -1095,7 +1095,7 @@ export const apiService = {
 // DELTA RULE MANAGEMENT OPERATIONS
 // ===========================================
     saveDeltaRule: async (ruleData, metadata) => {
-        const response = await api.post('/delta-rules/save', {
+        const response = await defaultApi.post('/delta-rules/save', {
             metadata: metadata,
             rule_config: ruleData
         });
@@ -1109,47 +1109,47 @@ export const apiService = {
         if (filters.limit) params.append('limit', filters.limit.toString());
         if (filters.offset) params.append('offset', filters.offset.toString());
 
-        const response = await api.get(`/delta-rules/list?${params}`);
+        const response = await defaultApi.get(`/delta-rules/list?${params}`);
         return response.data;
     },
 
     getDeltaRulesByTemplate: async (templateId) => {
-        const response = await api.get(`/delta-rules/template/${templateId}`);
+        const response = await defaultApi.get(`/delta-rules/template/${templateId}`);
         return response.data;
     },
 
     getDeltaRule: async (ruleId) => {
-        const response = await api.get(`/delta-rules/${ruleId}`);
+        const response = await defaultApi.get(`/delta-rules/${ruleId}`);
         return response.data;
     },
 
     updateDeltaRule: async (ruleId, updates) => {
-        const response = await api.put(`/delta-rules/${ruleId}`, updates);
+        const response = await defaultApi.put(`/delta-rules/${ruleId}`, updates);
         return response.data;
     },
 
     deleteDeltaRule: async (ruleId) => {
-        const response = await api.delete(`/delta-rules/${ruleId}`);
+        const response = await defaultApi.delete(`/delta-rules/${ruleId}`);
         return response.data;
     },
 
     markDeltaRuleAsUsed: async (ruleId) => {
-        const response = await api.post(`/delta-rules/${ruleId}/use`);
+        const response = await defaultApi.post(`/delta-rules/${ruleId}/use`);
         return response.data;
     },
 
     searchDeltaRules: async (searchFilters) => {
-        const response = await api.post('/delta-rules/search', searchFilters);
+        const response = await defaultApi.post('/delta-rules/search', searchFilters);
         return response.data;
     },
 
     getDeltaRuleCategories: async () => {
-        const response = await api.get('/delta-rules/categories/list');
+        const response = await defaultApi.get('/delta-rules/categories/list');
         return response.data;
     },
 
     getDeltaRuleManagementHealth: async () => {
-        const response = await api.get('/delta-rules/health');
+        const response = await defaultApi.get('/delta-rules/health');
         return response.data;
     },
 
@@ -1285,7 +1285,7 @@ export const apiService = {
 
 
 // Enhanced error handling interceptor with access control
-api.interceptors.response.use(
+defaultApi.interceptors.response.use(
     (response) => response,
     (error) => {
         console.error('API Error:', error);

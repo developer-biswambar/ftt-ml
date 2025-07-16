@@ -29,7 +29,7 @@ import {
     Zap,
     Layers
 } from 'lucide-react';
-import { apiService } from '../services/api';
+import { apiService } from '../services/defaultApi.js';
 import { deltaApiService } from '../services/deltaApiService';
 
 const RecentResultsPage = () => {

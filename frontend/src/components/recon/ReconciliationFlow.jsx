@@ -16,8 +16,8 @@ import {
     Wand2,
     X
 } from 'lucide-react';
-import AIRegexGenerator from './AIRegexGenerator';
-import RuleSaveLoad from './RuleSaveLoad';
+import AIRegexGenerator from '../core/AIRegexGenerator.jsx';
+import RuleSaveLoad from '../rules/RuleSaveLoad.jsx';
 
 const ReconciliationFlow = ({
     files,

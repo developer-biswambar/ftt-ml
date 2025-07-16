@@ -1,5 +1,5 @@
 // src/services/deltaRuleManagementService.js - Delta Rule Management Service
-import { apiService } from './api';
+import { apiService } from './defaultApi.js';
 
 class DeltaRuleManagementService {
     constructor() {

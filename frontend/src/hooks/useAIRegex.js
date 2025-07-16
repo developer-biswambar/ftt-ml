@@ -1,6 +1,6 @@
 // src/hooks/useAIRegex.js - Updated to use backend API
 import {useCallback, useState} from 'react';
-import apiService from '../services/api';
+import apiService from '../services/defaultApi.js';
 
 export const useAIRegex = () => {
     const [isGenerating, setIsGenerating] = useState(false);

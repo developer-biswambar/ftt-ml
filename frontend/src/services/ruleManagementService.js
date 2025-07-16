@@ -1,5 +1,5 @@
 // src/services/ruleManagementService.js - Reconciliation Rule Management Service
-import { apiService } from './api';
+import { apiService } from './defaultApi.js';
 
 class RuleManagementService {
     constructor() {

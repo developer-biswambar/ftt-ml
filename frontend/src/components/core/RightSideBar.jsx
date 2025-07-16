@@ -55,7 +55,7 @@ const RightSidebar = ({
             } else {
                 // Merge current processed files with recent results from server
                 try {
-                    const {deltaApiService} = await import('../services/deltaApiService');
+                    const {deltaApiService} = await import('../../services/deltaApiService.js');
                     const recentResults = await deltaApiService.loadRecentResultsForSidebar(10);
 
                     // Create a merged list, avoiding duplicates
@@ -113,7 +113,7 @@ const RightSidebar = ({
         setLoadingRecentResults(true);
         try {
             // Import deltaApiService dynamically
-            const {deltaApiService} = await import('../services/deltaApiService');
+            const {deltaApiService} = await import('../../services/deltaApiService.js');
 
             const recentResults = await deltaApiService.loadRecentResultsForSidebar(10);
 
@@ -169,7 +169,7 @@ const RightSidebar = ({
             }
 
             // Then load recent results from server
-            const {deltaApiService} = await import('../services/deltaApiService');
+            const {deltaApiService} = await import('../../services/deltaApiService.js');
             const recentResults = await deltaApiService.loadRecentResultsForSidebar(10);
 
             // Merge with current processedFiles
@@ -372,7 +372,7 @@ const RightSidebar = ({
         setSaveInProgress(true);
         try {
             // Import the deltaApiService for saving
-            const {deltaApiService} = await import('../services/deltaApiService');
+            const {deltaApiService} = await import('../../services/deltaApiService.js');
 
             let result;
             const {processId, downloadType, processInfo} = saveModalData;

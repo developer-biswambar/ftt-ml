@@ -1,7 +1,7 @@
 // src/components/FileUploadModal.jsx - Reusable File Upload Modal with Sheet Selection
 import React, { useState, useEffect } from 'react';
 import { Upload, X, AlertCircle, AlertTriangle } from 'lucide-react';
-import { apiService } from '../services/api';
+import { apiService } from '../services/defaultApi.js';
 
 const FileUploadModal = ({
     isOpen,

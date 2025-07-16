@@ -1,5 +1,5 @@
 // src/services/processManagementService.js
-import { apiService } from './api';
+import { apiService } from './defaultApi.js';
 import { deltaApiService } from './deltaApiService';
 
 class ProcessManagementService {

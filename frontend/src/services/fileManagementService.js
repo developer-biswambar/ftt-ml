@@ -1,5 +1,5 @@
 // src/services/fileManagementService.js
-import { apiService } from './api';
+import { apiService } from './defaultApi.js';
 
 class FileManagementService {
     constructor() {

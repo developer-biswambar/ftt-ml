@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {apiService} from '../services/api';
+import {apiService} from '../services/defaultApi.js';
 import {AlertTriangle, CheckCircle, Copy, Download, Layers, Zap} from 'lucide-react';
 
 const FileGeneratorFlow = ({

@@ -1,4 +1,4 @@
-// src/components/DeltaRuleSaveLoad.jsx - Component for saving and loading delta generation rules
+// src/components/RuleSaveLoad.jsx - Component for saving and loading reconciliation rules
 import React, { useState, useEffect } from 'react';
 import {
     Save,
@@ -14,12 +14,11 @@ import {
     Check,
     Filter,
     Star,
-    Clock,
-    GitCompare
+    Clock
 } from 'lucide-react';
-import { apiService } from '../services/api';
+import { apiService } from '../../services/defaultApi.js';
 
-const DeltaRuleSaveLoad = ({
+const RuleSaveLoad = ({
     selectedTemplate,
     currentConfig,
     fileColumns,
@@ -40,13 +39,13 @@ const DeltaRuleSaveLoad = ({
     const [saveForm, setSaveForm] = useState({
         name: '',
         description: '',
-        category: 'delta',
+        category: 'reconciliation',
         tags: []
     });
     const [saveErrors, setSaveErrors] = useState([]);
 
     // Categories and filters
-    const [categories, setCategories] = useState(['all', 'delta', 'financial', 'trading', 'data-comparison', 'general']);
+    const [categories, setCategories] = useState(['all', 'reconciliation', 'financial', 'trading', 'general']);
 
     useEffect(() => {
         if (activeTab === 'load') {
@@ -63,7 +62,7 @@ const DeltaRuleSaveLoad = ({
                 setSaveForm({
                     name: loadedRule.name,
                     description: loadedRule.description || '',
-                    category: loadedRule.category || 'delta',
+                    category: loadedRule.category || 'reconciliation',
                     tags: loadedRule.tags || []
                 });
             }
@@ -74,14 +73,12 @@ const DeltaRuleSaveLoad = ({
         setLoading(true);
         try {
             const templateRules = selectedTemplate?.id
-                ? await apiService.getDeltaRulesByTemplate(selectedTemplate.id)
-                : await apiService.listDeltaRules({ limit: 50 });
+                ? await apiService.getRulesByTemplate(selectedTemplate.id)
+                : await apiService.listReconciliationRules({ limit: 50 });
 
             setRules(templateRules);
         } catch (error) {
-            console.error('Error loading delta rules:', error);
-            // Fallback to empty array if API fails
-            setRules([]);
+            console.error('Error loading rules:', error);
         } finally {
             setLoading(false);
         }
@@ -91,7 +88,7 @@ const DeltaRuleSaveLoad = ({
         setSaveErrors([]);
 
         // Validate form
-        const validation = apiService.validateDeltaRuleMetadata(saveForm);
+        const validation = apiService.validateRuleMetadata(saveForm);
         if (!validation.isValid) {
             setSaveErrors(validation.errors);
             return;
@@ -99,7 +96,7 @@ const DeltaRuleSaveLoad = ({
 
         setLoading(true);
         try {
-            const { ruleConfig, ruleMetadata } = apiService.createDeltaRuleFromConfig(
+            const { ruleConfig, ruleMetadata } = apiService.createRuleFromConfig(
                 currentConfig,
                 selectedTemplate,
                 saveForm
@@ -108,19 +105,19 @@ const DeltaRuleSaveLoad = ({
             let savedRule;
             if (loadedRuleId && hasUnsavedChanges) {
                 // Update existing rule
-                savedRule = await apiService.updateDeltaRule(loadedRuleId, {
+                savedRule = await apiService.updateReconciliationRule(loadedRuleId, {
                     metadata: ruleMetadata,
                     rule_config: ruleConfig
                 });
             } else {
                 // Create new rule
-                savedRule = await apiService.saveDeltaRule(ruleConfig, ruleMetadata);
+                savedRule = await apiService.saveReconciliationRule(ruleConfig, ruleMetadata);
             }
 
             onRuleSaved(savedRule);
             onClose();
         } catch (error) {
-            console.error('Error saving delta rule:', error);
+            console.error('Error saving rule:', error);
             setSaveErrors([error.message || 'Failed to save rule']);
         } finally {
             setLoading(false);
@@ -131,10 +128,10 @@ const DeltaRuleSaveLoad = ({
         setLoading(true);
         try {
             // Mark rule as used
-            await apiService.markDeltaRuleAsUsed(rule.id);
+            await apiService.markRuleAsUsed(rule.id);
 
             // Adapt rule to current files
-            const { adaptedConfig, warnings, errors } = apiService.adaptDeltaRuleToFiles(rule, fileColumns);
+            const { adaptedConfig, warnings, errors } = apiService.adaptRuleToFiles(rule, fileColumns);
 
             if (errors.length > 0) {
                 alert(`Cannot load rule: ${errors.join('\n')}`);
@@ -144,7 +141,7 @@ const DeltaRuleSaveLoad = ({
             onRuleLoaded(rule, adaptedConfig, warnings);
             onClose();
         } catch (error) {
-            console.error('Error loading delta rule:', error);
+            console.error('Error loading rule:', error);
             alert('Failed to load rule: ' + error.message);
         } finally {
             setLoading(false);
@@ -152,16 +149,16 @@ const DeltaRuleSaveLoad = ({
     };
 
     const handleDeleteRule = async (ruleId) => {
-        if (!confirm('Are you sure you want to delete this delta rule? This action cannot be undone.')) {
+        if (!confirm('Are you sure you want to delete this rule? This action cannot be undone.')) {
             return;
         }
 
         setLoading(true);
         try {
-            await apiService.deleteDeltaRule(ruleId);
+            await apiService.deleteReconciliationRule(ruleId);
             await loadRules(); // Refresh list
         } catch (error) {
-            console.error('Error deleting delta rule:', error);
+            console.error('Error deleting rule:', error);
             alert('Failed to delete rule: ' + error.message);
         } finally {
             setLoading(false);
@@ -200,12 +197,9 @@ const DeltaRuleSaveLoad = ({
                 {/* Header */}
                 <div className="p-4 border-b border-gray-200 bg-gray-50">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                            <GitCompare size={20} className="text-blue-600" />
-                            <h2 className="text-lg font-semibold text-gray-800">
-                                {loadedRuleId && hasUnsavedChanges ? 'Update Delta Rule' : 'Delta Rule Management'}
-                            </h2>
-                        </div>
+                        <h2 className="text-lg font-semibold text-gray-800">
+                            {loadedRuleId && hasUnsavedChanges ? 'Update Rule' : 'Rule Management'}
+                        </h2>
                         <button
                             onClick={onClose}
                             className="p-1 text-gray-400 hover:text-gray-600"
@@ -251,7 +245,7 @@ const DeltaRuleSaveLoad = ({
                                     <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                                     <input
                                         type="text"
-                                        placeholder="Search delta rules..."
+                                        placeholder="Search rules..."
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                         className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -274,22 +268,21 @@ const DeltaRuleSaveLoad = ({
                             {loading ? (
                                 <div className="text-center py-8">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                                    <p className="text-gray-500 mt-2">Loading delta rules...</p>
+                                    <p className="text-gray-500 mt-2">Loading rules...</p>
                                 </div>
                             ) : filteredRules.length === 0 ? (
                                 <div className="text-center py-8">
-                                    <GitCompare size={48} className="mx-auto mb-4 text-gray-400" />
                                     <p className="text-gray-500">
                                         {searchTerm || selectedCategory !== 'all'
-                                            ? 'No delta rules match your filters'
-                                            : 'No saved delta rules found'
+                                            ? 'No rules match your filters'
+                                            : 'No saved rules found'
                                         }
                                     </p>
                                     <button
                                         onClick={() => setActiveTab('save')}
                                         className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
                                     >
-                                        Save your first delta rule →
+                                        Save your first rule →
                                     </button>
                                 </div>
                             ) : (
@@ -301,10 +294,9 @@ const DeltaRuleSaveLoad = ({
                                                     <div className="flex items-center space-x-2 mb-2">
                                                         <h3 className="font-medium text-gray-800">{rule.name}</h3>
                                                         <span className={`px-2 py-1 text-xs rounded-full ${
-                                                            rule.category === 'delta' ? 'bg-blue-100 text-blue-800' :
+                                                            rule.category === 'reconciliation' ? 'bg-blue-100 text-blue-800' :
                                                             rule.category === 'financial' ? 'bg-green-100 text-green-800' :
                                                             rule.category === 'trading' ? 'bg-purple-100 text-purple-800' :
-                                                            rule.category === 'data-comparison' ? 'bg-orange-100 text-orange-800' :
                                                             'bg-gray-100 text-gray-800'
                                                         }`}>
                                                             {rule.category}
@@ -385,7 +377,7 @@ const DeltaRuleSaveLoad = ({
                         <div className="space-y-4">
                             <div>
                                 <h3 className="text-lg font-medium text-gray-800 mb-4">
-                                    {loadedRuleId && hasUnsavedChanges ? 'Update Delta Rule Configuration' : 'Save Current Delta Configuration as Rule'}
+                                    {loadedRuleId && hasUnsavedChanges ? 'Update Rule Configuration' : 'Save Current Configuration as Rule'}
                                 </h3>
 
                                 {saveErrors.length > 0 && (
@@ -412,7 +404,7 @@ const DeltaRuleSaveLoad = ({
                                             value={saveForm.name}
                                             onChange={(e) => setSaveForm(prev => ({ ...prev, name: e.target.value }))}
                                             className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="e.g., Financial Delta with Amount Comparison"
+                                            placeholder="e.g., Trade Reconciliation with Amount Extraction"
                                         />
                                     </div>
 
@@ -425,10 +417,9 @@ const DeltaRuleSaveLoad = ({
                                             onChange={(e) => setSaveForm(prev => ({ ...prev, category: e.target.value }))}
                                             className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         >
-                                            <option value="delta">Delta</option>
+                                            <option value="reconciliation">Reconciliation</option>
                                             <option value="financial">Financial</option>
                                             <option value="trading">Trading</option>
-                                            <option value="data-comparison">Data Comparison</option>
                                             <option value="general">General</option>
                                             <option value="custom">Custom</option>
                                         </select>
@@ -444,7 +435,7 @@ const DeltaRuleSaveLoad = ({
                                         onChange={(e) => setSaveForm(prev => ({ ...prev, description: e.target.value }))}
                                         rows={3}
                                         className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Describe what this delta rule does and when to use it..."
+                                        placeholder="Describe what this rule does and when to use it..."
                                     />
                                 </div>
 
@@ -478,7 +469,7 @@ const DeltaRuleSaveLoad = ({
                                             className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                         />
                                         <div className="flex space-x-1">
-                                            {['key-matching', 'comparison', 'tolerance'].map(suggestedTag => (
+                                            {['extraction', 'filtering', 'tolerance'].map(suggestedTag => (
                                                 <button
                                                     key={suggestedTag}
                                                     onClick={() => addTag(suggestedTag)}
@@ -495,10 +486,11 @@ const DeltaRuleSaveLoad = ({
                                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                                     <h4 className="font-medium text-gray-800 mb-2">Configuration Summary</h4>
                                     <div className="text-sm text-gray-600 space-y-1">
-                                        <div>• Key rules: {currentConfig.KeyRules?.length || 0}</div>
-                                        <div>• Comparison rules: {currentConfig.ComparisonRules?.length || 0}</div>
-                                        <div>• Older file columns: {currentConfig.selected_columns_file_a?.length || 0}</div>
-                                        <div>• Newer file columns: {currentConfig.selected_columns_file_b?.length || 0}</div>
+                                        <div>• Extraction rules: {currentConfig.Files?.reduce((total, file) => total + (file.Extract?.length || 0), 0) || 0}</div>
+                                        <div>• Filter rules: {currentConfig.Files?.reduce((total, file) => total + (file.Filter?.length || 0), 0) || 0}</div>
+                                        <div>• Reconciliation rules: {currentConfig.ReconciliationRules?.length || 0}</div>
+                                        <div>• File A columns: {currentConfig.selected_columns_file_a?.length || 0}</div>
+                                        <div>• File B columns: {currentConfig.selected_columns_file_b?.length || 0}</div>
                                     </div>
                                 </div>
 
@@ -530,7 +522,7 @@ const DeltaRuleSaveLoad = ({
                         <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
                             <div className="p-4 border-b border-gray-200 bg-gray-50">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-lg font-semibold text-gray-800">Delta Rule Details</h3>
+                                    <h3 className="text-lg font-semibold text-gray-800">Rule Details</h3>
                                     <button
                                         onClick={() => setShowRuleDetails(null)}
                                         className="p-1 text-gray-400 hover:text-gray-600"
@@ -582,37 +574,20 @@ const DeltaRuleSaveLoad = ({
                                     <div>
                                         <h5 className="font-medium text-gray-700 mb-2">Configuration Summary:</h5>
                                         <div className="bg-gray-50 p-3 rounded text-sm">
-                                            <div>• Key Rules: {showRuleDetails.rule_config.KeyRules?.length || 0}</div>
-                                            <div>• Comparison Rules: {showRuleDetails.rule_config.ComparisonRules?.length || 0}</div>
-                                            <div>• Result Columns Selected: {
-                                                (showRuleDetails.rule_config.selected_columns_file_a?.length || 0) +
-                                                (showRuleDetails.rule_config.selected_columns_file_b?.length || 0)
-                                            }</div>
+                                            <div>• Extraction Rules: {showRuleDetails.rule_config.Files?.reduce((total, file) => total + (file.Extract?.length || 0), 0) || 0}</div>
+                                            <div>• Filter Rules: {showRuleDetails.rule_config.Files?.reduce((total, file) => total + (file.Filter?.length || 0), 0) || 0}</div>
+                                            <div>• Reconciliation Rules: {showRuleDetails.rule_config.ReconciliationRules?.length || 0}</div>
                                         </div>
                                     </div>
 
-                                    {showRuleDetails.rule_config.KeyRules && showRuleDetails.rule_config.KeyRules.length > 0 && (
+                                    {showRuleDetails.rule_config.ReconciliationRules && showRuleDetails.rule_config.ReconciliationRules.length > 0 && (
                                         <div>
-                                            <h5 className="font-medium text-gray-700 mb-2">Key Rules:</h5>
+                                            <h5 className="font-medium text-gray-700 mb-2">Reconciliation Rules:</h5>
                                             <div className="space-y-2">
-                                                {showRuleDetails.rule_config.KeyRules.map((rule, index) => (
-                                                    <div key={index} className="bg-blue-50 p-2 rounded text-sm">
-                                                        <div>Key {index + 1}: "{rule.LeftFileColumn}" matches "{rule.RightFileColumn}"</div>
-                                                        <div>Type: {rule.MatchType} {rule.ToleranceValue ? `(tolerance: ${rule.ToleranceValue}%)` : ''}</div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {showRuleDetails.rule_config.ComparisonRules && showRuleDetails.rule_config.ComparisonRules.length > 0 && (
-                                        <div>
-                                            <h5 className="font-medium text-gray-700 mb-2">Comparison Rules:</h5>
-                                            <div className="space-y-2">
-                                                {showRuleDetails.rule_config.ComparisonRules.map((rule, index) => (
-                                                    <div key={index} className="bg-green-50 p-2 rounded text-sm">
-                                                        <div>Compare "{rule.LeftFileColumn}" with "{rule.RightFileColumn}"</div>
-                                                        <div>Type: {rule.MatchType} {rule.ToleranceValue ? `(tolerance: ${rule.ToleranceValue}%)` : ''}</div>
+                                                {showRuleDetails.rule_config.ReconciliationRules.map((rule, index) => (
+                                                    <div key={index} className="bg-gray-50 p-2 rounded text-sm">
+                                                        <div>Match: {rule.LeftFileColumn} ↔ {rule.RightFileColumn}</div>
+                                                        <div>Type: {rule.MatchType} {rule.ToleranceValue ? `(tolerance: ${rule.ToleranceValue})` : ''}</div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -649,4 +624,4 @@ const DeltaRuleSaveLoad = ({
     );
 };
 
-export default DeltaRuleSaveLoad;
+export default RuleSaveLoad;

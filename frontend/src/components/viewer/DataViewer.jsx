@@ -16,7 +16,7 @@ import {
     Undo,
     X
 } from 'lucide-react';
-import {apiService} from '../services/api';
+import {apiService} from '../../services/defaultApi.js';
 
 const DataViewer = ({fileId, onClose}) => {
     // State management

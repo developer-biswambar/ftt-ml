@@ -27,8 +27,8 @@ import {
     MoreVertical,
     Info
 } from 'lucide-react';
-import { apiService } from '../services/api';
-import FileUploadModal from '../components/FileUploadModal';
+import { apiService } from '../services/defaultApi.js';
+import FileUploadModal from '../fileManagement/FileUploadModal.jsx';
 
 const FileLibraryPage = () => {
     const [files, setFiles] = useState([]);
