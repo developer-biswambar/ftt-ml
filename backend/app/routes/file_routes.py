@@ -3,13 +3,14 @@ import io
 import logging
 import os
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import UploadFile, File, HTTPException, APIRouter, BackgroundTasks, Form
 from pydantic import BaseModel
 
+from app.routes.delta_routes import DeltaProcessor, get_file_by_id
 from app.utils.uuid_generator import generate_uuid
 
 # Load environment variables
@@ -480,3 +481,123 @@ async def preview_file_data(
             }
         }
     }
+@router.get("/{file_id}/columns/{column_name}/unique-values")
+async def get_column_unique_values(
+        file_id: str,
+        column_name: str,
+        limit: Optional[int] = 1000
+):
+    """Get unique values for a specific column in a file with date parsing"""
+
+    try:
+        # Get the file DataFrame
+        df = await get_file_by_id(file_id)
+
+        if column_name not in df.columns:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Column '{column_name}' not found in file"
+            )
+
+        # Get the column data
+        column_data = df[column_name].dropna()
+
+        if len(column_data) == 0:
+            return {
+                "file_id": file_id,
+                "column_name": column_name,
+                "unique_values": [],
+                "total_unique": 0,
+                "is_date_column": False,
+                "sample_values": []
+            }
+
+        # Check if this might be a date column by sampling some values
+        processor = DeltaProcessor()
+        sample_size = min(50, len(column_data))
+        sample_values = column_data.sample(n=sample_size).tolist()
+
+        # Test if this looks like a date column
+        parsed_dates = 0
+        for value in sample_values[:10]:  # Test first 10 samples
+            if processor.parse_excel_date(value) is not None:
+                parsed_dates += 1
+
+        is_date_column = parsed_dates >= 5  # If 5+ out of 10 samples parse as dates
+
+        # Get unique values
+        unique_values = column_data.unique()
+
+        # Limit the number of unique values returned
+        if len(unique_values) > limit:
+            unique_values = unique_values[:limit]
+
+        # Process values based on whether it's a date column
+        processed_values = []
+
+        for value in unique_values:
+            if pd.isna(value):
+                continue
+
+            if is_date_column:
+                # Try to parse as date
+                parsed_date = processor.parse_excel_date(value)
+                if parsed_date is not None:
+                    # Format date consistently
+                    formatted_date = parsed_date.strftime('%Y-%m-%d')
+                    processed_values.append({
+                        "original_value": value,
+                        "display_value": formatted_date,
+                        "sort_value": formatted_date,
+                        "is_date": True
+                    })
+                else:
+                    # Not a valid date, treat as string
+                    processed_values.append({
+                        "original_value": value,
+                        "display_value": str(value),
+                        "sort_value": str(value).lower(),
+                        "is_date": False
+                    })
+            else:
+                # Regular string/numeric value
+                processed_values.append({
+                    "original_value": value,
+                    "display_value": str(value),
+                    "sort_value": str(value).lower() if not pd.api.types.is_numeric_dtype(type(value)) else value,
+                    "is_date": False
+                })
+
+        # Sort the processed values
+        if is_date_column:
+            # Sort dates chronologically
+            processed_values.sort(key=lambda x: x["sort_value"])
+        else:
+            # Sort alphabetically/numerically
+            processed_values.sort(key=lambda x: x["sort_value"])
+
+        # Extract just the display values for the response
+        unique_display_values = [item["display_value"] for item in processed_values]
+
+        # Get some sample values for debugging
+        sample_display_values = unique_display_values[:10]
+
+        return {
+            "file_id": file_id,
+            "column_name": column_name,
+            "unique_values": unique_display_values,
+            "total_unique": len(column_data.unique()),
+            "returned_count": len(unique_display_values),
+            "is_date_column": is_date_column,
+            "sample_values": sample_display_values,
+            "has_more": len(column_data.unique()) > limit
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting unique values for column {column_name} in file {file_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get unique values: {str(e)}"
+        )
