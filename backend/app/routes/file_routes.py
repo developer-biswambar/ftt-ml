@@ -574,7 +574,7 @@ async def get_column_unique_values(
             processed_values.sort(key=lambda x: x["sort_value"])
         else:
             # Sort alphabetically/numerically
-            processed_values.sort(key=lambda x: x["sort_value"])
+            processed_values.sort(key=lambda x: str(x["sort_value"]))
 
         # Extract just the display values for the response
         unique_display_values = [item["display_value"] for item in processed_values]

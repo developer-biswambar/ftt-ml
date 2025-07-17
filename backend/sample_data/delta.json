@@ -1,0 +1,70 @@
+{
+  "process_type": "delta-generation",
+  "process_name": "Delta Generation",
+  "user_requirements": "Generate delta between older and newer files using configured key and comparison rules",
+  "files": [
+    {
+      "file_id": "file_20250717_05h09m28s_730",
+      "role": "file_0",
+      "label": "Older File"
+    },
+    {
+      "file_id": "file_20250717_05h09m28s_730",
+      "role": "file_1",
+      "label": "Newer File"
+    }
+  ],
+  "delta_config": {
+    "Files": [
+      {
+        "Name": "FileA",
+        "Extract": [],
+        "Filter": []
+      },
+      {
+        "Name": "FileB",
+        "Extract": [],
+        "Filter": []
+      }
+    ],
+    "KeyRules": [
+      {
+        "LeftFileColumn": "employee_id",
+        "RightFileColumn": "employee_id",
+        "MatchType": "equals",
+        "ToleranceValue": null,
+        "IsKey": true
+      }
+    ],
+    "ComparisonRules": [
+      {
+        "LeftFileColumn": "salary",
+        "RightFileColumn": "salary",
+        "MatchType": "equals",
+        "ToleranceValue": null,
+        "IsKey": false
+      }
+    ],
+    "selected_columns_file_a": [
+      "employee_id",
+      "salary"
+    ],
+    "selected_columns_file_b": [
+      "employee_id",
+      "salary"
+    ],
+    "user_requirements": "Generate delta between older and newer files using configured key and comparison rules",
+    "files": [
+      {
+        "file_id": "file_20250717_05h09m28s_730",
+        "role": "file_0",
+        "label": "Older File"
+      },
+      {
+        "file_id": "file_20250717_05h09m28s_730",
+        "role": "file_1",
+        "label": "Newer File"
+      }
+    ]
+  }
+}

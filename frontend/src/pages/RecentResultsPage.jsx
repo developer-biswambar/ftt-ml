@@ -1,6 +1,6 @@
 // src/pages/RecentResultsPage.jsx - Detailed Recent Results View
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, {useState, useEffect} from 'react';
+import {useNavigate, useSearchParams} from 'react-router-dom';
 import {
     ArrowLeft,
     BarChart3,
@@ -29,8 +29,9 @@ import {
     Zap,
     Layers
 } from 'lucide-react';
-import { apiService } from '../services/defaultApi.js';
-import { deltaApiService } from '../services/deltaApiService';
+import {apiService} from '../services/defaultApi.js';
+import {deltaApiService} from '../services/deltaApiService';
+import RulesTab from "../components/rules/RulesTab.jsx";
 
 const RecentResultsPage = () => {
     const navigate = useNavigate();
@@ -239,29 +240,33 @@ const RecentResultsPage = () => {
         switch (status) {
             case 'completed':
                 return (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <CheckCircle className="w-3 h-3 mr-1" />
+                    <span
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <CheckCircle className="w-3 h-3 mr-1"/>
                         Completed
                     </span>
                 );
             case 'processing':
                 return (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        <Clock className="w-3 h-3 mr-1 animate-pulse" />
+                    <span
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        <Clock className="w-3 h-3 mr-1 animate-pulse"/>
                         Processing
                     </span>
                 );
             case 'failed':
                 return (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        <AlertCircle className="w-3 h-3 mr-1" />
+                    <span
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        <AlertCircle className="w-3 h-3 mr-1"/>
                         Failed
                     </span>
                 );
             default:
                 return (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        <Clock className="w-3 h-3 mr-1" />
+                    <span
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        <Clock className="w-3 h-3 mr-1"/>
                         {status || 'Unknown'}
                     </span>
                 );
@@ -279,7 +284,7 @@ const RecentResultsPage = () => {
                                 onClick={() => navigate('/')}
                                 className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                             >
-                                <ArrowLeft className="w-4 h-4 mr-2" />
+                                <ArrowLeft className="w-4 h-4 mr-2"/>
                                 Back to Main
                             </button>
                             <div>
@@ -293,7 +298,7 @@ const RecentResultsPage = () => {
                                 disabled={loading}
                                 className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                             >
-                                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`}/>
                                 Refresh
                             </button>
                         </div>
@@ -308,7 +313,7 @@ const RecentResultsPage = () => {
                         <div className="p-5">
                             <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                    <Database className="h-6 w-6 text-gray-400" />
+                                    <Database className="h-6 w-6 text-gray-400"/>
                                 </div>
                                 <div className="ml-5 w-0 flex-1">
                                     <dl>
@@ -324,7 +329,7 @@ const RecentResultsPage = () => {
                         <div className="p-5">
                             <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                    <TrendingUp className="h-6 w-6 text-green-400" />
+                                    <TrendingUp className="h-6 w-6 text-green-400"/>
                                 </div>
                                 <div className="ml-5 w-0 flex-1">
                                     <dl>
@@ -340,7 +345,7 @@ const RecentResultsPage = () => {
                         <div className="p-5">
                             <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                    <Activity className="h-6 w-6 text-blue-400" />
+                                    <Activity className="h-6 w-6 text-blue-400"/>
                                 </div>
                                 <div className="ml-5 w-0 flex-1">
                                     <dl>
@@ -356,7 +361,7 @@ const RecentResultsPage = () => {
                         <div className="p-5">
                             <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                    <PieChart className="h-6 w-6 text-purple-400" />
+                                    <PieChart className="h-6 w-6 text-purple-400"/>
                                 </div>
                                 <div className="ml-5 w-0 flex-1">
                                     <dl>
@@ -376,7 +381,7 @@ const RecentResultsPage = () => {
                             {/* Search */}
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Search className="h-5 w-5 text-gray-400" />
+                                    <Search className="h-5 w-5 text-gray-400"/>
                                 </div>
                                 <input
                                     type="text"
@@ -433,22 +438,23 @@ const RecentResultsPage = () => {
                 {loading ? (
                     <div className="bg-white shadow rounded-lg p-8">
                         <div className="text-center">
-                            <Loader className="mx-auto h-12 w-12 text-gray-400 animate-spin" />
+                            <Loader className="mx-auto h-12 w-12 text-gray-400 animate-spin"/>
                             <h3 className="mt-2 text-sm font-medium text-gray-900">Loading results...</h3>
-                            <p className="mt-1 text-sm text-gray-500">Please wait while we fetch your recent processes</p>
+                            <p className="mt-1 text-sm text-gray-500">Please wait while we fetch your recent
+                                processes</p>
                         </div>
                     </div>
                 ) : error ? (
                     <div className="bg-white shadow rounded-lg p-8">
                         <div className="text-center">
-                            <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
+                            <AlertCircle className="mx-auto h-12 w-12 text-red-400"/>
                             <h3 className="mt-2 text-sm font-medium text-gray-900">Error Loading Results</h3>
                             <p className="mt-1 text-sm text-gray-500">{error}</p>
                             <button
                                 onClick={loadRecentResults}
                                 className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                             >
-                                <RefreshCw className="w-4 h-4 mr-2" />
+                                <RefreshCw className="w-4 h-4 mr-2"/>
                                 Try Again
                             </button>
                         </div>
@@ -456,7 +462,7 @@ const RecentResultsPage = () => {
                 ) : filteredResults.length === 0 ? (
                     <div className="bg-white shadow rounded-lg p-8">
                         <div className="text-center">
-                            <FileText className="mx-auto h-12 w-12 text-gray-400" />
+                            <FileText className="mx-auto h-12 w-12 text-gray-400"/>
                             <h3 className="mt-2 text-sm font-medium text-gray-900">No results found</h3>
                             <p className="mt-1 text-sm text-gray-500">
                                 {searchTerm || filterType !== 'all'
@@ -482,8 +488,10 @@ const RecentResultsPage = () => {
                                         <div className="px-4 py-4 sm:px-6">
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center space-x-4">
-                                                    <div className={`flex-shrink-0 w-10 h-10 bg-${processInfo.color}-100 rounded-full flex items-center justify-center`}>
-                                                        <ProcessIcon className={`w-5 h-5 text-${processInfo.color}-600`} />
+                                                    <div
+                                                        className={`flex-shrink-0 w-10 h-10 bg-${processInfo.color}-100 rounded-full flex items-center justify-center`}>
+                                                        <ProcessIcon
+                                                            className={`w-5 h-5 text-${processInfo.color}-600`}/>
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center space-x-3">
@@ -496,7 +504,8 @@ const RecentResultsPage = () => {
                                                             ID: {result.id}
                                                         </p>
                                                         <div className="mt-2 flex items-center text-sm text-gray-500">
-                                                            <Calendar className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
+                                                            <Calendar
+                                                                className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400"/>
                                                             {new Date(result.created_at).toLocaleString()}
                                                         </div>
                                                     </div>
@@ -506,7 +515,7 @@ const RecentResultsPage = () => {
                                                         onClick={() => openResultDetails(result)}
                                                         className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                                     >
-                                                        <Eye className="w-4 h-4 mr-2" />
+                                                        <Eye className="w-4 h-4 mr-2"/>
                                                         Details
                                                     </button>
                                                 </div>
@@ -519,7 +528,8 @@ const RecentResultsPage = () => {
                                                         <div className="text-xs font-medium text-gray-500 mb-1">
                                                             {processInfo.type === 'delta' ? 'Older File' : 'File A'}
                                                         </div>
-                                                        <div className="text-sm text-gray-900 truncate" title={result.file_a}>
+                                                        <div className="text-sm text-gray-900 truncate"
+                                                             title={result.file_a}>
                                                             📄 {result.file_a}
                                                         </div>
                                                     </div>
@@ -529,7 +539,8 @@ const RecentResultsPage = () => {
                                                         <div className="text-xs font-medium text-gray-500 mb-1">
                                                             {processInfo.type === 'delta' ? 'Newer File' : 'File B'}
                                                         </div>
-                                                        <div className="text-sm text-gray-900 truncate" title={result.file_b}>
+                                                        <div className="text-sm text-gray-900 truncate"
+                                                             title={result.file_b}>
                                                             📄 {result.file_b}
                                                         </div>
                                                     </div>
@@ -539,18 +550,22 @@ const RecentResultsPage = () => {
                                             {/* Summary Statistics */}
                                             {result.summary && result.status === 'completed' && (
                                                 <div className="mt-4 bg-gray-50 rounded-lg p-4">
-                                                    <h4 className="text-sm font-medium text-gray-900 mb-3">Summary Statistics</h4>
+                                                    <h4 className="text-sm font-medium text-gray-900 mb-3">Summary
+                                                        Statistics</h4>
                                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                                         {processInfo.type === 'delta' ? (
                                                             <>
                                                                 <div className="text-center">
-                                                                    <div className="text-lg font-semibold text-green-600">
+                                                                    <div
+                                                                        className="text-lg font-semibold text-green-600">
                                                                         {(result.summary.unchanged_records || 0).toLocaleString()}
                                                                     </div>
-                                                                    <div className="text-xs text-gray-500">Unchanged</div>
+                                                                    <div className="text-xs text-gray-500">Unchanged
+                                                                    </div>
                                                                 </div>
                                                                 <div className="text-center">
-                                                                    <div className="text-lg font-semibold text-orange-600">
+                                                                    <div
+                                                                        className="text-lg font-semibold text-orange-600">
                                                                         {(result.summary.amended_records || 0).toLocaleString()}
                                                                     </div>
                                                                     <div className="text-xs text-gray-500">Amended</div>
@@ -562,7 +577,8 @@ const RecentResultsPage = () => {
                                                                     <div className="text-xs text-gray-500">Deleted</div>
                                                                 </div>
                                                                 <div className="text-center">
-                                                                    <div className="text-lg font-semibold text-purple-600">
+                                                                    <div
+                                                                        className="text-lg font-semibold text-purple-600">
                                                                         {(result.summary.newly_added_records || 0).toLocaleString()}
                                                                     </div>
                                                                     <div className="text-xs text-gray-500">Added</div>
@@ -571,25 +587,30 @@ const RecentResultsPage = () => {
                                                         ) : (
                                                             <>
                                                                 <div className="text-center">
-                                                                    <div className="text-lg font-semibold text-green-600">
+                                                                    <div
+                                                                        className="text-lg font-semibold text-green-600">
                                                                         {(result.summary.match_percentage || 0).toFixed(1)}%
                                                                     </div>
-                                                                    <div className="text-xs text-gray-500">Match Rate</div>
+                                                                    <div className="text-xs text-gray-500">Match Rate
+                                                                    </div>
                                                                 </div>
                                                                 <div className="text-center">
-                                                                    <div className="text-lg font-semibold text-blue-600">
+                                                                    <div
+                                                                        className="text-lg font-semibold text-blue-600">
                                                                         {(result.summary.matched_records || 0).toLocaleString()}
                                                                     </div>
                                                                     <div className="text-xs text-gray-500">Matched</div>
                                                                 </div>
                                                                 <div className="text-center">
-                                                                    <div className="text-lg font-semibold text-orange-600">
+                                                                    <div
+                                                                        className="text-lg font-semibold text-orange-600">
                                                                         {(result.summary.unmatched_file_a || 0).toLocaleString()}
                                                                     </div>
                                                                     <div className="text-xs text-gray-500">A Only</div>
                                                                 </div>
                                                                 <div className="text-center">
-                                                                    <div className="text-lg font-semibold text-purple-600">
+                                                                    <div
+                                                                        className="text-lg font-semibold text-purple-600">
                                                                         {(result.summary.unmatched_file_b || 0).toLocaleString()}
                                                                     </div>
                                                                     <div className="text-xs text-gray-500">B Only</div>
@@ -607,21 +628,21 @@ const RecentResultsPage = () => {
                                                         onClick={() => handleDownload(result.id, 'all', processInfo.type)}
                                                         className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                                     >
-                                                        <Download className="w-3 h-3 mr-1" />
+                                                        <Download className="w-3 h-3 mr-1"/>
                                                         Download All
                                                     </button>
                                                     <button
                                                         onClick={() => handleSaveToServer(result.id, 'all', processInfo.type)}
                                                         className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                                     >
-                                                        <Server className="w-3 h-3 mr-1" />
+                                                        <Server className="w-3 h-3 mr-1"/>
                                                         Save to Server
                                                     </button>
                                                     <button
                                                         onClick={() => handleDownload(result.id, 'all_excel', processInfo.type)}
                                                         className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                                     >
-                                                        <FileSpreadsheet className="w-3 h-3 mr-1" />
+                                                        <FileSpreadsheet className="w-3 h-3 mr-1"/>
                                                         Excel Export
                                                     </button>
                                                 </div>
@@ -649,14 +670,14 @@ const RecentResultsPage = () => {
 };
 
 // Result Detail Modal Component
-const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
+const ResultDetailModal = ({result, onClose, onDownload, onSaveToServer}) => {
     const [activeTab, setActiveTab] = useState('overview');
     const [detailedData, setDetailedData] = useState(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
 
     const processInfo = result.process_type === 'delta'
-        ? { icon: GitCompare, color: 'purple', label: 'Delta Generation', type: 'delta' }
-        : { icon: Shuffle, color: 'blue', label: 'Reconciliation', type: 'reconciliation' };
+        ? {icon: GitCompare, color: 'purple', label: 'Delta Generation', type: 'delta'}
+        : {icon: Shuffle, color: 'blue', label: 'Reconciliation', type: 'reconciliation'};
 
     useEffect(() => {
         if (activeTab === 'data' && !detailedData) {
@@ -689,8 +710,9 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                 {/* Header */}
                 <div className="flex items-center justify-between pb-4 border-b border-gray-200">
                     <div className="flex items-center space-x-3">
-                        <div className={`w-10 h-10 bg-${processInfo.color}-100 rounded-full flex items-center justify-center`}>
-                            <ProcessIcon className={`w-5 h-5 text-${processInfo.color}-600`} />
+                        <div
+                            className={`w-10 h-10 bg-${processInfo.color}-100 rounded-full flex items-center justify-center`}>
+                            <ProcessIcon className={`w-5 h-5 text-${processInfo.color}-600`}/>
                         </div>
                         <div>
                             <h3 className="text-lg font-medium text-gray-900">{processInfo.label} Details</h3>
@@ -703,7 +725,8 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                     >
                         <span className="sr-only">Close</span>
                         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                  d="M6 18L18 6M6 6l12 12"/>
                         </svg>
                     </button>
                 </div>
@@ -711,7 +734,7 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                 {/* Tabs */}
                 <div className="mt-4">
                     <nav className="flex space-x-8" aria-label="Tabs">
-                        {['overview', 'summary', 'data', 'actions'].map((tab) => (
+                        {['overview', 'summary', 'data', 'actions', 'rules'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
@@ -796,7 +819,8 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                                                 {(result.summary.unchanged_records || 0).toLocaleString()}
                                             </div>
                                             <div className="text-sm text-green-600 font-medium">Unchanged Records</div>
-                                            <div className="text-xs text-gray-500 mt-1">Records that remained the same</div>
+                                            <div className="text-xs text-gray-500 mt-1">Records that remained the same
+                                            </div>
                                         </div>
                                         <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                                             <div className="text-2xl font-bold text-orange-600">
@@ -810,20 +834,24 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                                                 {(result.summary.deleted_records || 0).toLocaleString()}
                                             </div>
                                             <div className="text-sm text-red-600 font-medium">Deleted Records</div>
-                                            <div className="text-xs text-gray-500 mt-1">Records removed from newer file</div>
+                                            <div className="text-xs text-gray-500 mt-1">Records removed from newer
+                                                file
+                                            </div>
                                         </div>
                                         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                                             <div className="text-2xl font-bold text-purple-600">
                                                 {(result.summary.newly_added_records || 0).toLocaleString()}
                                             </div>
                                             <div className="text-sm text-purple-600 font-medium">Newly Added</div>
-                                            <div className="text-xs text-gray-500 mt-1">Records added to newer file</div>
+                                            <div className="text-xs text-gray-500 mt-1">Records added to newer file
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             ) : processInfo.type === 'file_generation' ? (
                                 <div>
-                                    <h4 className="text-lg font-medium text-gray-900 mb-4">AI File Generation Summary</h4>
+                                    <h4 className="text-lg font-medium text-gray-900 mb-4">AI File Generation
+                                        Summary</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                             <div className="text-2xl font-bold text-blue-600">
@@ -850,14 +878,18 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                                             <div className="text-2xl font-bold text-orange-600">
                                                 {(result.summary.row_multiplication_factor || result.row_multiplication_factor || 1)}x
                                             </div>
-                                            <div className="text-sm text-orange-600 font-medium">Multiplication Factor</div>
+                                            <div className="text-sm text-orange-600 font-medium">Multiplication Factor
+                                            </div>
                                             <div className="text-xs text-gray-500 mt-1">Rows per source record</div>
                                         </div>
                                     </div>
                                     {result.summary.rules_description && (
                                         <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
-                                            <div className="text-sm font-medium text-gray-900 mb-2">Generation Rules Applied:</div>
-                                            <div className="text-sm text-gray-700">{result.summary.rules_description}</div>
+                                            <div className="text-sm font-medium text-gray-900 mb-2">Generation Rules
+                                                Applied:
+                                            </div>
+                                            <div
+                                                className="text-sm text-gray-700">{result.summary.rules_description}</div>
                                         </div>
                                     )}
                                 </div>
@@ -870,14 +902,16 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                                                 {(result.summary.match_percentage || 0).toFixed(1)}%
                                             </div>
                                             <div className="text-sm text-green-600 font-medium">Match Rate</div>
-                                            <div className="text-xs text-gray-500 mt-1">Overall matching percentage</div>
+                                            <div className="text-xs text-gray-500 mt-1">Overall matching percentage
+                                            </div>
                                         </div>
                                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                             <div className="text-2xl font-bold text-blue-600">
                                                 {(result.summary.matched_records || 0).toLocaleString()}
                                             </div>
                                             <div className="text-sm text-blue-600 font-medium">Matched Records</div>
-                                            <div className="text-xs text-gray-500 mt-1">Successfully matched records</div>
+                                            <div className="text-xs text-gray-500 mt-1">Successfully matched records
+                                            </div>
                                         </div>
                                         <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                                             <div className="text-2xl font-bold text-orange-600">
@@ -903,7 +937,7 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                         <div className="space-y-6">
                             {loadingDetails ? (
                                 <div className="text-center py-8">
-                                    <Loader className="mx-auto h-8 w-8 text-gray-400 animate-spin" />
+                                    <Loader className="mx-auto h-8 w-8 text-gray-400 animate-spin"/>
                                     <p className="mt-2 text-sm text-gray-500">Loading detailed data...</p>
                                 </div>
                             ) : detailedData ? (
@@ -912,24 +946,26 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                                     <div className="overflow-x-auto">
                                         <table className="min-w-full divide-y divide-gray-200">
                                             <thead className="bg-gray-50">
-                                                <tr>
-                                                    {detailedData.columns?.map((column, index) => (
-                                                        <th key={index} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                            {column}
-                                                        </th>
-                                                    ))}
-                                                </tr>
+                                            <tr>
+                                                {detailedData.columns?.map((column, index) => (
+                                                    <th key={index}
+                                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        {column}
+                                                    </th>
+                                                ))}
+                                            </tr>
                                             </thead>
                                             <tbody className="bg-white divide-y divide-gray-200">
-                                                {detailedData.data?.slice(0, 10).map((row, rowIndex) => (
-                                                    <tr key={rowIndex}>
-                                                        {row.map((cell, cellIndex) => (
-                                                            <td key={cellIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                                {cell}
-                                                            </td>
-                                                        ))}
-                                                    </tr>
-                                                ))}
+                                            {detailedData.data?.slice(0, 10).map((row, rowIndex) => (
+                                                <tr key={rowIndex}>
+                                                    {row.map((cell, cellIndex) => (
+                                                        <td key={cellIndex}
+                                                            className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                            {cell}
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))}
                                             </tbody>
                                         </table>
                                     </div>
@@ -965,28 +1001,28 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                                                 onClick={() => onDownload(result.id, 'unchanged', processInfo.type)}
                                                 className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                             >
-                                                <Download className="w-4 h-4 mr-2" />
+                                                <Download className="w-4 h-4 mr-2"/>
                                                 Unchanged Records
                                             </button>
                                             <button
                                                 onClick={() => onDownload(result.id, 'amended', processInfo.type)}
                                                 className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                             >
-                                                <Download className="w-4 h-4 mr-2" />
+                                                <Download className="w-4 h-4 mr-2"/>
                                                 Amended Records
                                             </button>
                                             <button
                                                 onClick={() => onDownload(result.id, 'deleted', processInfo.type)}
                                                 className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                             >
-                                                <Download className="w-4 h-4 mr-2" />
+                                                <Download className="w-4 h-4 mr-2"/>
                                                 Deleted Records
                                             </button>
                                             <button
                                                 onClick={() => onDownload(result.id, 'newly_added', processInfo.type)}
                                                 className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                             >
-                                                <Download className="w-4 h-4 mr-2" />
+                                                <Download className="w-4 h-4 mr-2"/>
                                                 Newly Added Records
                                             </button>
                                         </>
@@ -996,21 +1032,21 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                                                 onClick={() => onDownload(result.id, 'matched', processInfo.type)}
                                                 className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                             >
-                                                <Download className="w-4 h-4 mr-2" />
+                                                <Download className="w-4 h-4 mr-2"/>
                                                 Matched Records
                                             </button>
                                             <button
                                                 onClick={() => onDownload(result.id, 'unmatched_a', processInfo.type)}
                                                 className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                             >
-                                                <Download className="w-4 h-4 mr-2" />
+                                                <Download className="w-4 h-4 mr-2"/>
                                                 File A Only
                                             </button>
                                             <button
                                                 onClick={() => onDownload(result.id, 'unmatched_b', processInfo.type)}
                                                 className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                             >
-                                                <Download className="w-4 h-4 mr-2" />
+                                                <Download className="w-4 h-4 mr-2"/>
                                                 File B Only
                                             </button>
                                         </>
@@ -1019,7 +1055,7 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                                         onClick={() => onDownload(result.id, 'all_excel', processInfo.type)}
                                         className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                     >
-                                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                                        <FileSpreadsheet className="w-4 h-4 mr-2"/>
                                         Excel Export (All)
                                     </button>
                                 </div>
@@ -1033,19 +1069,25 @@ const ResultDetailModal = ({ result, onClose, onDownload, onSaveToServer }) => {
                                         onClick={() => onSaveToServer(result.id, 'all', processInfo.type)}
                                         className="inline-flex items-center px-4 py-2 border border-blue-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50"
                                     >
-                                        <Server className="w-4 h-4 mr-2" />
+                                        <Server className="w-4 h-4 mr-2"/>
                                         Save All Results
                                     </button>
                                     <button
                                         onClick={() => onSaveToServer(result.id, 'summary_report', processInfo.type)}
                                         className="inline-flex items-center px-4 py-2 border border-blue-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50"
                                     >
-                                        <FileText className="w-4 h-4 mr-2" />
+                                        <FileText className="w-4 h-4 mr-2"/>
                                         Save Summary Report
                                     </button>
                                 </div>
                             </div>
                         </div>
+                    )}
+                    {activeTab === 'rules' && (
+                        <RulesTab
+                            result={result}
+                            onClose={onClose}
+                        />
                     )}
                 </div>
             </div>
