@@ -1,3 +1,5 @@
+# Complete updated delta_routes.py with filter logic
+
 import io
 import logging
 from datetime import datetime
@@ -85,6 +87,7 @@ class DeltaGenerationConfig(BaseModel):
     ComparisonRules: Optional[List[Dict[str, Any]]] = []  # Optional field comparison rules
     selected_columns_file_a: Optional[List[str]] = None
     selected_columns_file_b: Optional[List[str]] = None
+    file_filters: Optional[Dict[str, List[Dict[str, Any]]]] = None  # NEW: File filters
     user_requirements: Optional[str] = None
     files: Optional[List[DeltaFileReference]] = None
 
@@ -103,7 +106,7 @@ delta_storage = {}
 
 
 class DeltaProcessor:
-    """Delta generation processor"""
+    """Delta generation processor with filter support"""
 
     def __init__(self):
         self.errors = []
@@ -188,22 +191,25 @@ class DeltaProcessor:
         # Handle Excel serial date numbers (days since 1900-01-01)
         if self.is_numeric(value):
             try:
-                # Excel serial date conversion
-                excel_epoch = pd.Timestamp('1900-01-01')
                 days_since_1900 = float(value)
 
-                # Excel incorrectly considers 1900 as a leap year, so adjust
+                # Adjust for Excel's incorrect leap year in 1900
                 adjusted_days = days_since_1900 - 2 if days_since_1900 > 59 else days_since_1900 - 1
+                excel_epoch = pd.Timestamp('1900-01-01')
                 date = excel_epoch + pd.Timedelta(days=adjusted_days)
+
+                # Only accept dates >= Jan 1, 2024
+                if date < pd.Timestamp('2024-01-01'):
+                    return None
+
                 return date
             except:
                 return None
 
         # Handle string dates
         try:
-            # Try pandas to_datetime which handles most formats
             date = pd.to_datetime(value, errors='coerce')
-            if pd.notna(date):
+            if pd.notna(date) and date >= pd.Timestamp('2024-01-01'):
                 return date
         except:
             pass
@@ -229,6 +235,90 @@ class DeltaProcessor:
         else:
             diff_days = abs((date_a_only - date_b_only).days)
             return diff_days <= tolerance_days
+
+    def apply_filters(self, df: pd.DataFrame, filters: List[Dict[str, Any]], file_label: str) -> pd.DataFrame:
+        """Apply filters to a DataFrame based on filter configuration"""
+        if not filters:
+            return df
+
+        filtered_df = df.copy()
+        original_count = len(filtered_df)
+
+        for filter_config in filters:
+            column = filter_config.get('column')
+            values = filter_config.get('values', [])
+
+            if not column or not values or column not in filtered_df.columns:
+                continue
+
+            # Create a mask for matching values
+            mask = pd.Series([False] * len(filtered_df), index=filtered_df.index)
+
+            for value in values:
+                # Handle different data types and date parsing
+                column_mask = self.create_value_mask(filtered_df[column], value)
+                mask = mask | column_mask
+
+            # Apply the filter
+            filtered_df = filtered_df[mask]
+
+            logger.info(f"Filter applied to {file_label}: {column} with {len(values)} values. "
+                        f"Rows after filter: {len(filtered_df)}")
+
+        final_count = len(filtered_df)
+        if final_count != original_count:
+            logger.info(f"Total filtering result for {file_label}: {original_count} → {final_count} rows "
+                        f"({((original_count - final_count) / original_count * 100):.1f}% filtered out)")
+
+        return filtered_df
+
+    def create_value_mask(self, series: pd.Series, target_value: str) -> pd.Series:
+        """Create a boolean mask for matching a target value in a series"""
+        # Handle NaN values
+        if target_value.lower() in ['nan', 'null', '']:
+            return series.isna()
+
+        # Try exact string match first
+        string_mask = series.astype(str).str.strip() == str(target_value).strip()
+
+        # Try date parsing if exact match fails and this looks like a date
+        if not string_mask.any():
+            date_mask = self.create_date_mask(series, target_value)
+            if date_mask.any():
+                return date_mask
+
+        return string_mask
+
+    def create_date_mask(self, series: pd.Series, target_date_str: str) -> pd.Series:
+        """Create a boolean mask for date matching with format flexibility"""
+        try:
+            # Parse the target date
+            target_date = pd.to_datetime(target_date_str, errors='coerce')
+            if pd.isna(target_date):
+                return pd.Series([False] * len(series), index=series.index)
+
+            # Convert target to date only (no time)
+            target_date_only = target_date.date()
+
+            # Create mask by parsing each value in the series
+            mask = pd.Series([False] * len(series), index=series.index)
+
+            for idx, value in series.items():
+                if pd.isna(value):
+                    continue
+
+                # Try to parse the value as a date using our existing method
+                parsed_date = self.parse_excel_date(value)
+                if parsed_date is not None:
+                    # Convert to date only for comparison
+                    value_date_only = parsed_date.date() if hasattr(parsed_date, 'date') else parsed_date
+                    mask.iloc[mask.index.get_loc(idx)] = (value_date_only == target_date_only)
+
+            return mask
+
+        except Exception as e:
+            logger.warning(f"Date filtering error: {str(e)}")
+            return pd.Series([False] * len(series), index=series.index)
 
     def create_composite_key(self, df: pd.DataFrame, key_columns: List[str], rules: List[DeltaKeyRule]) -> pd.Series:
         """Create composite key for matching records with proper numeric normalization"""
@@ -367,8 +457,24 @@ class DeltaProcessor:
                        key_rules: List[DeltaKeyRule],
                        comparison_rules: Optional[List[DeltaComparisonRule]] = None,
                        selected_columns_a: Optional[List[str]] = None,
-                       selected_columns_b: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Generate delta between two DataFrames based on key rules and comparison rules"""
+                       selected_columns_b: Optional[List[str]] = None,
+                       file_filters: Optional[Dict[str, List[Dict[str, Any]]]] = None) -> Dict[str, Any]:
+        """Generate delta between two DataFrames with optional filtering"""
+
+        # Apply filters if provided
+        if file_filters:
+            filters_a = file_filters.get('file_0', [])
+            filters_b = file_filters.get('file_1', [])
+
+            if filters_a:
+                original_count_a = len(df_a)
+                df_a = self.apply_filters(df_a, filters_a, "FileA (Older)")
+                logger.info(f"Applied {len(filters_a)} filter(s) to FileA. {original_count_a} → {len(df_a)} rows")
+
+            if filters_b:
+                original_count_b = len(df_b)
+                df_b = self.apply_filters(df_b, filters_b, "FileB (Newer)")
+                logger.info(f"Applied {len(filters_b)} filter(s) to FileB. {original_count_b} → {len(df_b)} rows")
 
         # Extract key columns for matching (composite key)
         key_columns_a = [rule.LeftFileColumn for rule in key_rules]
@@ -535,9 +641,11 @@ async def get_file_by_id(file_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to retrieve file: {str(e)}")
 
 
+
+
 @router.post("/process/", response_model=DeltaResponse)
 async def process_delta_generation(request: JSONDeltaRequest):
-    """Process delta generation with JSON input - File ID Version"""
+    """Process delta generation with JSON input - File ID Version with Filter Support"""
     start_time = datetime.now()
     processor = DeltaProcessor()
 
@@ -588,6 +696,11 @@ async def process_delta_generation(request: JSONDeltaRequest):
                 )
                 comparison_rules.append(comparison_rule)
 
+        # Extract file filters if provided
+        file_filters = getattr(request.delta_config, 'file_filters', None)
+        if file_filters is None:
+            file_filters = {}
+
         # Validate key rules
         if not key_rules:
             raise HTTPException(status_code=400, detail="At least one key rule is required for composite key matching")
@@ -613,24 +726,41 @@ async def process_delta_generation(request: JSONDeltaRequest):
         print(f"Processing delta: FileA {len(df_a)} rows, FileB {len(df_b)} rows")
         print(f"Key rules: {len(key_rules)}, Comparison rules: {len(comparison_rules)}")
 
+        # Log filter information if present
+        if file_filters:
+            filters_a = file_filters.get('file_0', [])
+            filters_b = file_filters.get('file_1', [])
+            active_filters_a = [f for f in filters_a if f.get('column') and f.get('values')]
+            active_filters_b = [f for f in filters_b if f.get('column') and f.get('values')]
+
+            if active_filters_a:
+                print(f"Active filters for FileA: {len(active_filters_a)} filter(s)")
+                for f in active_filters_a:
+                    print(f"  - {f['column']}: {len(f['values'])} values")
+            if active_filters_b:
+                print(f"Active filters for FileB: {len(active_filters_b)} filter(s)")
+                for f in active_filters_b:
+                    print(f"  - {f['column']}: {len(f['values'])} values")
+
         # Extract column selections
         columns_a = request.delta_config.selected_columns_file_a
         columns_b = request.delta_config.selected_columns_file_b
 
-        # Perform delta generation
-        print("Starting delta generation...")
+        # Perform delta generation with filters
+        print("Starting delta generation with filter support...")
         delta_results = processor.generate_delta(
             df_a, df_b,
             key_rules,
             comparison_rules if comparison_rules else None,
             columns_a,
-            columns_b
+            columns_b,
+            file_filters  # Pass filters to the processor
         )
 
         # Generate delta ID
         delta_id = generate_uuid('delta')
 
-        # Store results
+        # Store results with filter information
         delta_storage[delta_id] = {
             'unchanged': delta_results['unchanged'],
             'amended': delta_results['amended'],
@@ -640,6 +770,7 @@ async def process_delta_generation(request: JSONDeltaRequest):
             'timestamp': datetime.now(),
             'file_a': file_0.file_id,
             'file_b': file_1.file_id,
+            'filters_applied': file_filters,  # Store filter information
             'row_counts': {
                 'unchanged': len(delta_results['unchanged']),
                 'amended': len(delta_results['amended']),
@@ -664,7 +795,7 @@ async def process_delta_generation(request: JSONDeltaRequest):
         )
 
         print(f"Delta generation completed in {processing_time:.2f}s")
-        print(f"Unchanged: {len(delta_results['unchanged'])}, Amended: {len(delta_results['amended'])}")
+        print(f"Results: Unchanged: {len(delta_results['unchanged'])}, Amended: {len(delta_results['amended'])}")
         print(f"Deleted: {len(delta_results['deleted'])}, New: {len(delta_results['newly_added'])}")
 
         return DeltaResponse(
@@ -716,6 +847,7 @@ async def get_delta_results(
         'delta_id': delta_id,
         'timestamp': results['timestamp'].isoformat(),
         'row_counts': results['row_counts'],
+        'filters_applied': results.get('filters_applied', {}),  # Include filter info
         'pagination': {
             'page': page,
             'page_size': page_size,
@@ -876,6 +1008,7 @@ async def get_delta_summary(delta_id: str):
     return {
         'delta_id': delta_id,
         'timestamp': results['timestamp'].isoformat(),
+        'filters_applied': results.get('filters_applied', {}),
         'summary': {
             'total_records_compared': total_records,
             'unchanged_records': row_counts['unchanged'],
@@ -922,6 +1055,8 @@ async def delta_health_check():
             "change_categorization",
             "amendment_tracking",
             "column_selection",
+            "data_filtering",  # NEW
+            "date_aware_filtering",  # NEW
             "paginated_results",
             "streaming_downloads",
             "json_input_support",
@@ -931,4 +1066,4 @@ async def delta_health_check():
             "numeric_tolerance_matching",
             "auto_comparison_rules"
         ]
-    }
+    }  # Complete updated delta_routes.py with filter logic
