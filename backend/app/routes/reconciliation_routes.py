@@ -116,55 +116,6 @@ async def get_file_by_id(file_id: str) -> UploadFile:
         logger.error(f"Error retrieving file {file_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve file: {str(e)}")
 
-
-@router.post("/process/postman", response_model=ReconciliationResponse)
-async def process_reconciliation_optimized(
-        fileA: UploadFile = File(...),
-        fileB: UploadFile = File(...),
-        rules: str = Form(...),
-        selected_columns_file_a: Optional[str] = Form(None),
-        selected_columns_file_b: Optional[str] = Form(None),
-        output_format: Optional[str] = Form("standard")
-):
-    """Process file reconciliation with optimized performance and column selection - File Upload Version"""
-    start_time = datetime.now()
-    processor = OptimizedFileProcessor()
-
-    try:
-        # Parse rules
-        rules_config = OptimizedRulesConfig.parse_raw(rules)
-
-        # Parse column selections
-        columns_a = None
-        columns_b = None
-
-        if selected_columns_file_a:
-            try:
-                columns_a = json.loads(selected_columns_file_a) if selected_columns_file_a.startswith(
-                    '[') else selected_columns_file_a.split(',')
-                columns_a = [col.strip() for col in columns_a]
-            except json.JSONDecodeError:
-                columns_a = [col.strip() for col in selected_columns_file_a.split(',')]
-
-        if selected_columns_file_b:
-            try:
-                columns_b = json.loads(selected_columns_file_b) if selected_columns_file_b.startswith(
-                    '[') else selected_columns_file_b.split(',')
-                columns_b = [col.strip() for col in columns_b]
-            except json.JSONDecodeError:
-                columns_b = [col.strip() for col in selected_columns_file_b.split(',')]
-
-        return await _process_reconciliation_core(
-            processor, rules_config, fileA, fileB, columns_a, columns_b, output_format, start_time
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Reconciliation error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
-
-
 @router.post("/process/", response_model=ReconciliationResponse)
 async def process_reconciliation_json(
         request: JSONReconciliationRequest
@@ -174,9 +125,6 @@ async def process_reconciliation_json(
     processor = OptimizedFileProcessor()
 
     try:
-        # Validate request
-        # if request.process_type != "ai-reconciliation":
-        #     raise HTTPException(status_code=400, detail="Invalid process_type. Expected 'reconciliation'")
 
         if len(request.files) != 2:
             raise HTTPException(status_code=400, detail="Exactly 2 files are required for reconciliation")
