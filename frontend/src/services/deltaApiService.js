@@ -27,6 +27,7 @@ async processDeltaGeneration(deltaConfig) {
             files: deltaConfig.files,
             delta_config: {
                 Files: deltaConfig.delta_config.Files,
+                file_filters: deltaConfig.delta_config.file_filters || [],
                 KeyRules: deltaConfig.delta_config.KeyRules,
                 ComparisonRules: deltaConfig.delta_config.ComparisonRules || [],
                 selected_columns_file_a: deltaConfig.delta_config.selected_columns_file_a,
@@ -727,7 +728,33 @@ async downloadSavedResult(savedFileId, format = 'csv') {
         console.error('Error downloading saved result:', error);
         throw error;
     }
-}
+},
+
+/**
+ * Get unique values for a specific column in a file
+ * @param {string} fileId - File ID
+ * @param {string} columnName - Column name
+ * @param {number} limit - Limit for unique values (default 1000)
+ * @returns {Promise<Object>} Unique values response
+ */
+async getColumnUniqueValues(fileId, columnName, limit = 1000) {
+    try {
+        console.log(`Getting unique values for column ${columnName} in file ${fileId}`);
+
+        const response = await api.get(`/files/${fileId}/columns/${encodeURIComponent(columnName)}/unique-values`, {
+            params: {
+                limit: limit
+            }
+        });
+
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching unique values:', error);
+        throw error;
+    }
+},
+
 };
+
 
 export default deltaApiService;
