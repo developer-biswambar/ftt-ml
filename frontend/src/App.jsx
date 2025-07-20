@@ -97,126 +97,6 @@ const MainApp = () => {
         }
     };
 
-    const handleFileGeneration = async (generationConfig) => {
-        try {
-            // Generate a temporary ID for tracking
-            const tempGenerationId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-            // Create processing entry
-            const processingEntry = {
-                generation_id: tempGenerationId,
-                process_type: 'ai-file-generation',
-                status: 'processing',
-                created_at: new Date().toISOString(),
-                source_file: selectedFiles.file_0?.filename || 'Unknown Source',
-                output_filename: 'generated_file.csv',
-                summary: {
-                    total_input_records: 0,
-                    total_output_records: 0,
-                    row_multiplication_factor: 1,
-                    columns_generated: [],
-                    rules_description: 'Processing...'
-                },
-                row_multiplication_factor: 1
-            };
-
-            // Add to file generation processing state
-            setFileGenerationProcessing(prev => [processingEntry, ...prev]);
-
-            addMessage('user', `Starting ${selectedTemplate.name.toLowerCase()}...`, false);
-            addMessage('system', `⚡ Starting AI File Generation...\n\n🧠 Analyzing your requirements and generating intelligent file transformations...`, true);
-
-            // Import and use API service for file generation
-            const { apiService } = await import('./services/defaultApi.js');
-
-            // Get the selected file data
-            const selectedFile = selectedFiles.file_0;
-            if (!selectedFile) {
-                throw new Error('No file selected for generation');
-            }
-
-            // Get file data to convert to proper File object
-            const fileData = await apiService.getFileData(selectedFile.file_id, 1, 5000);
-            if (!fileData.success) {
-                throw new Error('Could not fetch file data');
-            }
-
-            // Convert data to CSV format for the API
-            const csvContent = convertDataToCSV(fileData.data.rows, fileData.data.columns);
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const file = new File([blob], selectedFile.filename, { type: 'text/csv' });
-
-            // Call the file generation API
-            const result = await apiService.generateFileFromRules(
-                file,
-                generationConfig.user_requirements || currentInput
-            );
-
-            if (result.success) {
-                // Create completed entry
-                const completedEntry = {
-                    generation_id: result.generation_id, // Use real ID from API
-                    process_type: 'ai-file-generation',
-                    status: 'completed',
-                    created_at: new Date().toISOString(),
-                    source_file: selectedFiles.file_0?.filename || 'Unknown Source',
-                    summary: {
-                        total_input_records: result.summary.total_input_records,
-                        total_output_records: result.summary.total_output_records,
-                        row_multiplication_factor: result.summary.row_multiplication_factor,
-                        columns_generated: result.summary.columns_generated,
-                        rules_description: result.summary.rules_applied
-                    },
-                    row_multiplication_factor: result.summary.row_multiplication_factor,
-                    output_filename: result.rules_used?.output_filename || 'generated_file.csv'
-                };
-
-                // Remove processing entry and the system will pick up completed entry from server
-                setFileGenerationProcessing(prev =>
-                    prev.filter(f => f.generation_id !== tempGenerationId)
-                );
-
-                const summaryText = formatFileGenerationResults(result.summary, result.generation_id);
-                addMessage('result', summaryText, true);
-
-                setTimeout(() => {
-                    addMessage('system', '💡 Use "Display Detailed Results" button above or download options in the right panel to view the generated file details.', true);
-                }, 1000);
-
-                setCurrentInput('');
-
-                // Refresh the processed files to get the completed result from server
-                setTimeout(() => {
-                    if (loadProcessedFiles) {
-                        loadProcessedFiles();
-                    }
-                }, 2000);
-
-            } else {
-                // Update with failed status
-                setFileGenerationProcessing(prev =>
-                    prev.map(f =>
-                        f.generation_id === tempGenerationId
-                            ? { ...f, status: 'failed', error: result.errors?.join(', ') || 'Generation failed' }
-                            : f
-                    )
-                );
-
-                addMessage('error', messageService.getErrorMessage(result.errors?.join(', ') || 'Unknown error', 'File generation failed'), false);
-            }
-
-        } catch (error) {
-            console.error('File generation error:', error);
-
-            // Update processing entry to failed
-            setFileGenerationProcessing(prev =>
-                prev.map(f => ({ ...f, status: 'failed', error: error.message }))
-            );
-
-            addMessage('error', messageService.getErrorMessage(error.message, 'File generation failed'), false);
-        }
-    };
-
     // Helper function to convert data to CSV
     const convertDataToCSV = (data, columns) => {
         const headers = columns.join(',');
@@ -264,11 +144,6 @@ const MainApp = () => {
             return;
         }
 
-        // Handle file generation separately
-        if (selectedTemplate.category.includes('ai-generation')) {
-            return handleFileGeneration(reconciliationConfig);
-        }
-
         // Build process config
         const processConfig = {
             process_type: selectedTemplate.category,
@@ -299,31 +174,7 @@ const MainApp = () => {
             setTimeout(() => {
                 addMessage('success', `🎉 ${selectedTemplate?.name || 'Process'} completed successfully!`, true);
 
-                // Display mock results
-                const mockResult = {
-                    summary: {
-                        matched_count: result.summary.matched_records,
-                        unmatched_file_a_count: result.summary.unmatched_file_a,
-                        unmatched_file_b_count: result.summary.unmatched_file_b,
-                        total_file_a: result.summary.total_records_file_a,
-                        total_file_b: result.summary.total_records_file_b,
-                        match_rate: result.summary.match_percentage / 100,
-                        processing_time: result.summary.processing_time_seconds
-                    },
-                    matching_strategy: {
-                        method: 'AI-guided pattern matching',
-                        key_fields: ['Trade_ID', 'Amount', 'Date'],
-                        tolerances_applied: 'Standard matching rules'
-                    },
-                    key_findings: [
-                        'High confidence matches found for Trade_ID fields',
-                        'Amount tolerances applied successfully',
-                        'Date format variations handled automatically',
-                        'Minimal data quality issues detected'
-                    ]
-                };
-
-                const resultText = messageService.formatReconciliationResults(mockResult);
+                const resultText = messageService.formatReconciliationResults(result);
                 addMessage('result', resultText, true);
             }, 3000);
         } else {
@@ -331,6 +182,35 @@ const MainApp = () => {
         }
     };
 
+    const handleStartTransformation = async (fileTransformationConfig) => {
+
+        if (!selectedTemplate || !areAllFilesSelected()) {
+            addMessage('error', '❌ Please select a process and all required files first.', false);
+            return;
+        }
+
+        // Start process
+        addMessage('user', `Starting ${selectedTemplate.name.toLowerCase()}...`, false);
+        addMessage('system', messageService.getProcessStartMessage(selectedTemplate, true), true);
+
+        const result = await startProcess('fileTransformation', fileTransformationConfig);
+
+        if (result.success) {
+            addMessage('system', '✅ Process started! Monitoring progress...', true);
+            setCurrentInput('');
+
+            // Simulate completion after 3 seconds
+            setTimeout(() => {
+                addMessage('success', `🎉 ${selectedTemplate?.name || 'Process'} completed successfully!`, true);
+
+                const resultText = messageService.formatReconciliationResults(result);
+                addMessage('result', resultText, true);
+            }, 3000);
+        } else {
+            addMessage('error', messageService.getErrorMessage(result.error, 'Failed to start'), false);
+        }
+
+    };
     const handleDeltaGeneration = async (deltaConfig) => {
         if (!selectedTemplate || !areAllFilesSelected()) {
             addMessage('error', '❌ Please select a process and all required files first.', false);
@@ -593,8 +473,9 @@ const MainApp = () => {
                 selectedFiles={selectedFiles}
                 selectedTemplate={selectedTemplate}
                 requiredFiles={requiredFiles}
-                onStartReconciliation={handleReconciliation}
-                onStartDeltaGeneration={handleDeltaGeneration}
+                onStartReconciliationInApp={handleReconciliation}
+                onStartDeltaGenerationInApp={handleDeltaGeneration}
+                onFileTransformationInApp = {handleStartTransformation}
                 isTyping={isTyping}
                 typingMessage={typingMessage}
                 files={files}

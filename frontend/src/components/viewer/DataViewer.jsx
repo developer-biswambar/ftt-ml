@@ -101,26 +101,10 @@ const DataViewer = ({fileId, onClose}) => {
                 console.log('API endpoint not available, using sample data');
             }
 
-            // Fallback to sample data
-            const sampleData = [
-                {id: 1, name: 'Sample Data', amount: 100, date: '2024-01-01', status: 'Active'},
-                {id: 2, name: 'Example Row', amount: 200, date: '2024-01-02', status: 'Pending'},
-                {id: 3, name: 'Test Entry', amount: 300, date: '2024-01-03', status: 'Complete'},
-                {id: 4, name: 'Demo Item', amount: 150, date: '2024-01-04', status: 'Active'},
-                {id: 5, name: 'Sample Entry', amount: 250, date: '2024-01-05', status: 'Pending'},
-                {id: 6, name: 'Another Row', amount: 175, date: '2024-01-06', status: 'Active'},
-                {id: 7, name: 'More Data', amount: 225, date: '2024-01-07', status: 'Complete'},
-                {id: 8, name: 'Test Item', amount: 125, date: '2024-01-08', status: 'Pending'},
-                {id: 9, name: 'Demo Data', amount: 275, date: '2024-01-09', status: 'Active'},
-                {id: 10, name: 'Final Entry', amount: 325, date: '2024-01-10', status: 'Complete'}
-            ];
-
-            setData(sampleData);
             setColumns(['id', 'name', 'amount', 'date', 'status']);
             setTotalRows(100); // Simulate larger dataset for pagination demo
 
             if (history.length === 0) {
-                setHistory([{data: sampleData, columns: ['id', 'name', 'amount', 'date', 'status']}]);
                 setHistoryIndex(0);
             }
 

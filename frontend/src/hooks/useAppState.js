@@ -95,6 +95,9 @@ export const useProcessManagement = () => {
         } else if (type === 'delta-generation') {
             result = await processManagementService.startDeltaGeneration(config);
         }
+        else if (type === 'fileTransformation') {
+            result = await processManagementService.startFileTransformation(config)
+        }
 
         if (result.success) {
             setActiveProcess({

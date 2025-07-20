@@ -380,38 +380,6 @@ async def get_delta_rule_categories():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get categories: {str(e)}")
 
-
-@delta_rules_router.get("/health")
-async def get_delta_rule_management_health():
-    """Health check for delta rule management system"""
-    try:
-        rule_count = len(delta_rules_storage)
-
-        # Calculate some basic stats
-        total_usage = sum(rule["usage_count"] for rule in delta_rules_storage.values())
-        categories = {}
-        for rule in delta_rules_storage.values():
-            category = rule["category"]
-            categories[category] = categories.get(category, 0) + 1
-
-        return {
-            "status": "healthy",
-            "total_rules": rule_count,
-            "total_usage": total_usage,
-            "categories": categories,
-            "timestamp": datetime.utcnow(),
-            "storage_type": "in_memory"
-        }
-
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.utcnow(),
-            "storage_type": "in_memory"
-        }
-
-
 # Additional utility endpoints
 
 @delta_rules_router.post("/bulk-delete")

@@ -1,6 +1,7 @@
 // src/services/processManagementService.js
-import { apiService } from './defaultApi.js';
-import { deltaApiService } from './deltaApiService';
+import {apiService} from './defaultApi.js';
+import {deltaApiService} from './deltaApiService';
+import {transformationApiService} from './transformationApiService.js';
 
 class ProcessManagementService {
     constructor() {
@@ -38,7 +39,7 @@ class ProcessManagementService {
                 };
             }
 
-            return { success: false, error: data.message };
+            return {success: false, error: data.message};
         } catch (error) {
             return {
                 success: false,
@@ -75,7 +76,45 @@ class ProcessManagementService {
                 };
             }
 
-            return { success: false, error: data.errors?.join(', ') || 'Unknown error' };
+            return {success: false, error: data.errors?.join(', ') || 'Unknown error'};
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    // Delta generation processes
+    async startFileTransformation(config) {
+        try {
+            const data = await transformationApiService.processTransformation(config);
+            console.log(data);
+
+            if (data.success) {
+                this.activeProcesses.set(data.transformation_id, {
+                    type: 'file-transformation',
+                    status: 'processing',
+                    startTime: Date.now()
+                });
+
+                return {
+                    success: true,
+                    processId: data.transformation_id,
+                    summary: data.summary,
+                    process: {
+                        delta_id: data.delta_id,
+                        process_type: 'delta-generation',
+                        status: 'processing',
+                        summary: data.validation_summary,
+                        created_at: new Date().toISOString(),
+                        file_a: config?.source_files?.[0]?.file_id ? config.source_files[0].file_id : 'Not Found',
+                        file_b: config?.source_files?.[1]?.file_id ? config.source_files[1].file_id : 'Not Found'
+                    }
+                };
+            }
+
+            return {success: false, error: data.errors?.join(', ') || 'Unknown error'};
         } catch (error) {
             return {
                 success: false,
@@ -111,12 +150,12 @@ class ProcessManagementService {
             }
 
             // For now, return empty array as the API endpoint doesn't exist yet
-            const result = { success: true, processedFiles: [] };
+            const result = {success: true, processedFiles: []};
             this.cache.set('processedFiles', result);
             return result;
         } catch (error) {
             console.error('Failed to load processed files:', error);
-            return { success: false, processedFiles: [], error: error.message };
+            return {success: false, processedFiles: [], error: error.message};
         }
     }
 
@@ -188,14 +227,15 @@ class ProcessManagementService {
                 format = 'excel';
                 apiResultType = 'all';
                 break;
-            case 'summary_report':
+            case 'summary_report': {
                 const summary = await deltaApiService.getDeltaSummary(resultId);
-                await deltaApiService.downloadDeltaSummaryReport(summary, { delta_id: resultId });
-                return { success: true, message: 'Delta summary report downloaded' };
+                await deltaApiService.downloadDeltaSummaryReport(summary, {delta_id: resultId});
+                return {success: true, message: 'Delta summary report downloaded'};
+            }
         }
 
         const result = await deltaApiService.downloadDeltaResults(resultId, format, apiResultType);
-        return { success: true, message: `Delta download completed: ${result.filename}` };
+        return {success: true, message: `Delta download completed: ${result.filename}`};
     }
 
     async _downloadReconciliationResults(resultId, resultType) {
@@ -232,63 +272,7 @@ class ProcessManagementService {
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
 
-        return { success: true, message: `Download started: ${filename}` };
-    }
-
-    // Process validation
-    validateProcessConfig(template, selectedFiles, requiredFiles, config) {
-        // File validation
-        const fileValidation = this._validateFiles(selectedFiles, requiredFiles);
-        if (!fileValidation.valid) {
-            return fileValidation;
-        }
-
-        // Template validation
-        if (!template) {
-            return { valid: false, error: 'No process template selected' };
-        }
-
-        // Config validation based on process type
-        if (template.category.includes('reconciliation') && !config) {
-            return { valid: false, error: 'Reconciliation configuration required' };
-        }
-
-        return { valid: true };
-    }
-
-    _validateFiles(selectedFiles, requiredFiles) {
-        if (!requiredFiles || requiredFiles.length === 0) {
-            return { valid: false, error: 'No file requirements defined' };
-        }
-
-        const missingFiles = requiredFiles.filter(rf => !selectedFiles[rf.key]);
-        if (missingFiles.length > 0) {
-            return {
-                valid: false,
-                error: `Missing files: ${missingFiles.map(f => f.label).join(', ')}`
-            };
-        }
-
-        return { valid: true };
-    }
-
-    // Cache management
-    invalidateCache(key) {
-        if (key) {
-            this.cache.delete(key);
-        } else {
-            this.cache.clear();
-        }
-    }
-
-    // Process status
-    getProcessStatus(processId) {
-        return this.activeProcesses.get(processId);
-    }
-
-    isProcessActive(processId) {
-        const process = this.activeProcesses.get(processId);
-        return process && process.status === 'processing';
+        return {success: true, message: `Download started: ${filename}`};
     }
 }
 

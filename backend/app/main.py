@@ -206,6 +206,7 @@ try:
     from app.routes.recent_results_routes import router as recent_results_router
     from app.routes.rule_management_routes import router as rule_management_router
     from app.routes.delta_rules_router import delta_rules_router
+    from app.routes.transformation_routes import router as transformation_router
 
     app.include_router(health_routes)
     app.include_router(reconciliation_router)
@@ -222,6 +223,8 @@ try:
 
     app.include_router(file_generator_router)
     app.include_router(delta_rules_router)
+
+    app.include_router(transformation_router)
     print("✅ All routes loaded successfully (optimized reconciliation + AI regex generation enabled)")
 except ImportError as e:
     print(f"❌ Failed to load routes: {e}")

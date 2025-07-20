@@ -4,6 +4,7 @@ import {AlertCircle, CheckCircle, Eye, Send, Settings} from 'lucide-react';
 import ReconciliationFlow from '../recon/ReconciliationFlow.jsx';
 import FileGeneratorFlow from '../../fileManagement/FileGeneratorFlow.jsx';
 import DeltaGenerationFlow from '../delta/DeltaGenerationFlow.jsx';
+import TransformationFlow from "../transformation/TransformationFlow.jsx";
 
 const TypingIndicator = ({message}) => {
     return (
@@ -192,8 +193,9 @@ const ChatInterface = ({
                            selectedFiles,
                            selectedTemplate,
                            requiredFiles,
-                           onStartReconciliation,
-                           onStartDeltaGeneration,
+                           onStartReconciliationInApp,
+                           onStartDeltaGenerationInApp,
+                           onFileTransformationInApp,
                            isTyping,
                            typingMessage,
                            files,
@@ -249,20 +251,19 @@ const ChatInterface = ({
         }
     }, [flowData]);
 
-    const handleFlowComplete = (processConfig) => {
+    const triggerFlowBasedOnProcessType = (processConfig) => {
         setCurrentFlow(null);
         setFlowData({});
 
         onSendMessage('user', `${selectedTemplate?.name || 'Process'} configuration completed. Starting process...`);
 
         // Route to appropriate handler based on process type
-        if (processConfig.process_type === 'delta-generation' && onStartDeltaGeneration) {
-            onStartDeltaGeneration(processConfig);
-        } else if (onStartReconciliation && !selectedTemplate?.category.includes('ai-generation')) {
-            onStartReconciliation(processConfig);
+        if (processConfig.process_type === 'delta-generation' && onStartDeltaGenerationInApp) {
+            onStartDeltaGenerationInApp(processConfig);
+        } else if (onStartReconciliationInApp && !selectedTemplate?.category.includes('ai-generation')) {
+            onStartReconciliationInApp(processConfig);
         } else if (selectedTemplate?.category.includes('ai-generation')) {
-            // For file generation, the flow handles everything internally
-            onSendMessage('success', '🎉 File generation process completed successfully!');
+            onFileTransformationInApp(processConfig);
         }
     };
 
@@ -272,7 +273,7 @@ const ChatInterface = ({
         onSendMessage('system', 'Process configuration cancelled. Please select a different template or try again.');
     };
 
-    const startProcessFlow = () => {
+    const configureDetailsBeforeProcessStarts = () => {
         // Send initial message based on process type
         const processName = selectedTemplate.name.toLowerCase();
         onSendMessage('system', `🔧 Let me help you configure this ${processName} step by step.\n\nStarting configuration wizard...`);
@@ -311,7 +312,9 @@ const ChatInterface = ({
         }, 1000);
     };
 
-    const handleRegularSubmit = () => {
+
+    // This gets triggered when chat start Button is clicked
+    const handleChatStartSubmit = () => {
         if (!currentInput.trim()) return;
 
         // Store the input before clearing it
@@ -326,6 +329,7 @@ const ChatInterface = ({
             userInput.toLowerCase().includes('reconcil') ||
             userInput.toLowerCase().includes('generate') ||
             userInput.toLowerCase().includes('delta');
+        userInput.toLowerCase().includes('Describe');
 
         if (isStartCommand) {
             if (selectedTemplate && areAllFilesSelected()) {
@@ -336,10 +340,10 @@ const ChatInterface = ({
                 if (selectedTemplate.category.includes('reconciliation') ||
                     selectedTemplate.category.includes('ai-generation') ||
                     selectedTemplate.category.includes('delta-generation')) {
-                    startProcessFlow();
+                    configureDetailsBeforeProcessStarts();
                 } else {
                     // For single file processes, start directly
-                    handleFlowComplete({
+                    triggerFlowBasedOnProcessType({
                         process_type: selectedTemplate.category,
                         user_requirements: userInput,
                         files: Object.entries(selectedFiles).map(([key, file]) => ({
@@ -402,7 +406,8 @@ const ChatInterface = ({
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-xl font-semibold text-gray-800">💼 Data Processing Platform</h1>
-                        <p className="text-sm text-gray-600">AI-powered reconciliation, delta generation, validation, and analysis</p>
+                        <p className="text-sm text-gray-600">AI-powered reconciliation, delta generation, validation,
+                            and analysis</p>
                     </div>
 
                     {/* Process Status Indicator */}
@@ -469,7 +474,7 @@ const ChatInterface = ({
                             selectedFiles={selectedFiles}
                             selectedTemplate={selectedTemplate}
                             flowData={flowData}
-                            onComplete={handleFlowComplete}
+                            onComplete={triggerFlowBasedOnProcessType}
                             onCancel={handleFlowCancel}
                             onSendMessage={onSendMessage}
                         />
@@ -478,12 +483,10 @@ const ChatInterface = ({
 
                 {currentFlow === 'file_generation' && (
                     <div className="mb-4">
-                        <FileGeneratorFlow
-                            files={files}
+                        <TransformationFlow
+                            files={selectedFiles}
                             selectedFiles={selectedFiles}
-                            selectedTemplate={selectedTemplate}
-                            flowData={flowData}
-                            onComplete={handleFlowComplete}
+                            onTransformationFlowStart={triggerFlowBasedOnProcessType}
                             onCancel={handleFlowCancel}
                             onSendMessage={onSendMessage}
                         />
@@ -497,7 +500,7 @@ const ChatInterface = ({
                             selectedFiles={selectedFiles}
                             selectedTemplate={selectedTemplate}
                             flowData={flowData}
-                            onComplete={handleFlowComplete}
+                            onComplete={triggerFlowBasedOnProcessType}
                             onCancel={handleFlowCancel}
                             onSendMessage={onSendMessage}
                         />
@@ -595,7 +598,7 @@ const ChatInterface = ({
                                     type="text"
                                     value={currentInput || ''}
                                     onChange={(e) => setCurrentInput(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && handleRegularSubmit()}
+                                    onKeyPress={(e) => e.key === 'Enter' && handleChatStartSubmit()}
                                     placeholder={
                                         selectedTemplate
                                             ? `Type "start" to begin ${selectedTemplate.name.toLowerCase()}...`
@@ -607,7 +610,7 @@ const ChatInterface = ({
                             )}
                         </div>
                         <button
-                            onClick={handleRegularSubmit}
+                            onClick={handleChatStartSubmit}
                             disabled={isProcessing || !status.ready || (!currentInput.trim() && !selectedTemplate)}
                             className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-all duration-200 hover:scale-105 disabled:hover:scale-100"
                         >
@@ -628,8 +631,8 @@ const ChatInterface = ({
                         {selectedTemplate && (
                             <span className="text-blue-600">
                                 {selectedTemplate.category.includes('ai') ? '🤖 AI-powered' :
-                                 selectedTemplate.category.includes('delta') ? '📊 Delta analysis' :
-                                 '⚙️ Manual config'}
+                                    selectedTemplate.category.includes('delta') ? '📊 Delta analysis' :
+                                        '⚙️ Manual config'}
                             </span>
                         )}
                     </div>
