@@ -217,6 +217,61 @@ Use the download buttons in the "Results" panel → to get detailed reports, or 
         }
     }
 
+    formatFileTransformationResult(result) {
+        const success = result.success === true;
+        const id = result.processId || 'N/A';
+        const totalIn = result.process.total_input_rows ?? 0;
+        const totalOut = result.process.total_output_rows ?? 0;
+        const processingTime =  result.process.processing_time_seconds ?? 0;
+
+        const val = result.process.validation_summary || {};
+        const passed = val.passed === true;
+        const errors = Array.isArray(val.errors) ? val.errors : [];
+        const warnings = Array.isArray(val.warnings) ? val.warnings : [];
+
+        // also pick top‑level errors/warnings if any
+        const topErrors = Array.isArray(val.errors) ? val.errors : [];
+        const topWarnings = Array.isArray(val.warnings) ? val.warnings : [];
+
+        return `🔄 **File Transformation Result**
+
+• ✅ Success: ${success ? 'Yes' : '❌ No'}
+• 🆔 Transformation ID: \`${id}\`
+• 📥 Input Rows: ${totalIn.toLocaleString()}
+• 📤 Output Rows: ${totalOut.toLocaleString()}
+• ⏱️ Processing Time: ${processingTime.toFixed(3)} sec
+
+🧪 **Validation Summary**:  
+• Passed: ${passed ? 'Yes' : '❌ No'}  
+• Warnings: ${[...warnings, ...topWarnings].length}  
+• Errors: ${[...errors, ...topErrors].length}
+
+${
+            warnings.length + topWarnings.length > 0
+                ? `⚠️ **Warnings:**\n` +
+                [...warnings, ...topWarnings]
+                    .slice(0, 4)
+                    .map(w => `  • ${w}`)
+                    .join('\n') + '\n'
+                : ''
+        }
+
+${
+            errors.length + topErrors.length > 0
+                ? `❗ **Errors:**\n` +
+                [...errors, ...topErrors]
+                    .slice(0, 4)
+                    .map(e => `  • ${e}`)
+                    .join('\n') + '\n'
+                : ''
+        }
+
+📥 **Next Steps:**  
+– Down‑load transformed file using the link in the “Results” panel.  
+– “Display Preview” to inspect sample rows in this chat.`;
+    }
+
+
     // Table data helpers
     createTableData(title, data, color, totalCount) {
         return {
@@ -231,19 +286,19 @@ Use the download buttons in the "Results" panel → to get detailed reports, or 
     // Delta table categories
     getDeltaTableCategories() {
         return {
-            unchanged: { name: '🔄 Unchanged Records', color: 'green' },
-            amended: { name: '✏️ Amended Records', color: 'orange' },
-            deleted: { name: '❌ Deleted Records', color: 'red' },
-            newly_added: { name: '✅ Newly Added Records', color: 'purple' }
+            unchanged: {name: '🔄 Unchanged Records', color: 'green'},
+            amended: {name: '✏️ Amended Records', color: 'orange'},
+            deleted: {name: '❌ Deleted Records', color: 'red'},
+            newly_added: {name: '✅ Newly Added Records', color: 'purple'}
         };
     }
 
     // Reconciliation table categories
     getReconciliationTableCategories() {
         return {
-            matched: { name: '✅ Matched Records', color: 'green' },
-            unmatched_file_a: { name: '❗ Unmatched in File A', color: 'orange' },
-            unmatched_file_b: { name: '❗ Unmatched in File B', color: 'purple' }
+            matched: {name: '✅ Matched Records', color: 'green'},
+            unmatched_file_a: {name: '❗ Unmatched in File A', color: 'orange'},
+            unmatched_file_b: {name: '❗ Unmatched in File B', color: 'purple'}
         };
     }
 }

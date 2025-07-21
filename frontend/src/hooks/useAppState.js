@@ -86,6 +86,10 @@ export const useProcessManagement = () => {
         return result;
     }, []);
 
+     useEffect(() => {
+        loadProcessedFiles(); // runs once when the component mounts (on page load)
+    }, [loadProcessedFiles]);
+
     const startProcess = useCallback(async (type, config) => {
         setIsProcessing(true);
 
@@ -95,7 +99,7 @@ export const useProcessManagement = () => {
         } else if (type === 'delta-generation') {
             result = await processManagementService.startDeltaGeneration(config);
         }
-        else if (type === 'fileTransformation') {
+        else if (type === 'file-transformation') {
             result = await processManagementService.startFileTransformation(config)
         }
 

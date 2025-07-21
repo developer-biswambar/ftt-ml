@@ -64,22 +64,28 @@ async def process_transformation(request: TransformationRequest):
 
         # Generate transformation ID
         transformation_id = generate_uuid('transform')
+        # Calculate processing time
+        processing_time = (datetime.now() - start_time).total_seconds()
+
+        processing_info['processing_time'] = processing_time
+
+        column_ids = [col.id for col in request.transformation_config.output_definition.columns]
+
+        # Remove col ids from the result
+        final_data_df = result_df.drop(column_ids, axis=1)
 
         # Store results if not preview
         if not request.preview_only:
             storage_success = transformation_storage.store_results(
                 transformation_id,
                 {
-                    'data': result_df,
+                    'data': final_data_df,
                     'config': request.transformation_config.dict(),
                     'processing_info': processing_info
                 }
             )
             if not storage_success:
                 logger.warning("Failed to store transformation results")
-
-        # Calculate processing time
-        processing_time = (datetime.now() - start_time).total_seconds()
 
         # Get total input rows
         total_input_rows = sum(len(df) for df in source_data.values())

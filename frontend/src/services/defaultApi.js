@@ -169,8 +169,8 @@ export const apiService = {
         return response.data;
     },
 
-    getGenerationResults: async (generationId) => {
-        const response = await defaultApi.get(`/file-generator/results/${generationId}`);
+    getFileTransformationResults: async (generationId) => {
+        const response = await defaultApi.get(`/transformation/results/${generationId}`);
         return response.data;
     },
 

@@ -1,5 +1,5 @@
 // src/App.jsx - Updated with AI File Generation Processing Support
-import React, {useState} from 'react';
+import React from 'react';
 import {BrowserRouter as Router, Route, Routes} from 'react-router-dom';
 import {messageService} from './services/messageService';
 import {
@@ -19,8 +19,6 @@ import FileLibraryPage from './pages/FileLibraryPage';
 import RecentResultsPage from './pages/RecentResultsPage';
 
 const MainApp = () => {
-    const [fileGenerationProcessing, setFileGenerationProcessing] = useState([]);
-
     // All state management is now handled by custom hooks
     const {files, uploadProgress, loadFiles, uploadFile} = useFileManagement();
     const {templates} = useTemplateManagement();
@@ -134,8 +132,8 @@ const MainApp = () => {
 
     // Merge file generation processing with regular processed files for the sidebar
     const allProcessedFiles = React.useMemo(() => {
-        return [...fileGenerationProcessing, ...processedFiles];
-    }, [fileGenerationProcessing, processedFiles]);
+        return processedFiles;
+    }, [processedFiles]);
 
     // Process handlers
     const handleReconciliation = async (reconciliationConfig) => {
@@ -193,7 +191,7 @@ const MainApp = () => {
         addMessage('user', `Starting ${selectedTemplate.name.toLowerCase()}...`, false);
         addMessage('system', messageService.getProcessStartMessage(selectedTemplate, true), true);
 
-        const result = await startProcess('fileTransformation', fileTransformationConfig);
+        const result = await startProcess('file-transformation', fileTransformationConfig);
 
         if (result.success) {
             addMessage('system', '✅ Process started! Monitoring progress...', true);
@@ -203,7 +201,7 @@ const MainApp = () => {
             setTimeout(() => {
                 addMessage('success', `🎉 ${selectedTemplate?.name || 'Process'} completed successfully!`, true);
 
-                const resultText = messageService.formatReconciliationResults(result);
+                const resultText = messageService.formatFileTransformationResult(result);
                 addMessage('result', resultText, true);
             }, 3000);
         } else {
@@ -265,7 +263,7 @@ const MainApp = () => {
             if (processType === 'file-generation') {
                 // Handle file generation results
                 const {apiService} = await import('./services/defaultApi.js');
-                const result = await apiService.getGenerationResults(resultId);
+                const result = await apiService.getFileTransformationResults(resultId);
 
                 if (result.data) {
                     // Display file generation results
@@ -365,6 +363,7 @@ const MainApp = () => {
     // Download results handler
     const handleDownloadResults = async (resultId, resultType) => {
         try {
+            if (processedFiles.length === 0) return
             // Determine process type
             const deltaRecord = processedFiles.find(f => f.delta_id === resultId);
             const generationRecord = processedFiles.find(f => f.generation_id === resultId);

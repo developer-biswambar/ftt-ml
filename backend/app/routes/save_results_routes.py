@@ -142,6 +142,25 @@ class ResultsSaver:
             logger.error(f"Could not import delta storage: {e}")
             raise HTTPException(status_code=500, detail="Delta storage not available")
 
+    def get_file_trasnformation_data(self, file_trasnformation_id: str, result_type: str) -> pd.DataFrame:
+        try:
+            # Import delta storage from existing routes
+            from app.services.transformation_service import transformation_storage
+
+
+            if not transformation_storage.isExist(file_trasnformation_id):
+                raise HTTPException(status_code=404, detail="File trasnformation ID not found")
+
+            results = transformation_storage.get_results(file_trasnformation_id)
+
+            return results['results']['data']
+
+
+
+        except ImportError as e:
+            logger.error(f"Could not import delta storage: {e}")
+            raise HTTPException(status_code=500, detail="Delta storage not available")
+
     def save_dataframe_to_storage(self, df: pd.DataFrame, saved_file_id: str, filename: str,
                                   file_format: str, description: str = None) -> SavedFileInfo:
         """Save DataFrame to storage service and return saved file info"""
@@ -219,12 +238,14 @@ async def save_results_to_server(request: SaveResultsRequest):
         saver = ResultsSaver()
 
         # Validate process type
-        if request.process_type not in ["reconciliation", "delta"]:
+        if request.process_type not in ["reconciliation", "delta","file-transformation"]:
             raise HTTPException(status_code=400, detail="process_type must be 'reconciliation' or 'delta'")
 
         # Get the appropriate data based on process type
         if request.process_type == "reconciliation":
             df = saver.get_reconciliation_data(request.result_id, request.result_type)
+        elif request.process_type == "file-transformation":
+            df = saver.get_file_trasnformation_data(request.result_id, request.result_type)
         else:  # delta
             df = saver.get_delta_data(request.result_id, request.result_type)
 

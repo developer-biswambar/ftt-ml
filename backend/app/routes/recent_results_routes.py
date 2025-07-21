@@ -46,7 +46,6 @@ async def get_recent_results(limit: int = 5):
         # Get Delta Generation results
         try:
             from app.routes.delta_routes import delta_storage
-
             for delta_id, delta_data in delta_storage.items():
                 recent_results.append(RecentResultInfo(
                     id=delta_id,
@@ -119,93 +118,43 @@ async def get_recent_results(limit: int = 5):
 
         # Get File Generation results
         try:
-            from app.routes.file_generator import generation_storage
+            from app.services.transformation_service import transformation_storage
 
-            for generation_id, generation_data in generation_storage.items():
+            for file_transformation in transformation_storage.storage.items():
                 try:
-                    # Safely access rules and output_data
-                    rules = generation_data.get("rules")
-                    output_data = generation_data.get("output_data")
-                    source_filename = generation_data.get("source_filename", "Unknown Source File")
-                    timestamp = generation_data.get("timestamp", datetime.now())
 
-                    # Calculate metrics safely
-                    total_output_records = len(output_data) if output_data is not None else 0
-                    total_input_records = 0
-                    row_multiplication_factor = 1
-                    columns_generated = []
-                    rules_description = "AI File Generation"
-                    output_filename = "generated_file.csv"
+                    transformation_id = file_transformation[0]
 
-                    # Extract information from rules if available
-                    if rules:
-                        try:
-                            # Handle different rule object types
-                            if hasattr(rules, 'row_multiplication'):
-                                if rules.row_multiplication and rules.row_multiplication.enabled:
-                                    row_multiplication_factor = rules.row_multiplication.count
-                            elif isinstance(rules, dict):
-                                row_mult = rules.get('row_multiplication', {})
-                                if row_mult.get('enabled', False):
-                                    row_multiplication_factor = row_mult.get('count', 1)
+                    transformation_details = file_transformation[1]
 
-                            # Get output filename
-                            if hasattr(rules, 'output_filename'):
-                                output_filename = rules.output_filename
-                            elif isinstance(rules, dict):
-                                output_filename = rules.get('output_filename', 'generated_file.csv')
-
-                            # Get description
-                            if hasattr(rules, 'description'):
-                                rules_description = rules.description
-                            elif isinstance(rules, dict):
-                                rules_description = rules.get('description', 'AI File Generation')
-
-                        except Exception as rule_error:
-                            logger.warning(f"Error processing rules for generation {generation_id}: {rule_error}")
-
-                    # Calculate input records
-                    if row_multiplication_factor > 1 and total_output_records > 0:
-                        total_input_records = total_output_records // row_multiplication_factor
-                    else:
-                        total_input_records = total_output_records
-
-                    # Get columns if available
-                    if output_data is not None:
-                        try:
-                            if hasattr(output_data, 'columns'):
-                                columns_generated = output_data.columns.tolist()
-                            elif hasattr(output_data, 'keys'):
-                                columns_generated = list(output_data.keys())
-                        except:
-                            pass
-
-                    # Build summary
-                    summary = {
-                        "total_input_records": total_input_records,
-                        "total_output_records": total_output_records,
-                        "row_multiplication_factor": row_multiplication_factor,
-                        "columns_generated": columns_generated,
-                        "rules_description": rules_description
-                    }
+                    print(file_transformation)
+                    file_ids = [
+                        file_info['file_id']
+                        for file_info in transformation_details['results']['config'].get('source_files', [])
+                    ]
 
                     recent_results.append(RecentResultInfo(
-                        id=generation_id,
-                        process_type="file_generation",
+                        id=transformation_id,
+                        process_type="file-transformation",
                         status="completed",
-                        created_at=timestamp.isoformat() if hasattr(timestamp, 'isoformat') else str(timestamp),
-                        source_file=source_filename,
-                        output_filename=output_filename,
-                        summary=summary,
-                        processing_time_seconds=None,  # Not stored in current generation structure
-                        row_multiplication_factor=row_multiplication_factor
+                        created_at=transformation_details['timestamp'].isoformat(),
+                        file_a=file_ids[0],
+                        file_b=file_ids[1] if len(file_ids) > 1 else '',
+                        summary={
+                            "input_records": transformation_details['results']['processing_info']['row_count'],
+                            'output_records': len(transformation_details['results']['data']),
+                            'columns_generated': len(transformation_details['results']['data'].columns),
+                            'configuration': transformation_details['results']['config'],
+                            'processing_info': transformation_details['results']['processing_info']
+                        },
+                        processing_time_seconds=None  # Not stored in current delta structure
                     ))
 
                 except Exception as gen_error:
-                    logger.error(f"Error processing generation result {generation_id}: {gen_error}")
+                    logger.error(f"Error processing generation result {transformation_id}: {gen_error}")
                     # Add a basic entry even if we can't process all details
                     recent_results.append(RecentResultInfo(
-                        id=generation_id,
+                        id=transformation_id,
                         process_type="file_generation",
                         status="completed",
                         created_at=datetime.now().isoformat(),

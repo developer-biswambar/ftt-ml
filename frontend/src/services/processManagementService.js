@@ -102,15 +102,7 @@ class ProcessManagementService {
                     success: true,
                     processId: data.transformation_id,
                     summary: data.summary,
-                    process: {
-                        delta_id: data.delta_id,
-                        process_type: 'delta-generation',
-                        status: 'processing',
-                        summary: data.validation_summary,
-                        created_at: new Date().toISOString(),
-                        file_a: config?.source_files?.[0]?.file_id ? config.source_files[0].file_id : 'Not Found',
-                        file_b: config?.source_files?.[1]?.file_id ? config.source_files[1].file_id : 'Not Found'
-                    }
+                    process: data
                 };
             }
 
@@ -143,16 +135,13 @@ class ProcessManagementService {
     }
 
     // Results retrieval
+    //TODO
     async getProcessedFiles() {
         try {
-            if (this.cache.has('processedFiles')) {
-                return this.cache.get('processedFiles');
-            }
-
             // For now, return empty array as the API endpoint doesn't exist yet
-            const result = {success: true, processedFiles: []};
-            this.cache.set('processedFiles', result);
-            return result;
+            const recentResult = await deltaApiService.loadRecentResultsForSidebar(20);
+
+            return {'success': true, 'processedFiles': recentResult};
         } catch (error) {
             console.error('Failed to load processed files:', error);
             return {success: false, processedFiles: [], error: error.message};

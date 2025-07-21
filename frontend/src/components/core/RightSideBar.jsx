@@ -23,6 +23,7 @@ import {
     ChevronRight
 } from 'lucide-react';
 import {useEffect, useState} from "react";
+import transformationApiService from "../../services/transformationApiService.js";
 
 const RightSidebar = ({
                           processedFiles = [],
@@ -272,12 +273,11 @@ const RightSidebar = ({
             };
         } else if (processInfo.type === 'file_generation') {
             const summary = processedFile.summary || {};
-            const multiplicationFactor = processedFile.row_multiplication_factor || summary.row_multiplication_factor || 1;
             return {
-                stat1: {label: 'Input Rows', value: summary.total_input_records || 0, color: 'blue'},
-                stat2: {label: 'Output Rows', value: summary.total_output_records || 0, color: 'green'},
-                stat3: {label: 'Columns', value: summary.columns_generated?.length || 0, color: 'purple'},
-                stat4: {label: 'Multiply', value: `${multiplicationFactor}x`, color: 'orange'}
+                stat1: {label: 'Input Rows', value: summary.input_records || 0, color: 'blue'},
+                stat2: {label: 'Output Rows', value: summary.output_records || 0, color: 'green'},
+                stat3: {label: 'Columns', value: summary.columns_generated, color: 'purple'},
+                stat4: {label: 'Errors', value: summary.processing_info.errors || 0, color: 'red'},
             };
         } else {
             // Generic stats for other process types
@@ -373,6 +373,7 @@ const RightSidebar = ({
         try {
             // Import the deltaApiService for saving
             const {deltaApiService} = await import('../../services/deltaApiService.js');
+            const {transformationApiService} = await import('../../services/transformationApiService.js');
 
             let result;
             const {processId, downloadType, processInfo} = saveModalData;
@@ -406,6 +407,16 @@ const RightSidebar = ({
                     customFilename.trim() || null,
                     description.trim() || null
                 );
+            } else if (processInfo.type === 'file_generation') {
+
+                result = await transformationApiService.saveTransformationResultsToServer(
+                    processId,
+                    downloadType,
+                    'csv',
+                    customFilename.trim() || null,
+                    description.trim() || null
+                )
+
             }
 
             if (result.success) {
@@ -579,19 +590,23 @@ const RightSidebar = ({
 
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center space-x-2">
-                                                            <span className="text-sm font-medium text-gray-800 truncate">
+                                                            <span
+                                                                className="text-sm font-medium text-gray-800 truncate">
                                                                 {processInfo.label}
                                                             </span>
 
                                                             {/* Status Icon */}
                                                             {processedFile.status === 'completed' && (
-                                                                <CheckCircle size={14} className="text-green-500 flex-shrink-0"/>
+                                                                <CheckCircle size={14}
+                                                                             className="text-green-500 flex-shrink-0"/>
                                                             )}
                                                             {processedFile.status === 'processing' && (
-                                                                <Clock size={14} className="text-blue-500 animate-pulse flex-shrink-0"/>
+                                                                <Clock size={14}
+                                                                       className="text-blue-500 animate-pulse flex-shrink-0"/>
                                                             )}
                                                             {processedFile.status === 'failed' && (
-                                                                <AlertCircle size={14} className="text-red-500 flex-shrink-0"/>
+                                                                <AlertCircle size={14}
+                                                                             className="text-red-500 flex-shrink-0"/>
                                                             )}
                                                         </div>
 
@@ -599,11 +614,11 @@ const RightSidebar = ({
                                                         <div className="text-xs text-gray-500 mt-1">
                                                             <div className="truncate">
                                                                 ID: {processInfo.id.slice(-8)} • {new Date(processedFile.created_at).toLocaleString('en-US', {
-                                                                    month: 'short',
-                                                                    day: 'numeric',
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit'
-                                                                })}
+                                                                month: 'short',
+                                                                day: 'numeric',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit'
+                                                            })}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -630,12 +645,28 @@ const RightSidebar = ({
                                             <div className="px-3 pb-3 border-t border-gray-100 pt-3">
                                                 {/* Full File Names */}
                                                 <div className="text-xs text-gray-600 mb-3">
-                                                    <div className="truncate" title={processedFile.file_a}>
-                                                        📄 {processInfo.type === 'delta' ? 'Older' : 'A'}: {processedFile.file_a}
+                                                    <div
+                                                        className="truncate"
+                                                        title={
+                                                            processInfo.type === 'file_generation'
+                                                                ? processedFile?.summary?.configuration?.source_files?.[0]?.file_id
+                                                                : processedFile.file_a
+                                                        }
+                                                    >
+                                                        📄 {processInfo.type === 'delta'
+                                                        ? 'Older'
+                                                        : processInfo.type === 'file_generation'
+                                                            ? 'SourceFile'
+                                                            : 'SourceFile'}: {
+                                                        processInfo.type === 'file_generation'
+                                                            ? processedFile?.summary?.configuration?.source_files?.[0]?.file_id
+                                                            : processedFile.file_a
+                                                    }
                                                     </div>
+
                                                     {processedFile.file_b && (
                                                         <div className="truncate" title={processedFile.file_b}>
-                                                            📄 {processInfo.type === 'delta' ? 'Newer' : 'B'}: {processedFile.file_b}
+                                                            📄 {processInfo.type === 'delta' ? 'Newer' : ''}: {processedFile.file_b}
                                                         </div>
                                                     )}
                                                 </div>
@@ -648,7 +679,8 @@ const RightSidebar = ({
                                                 {/* Results Summary (if completed) */}
                                                 {(processedFile.status === 'completed' || !processedFile.status) && (
                                                     <>
-                                                        <div className="text-xs text-gray-600 mb-3 bg-gray-50 p-2 rounded">
+                                                        <div
+                                                            className="text-xs text-gray-600 mb-3 bg-gray-50 p-2 rounded">
                                                             <div className="grid grid-cols-2 gap-2">
                                                                 <div className={`text-${summaryStats.stat1.color}-600`}>
                                                                     ✅ {summaryStats.stat1.label}: {summaryStats.stat1.value}
@@ -684,6 +716,7 @@ const RightSidebar = ({
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         console.log('Show summary chart for', processInfo.id);
+
                                                                     }}
                                                                     className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-1"
                                                                     title="Show summary statistics"
@@ -695,7 +728,9 @@ const RightSidebar = ({
 
                                                             {/* Download & Save Options */}
                                                             <div className="space-y-1">
-                                                                <div className="text-xs text-gray-500 font-medium">Download &
+                                                                <div
+                                                                    className="text-xs text-gray-500 font-medium">Download
+                                                                    &
                                                                     Save Options:
                                                                 </div>
 
@@ -822,7 +857,8 @@ const RightSidebar = ({
                                                 )}
 
                                                 {/* Timestamp */}
-                                                <div className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-100">
+                                                <div
+                                                    className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-100">
                                                     {new Date(processedFile.created_at).toLocaleString()}
                                                 </div>
                                             </div>

@@ -610,6 +610,10 @@ class TransformationStorage:
         """Retrieve transformation results"""
         return self.storage.get(transformation_id)
 
+    def isExist(self, transformation_id: str) -> bool:
+        """Check if transformation id exists"""
+        return transformation_id in self.storage
+
     def delete_results(self, transformation_id: str) -> bool:
         """Delete transformation results"""
         if transformation_id in self.storage:

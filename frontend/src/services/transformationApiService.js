@@ -1,7 +1,17 @@
 // Transformation API Service
 // Handles all API calls related to data transformation features
 
+import axios from "axios";
+
 const API_BASE_URL = 'http://localhost:8000';
+
+
+const api = axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
 
 export const transformationApiService = {
     // Process transformation
@@ -22,6 +32,24 @@ export const transformationApiService = {
         }
 
         return response.json();
+    },
+
+    saveTransformationResultsToServer: async (transformation_id, resultType = 'all', fileFormat = 'csv', customFilename = null, description = null) => {
+        try {
+            const response = await api.post('/save-results/save', {
+                result_id: transformation_id,
+                result_type: resultType,
+                process_type: 'file-transformation',
+                file_format: fileFormat,
+                custom_filename: customFilename,
+                description: description
+            });
+
+            return response.data;
+        } catch (error) {
+            console.error('Error saving delta results to server:', error);
+            throw error;
+        }
     },
 
 // Get transformation results

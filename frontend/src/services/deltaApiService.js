@@ -198,7 +198,7 @@ async saveFileGenerationResultsToServer(generationId, resultType = 'all', fileFo
  */
 async downloadFileGenerationResults(generationId, format = 'csv') {
     try {
-        const response = await api.get(`/file-generator/download/${generationId}`, {
+        const response = await api.get(`/transformation/download/${generationId}`, {
             params: {
                 format: format
             },
@@ -350,16 +350,17 @@ transformRecentResultsToProcessedFiles(recentResults) {
                 file_b: result.file_b,
                 summary: result.summary
             };
-        } else if (result.process_type === 'file_generation') {
+        } else if (result.process_type === 'file-transformation') {
             return {
                 generation_id: result.id,
-                process_type: 'ai-file-generation',
+                process_type: 'file-transformation',
                 status: result.status,
                 created_at: result.created_at,
-                source_file: result.source_file,
+                source_file: result.file_a,
                 output_filename: result.output_filename,
                 summary: result.summary,
         } }
+
         return result;
     });
 },
