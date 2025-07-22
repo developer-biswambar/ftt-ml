@@ -6,7 +6,6 @@ import {transformationApiService} from './transformationApiService.js';
 class ProcessManagementService {
     constructor() {
         this.activeProcesses = new Map();
-        this.cache = new Map();
     }
 
     // Reconciliation processes
@@ -102,7 +101,15 @@ class ProcessManagementService {
                     success: true,
                     processId: data.transformation_id,
                     summary: data.summary,
-                    process: data
+                    process: {
+                        delta_id: data.transformation_id,
+                        process_type: 'file-transformation',
+                        status: 'processing',
+                        summary: data.summary,
+                        created_at: new Date().toISOString(),
+                        SourceFile: "FileTransformation",
+                    }
+
                 };
             }
 

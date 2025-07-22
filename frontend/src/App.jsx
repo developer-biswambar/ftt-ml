@@ -95,41 +95,6 @@ const MainApp = () => {
         }
     };
 
-    // Helper function to convert data to CSV
-    const convertDataToCSV = (data, columns) => {
-        const headers = columns.join(',');
-        const rows = data.map(row =>
-            columns.map(col => {
-                const value = row[col];
-                if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
-                    return `"${value.replace(/"/g, '""')}"`;
-                }
-                return value || '';
-            }).join(',')
-        );
-        return [headers, ...rows].join('\n');
-    };
-
-    // Helper function to format file generation results
-    const formatFileGenerationResults = (summary, generationId) => {
-        let resultText = `🎉 **AI File Generation Complete!**\n\n`;
-        resultText += `📊 **Generation Summary:**\n`;
-        resultText += `• Input Records: ${summary.total_input_records.toLocaleString()}\n`;
-        resultText += `• Output Records: ${summary.total_output_records.toLocaleString()}\n`;
-
-        if (summary.row_multiplication_factor > 1) {
-            resultText += `• Row Multiplication: ${summary.row_multiplication_factor}x\n`;
-        }
-
-        resultText += `• Columns Generated: ${summary.columns_generated.length}\n`;
-        resultText += `• Processing Time: ${summary.processing_time_seconds}s\n\n`;
-        resultText += `🔧 **Rules Applied:** ${summary.rules_applied}\n\n`;
-        resultText += `📥 **Generation ID:** ${generationId}\n\n`;
-        resultText += `Use the download options in the right panel to get your generated file!`;
-
-        return resultText;
-    };
-
     // Merge file generation processing with regular processed files for the sidebar
     const allProcessedFiles = React.useMemo(() => {
         return processedFiles;

@@ -45,7 +45,6 @@ class OutputColumn(BaseModel):
     id: str
     name: str
     type: ColumnType
-    required: bool = True
     format: Optional[str] = None
     description: Optional[str] = None
     allowed_values: Optional[List[str]] = None

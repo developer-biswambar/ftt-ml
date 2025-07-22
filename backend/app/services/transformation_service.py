@@ -475,7 +475,7 @@ class TransformationEngine:
         }
 
         # Check required columns
-        required_columns = [col.id for col in output_definition.columns if col.required]
+        required_columns = [col.id for col in output_definition.columns]
         missing_columns = set(required_columns) - set(df.columns)
 
         if missing_columns:
@@ -488,12 +488,12 @@ class TransformationEngine:
                 continue
 
             # Type validation
-            if col_def.type == 'number' or col_def.type == 'decimal':
-                non_numeric = df[~df[col_def.name].apply(lambda x: isinstance(x, (int, float)) or pd.isna(x))]
-                if not non_numeric.empty:
-                    validation_results['errors'].append(
-                        f"Column '{col_def.name}' contains non-numeric values"
-                    )
+            # if col_def.type == 'number' or col_def.type == 'decimal':
+            #     non_numeric = df[~df[col_def.name].apply(lambda x: isinstance(x, (int, float)) or pd.isna(x))]
+            #     if not non_numeric.empty:
+            #         validation_results['errors'].append(
+            #             f"Column '{col_def.name}' contains non-numeric values"
+            #         )
 
             # Allowed values validation
             if col_def.allowed_values:

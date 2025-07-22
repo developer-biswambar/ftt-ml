@@ -219,6 +219,13 @@ const TransformationFlow = ({
         return columns;
     };
 
+    const handleSuggestMappings = (suggestedMappings) => {
+        setConfig(prev => ({
+            ...prev,
+            column_mappings: suggestedMappings
+        }));
+    };
+
     // Step content renderer
     const renderStepContent = () => {
         switch (currentStep) {
@@ -296,6 +303,7 @@ const TransformationFlow = ({
                     <SchemaDefinitionStep
                         outputDefinition={config.output_definition}
                         onUpdate={(updated) => setConfig(prev => ({...prev, output_definition: updated}))}
+                        onSuggestMappings={handleSuggestMappings}
                         sourceColumns={getSourceColumns()}
                         onSendMessage={onSendMessage}
                     />

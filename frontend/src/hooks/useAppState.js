@@ -132,7 +132,13 @@ export const useProcessManagement = () => {
             // Update the processed file status
             setProcessedFiles(prev =>
                 prev.map(file => {
-                    const idField = type === 'delta-generation' ? 'delta_id' : 'reconciliation_id';
+                    let idField = 'reconciliation'
+                    if (type === 'delta-generation') {
+                        idField = 'delta_id'
+                    }
+                    else if (type === 'file-transformation') {
+                        idField = 'generation_id'
+                    }
                     return file[idField] === processId
                         ? {...file, status: 'completed'}
                         : file;

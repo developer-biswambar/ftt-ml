@@ -21,6 +21,7 @@ import {
 const SchemaDefinitionStep = ({
     outputDefinition,
     onUpdate,
+    onSuggestMappings,
     sourceColumns,
     onSendMessage
 }) => {
@@ -153,14 +154,18 @@ const SchemaDefinitionStep = ({
     };
 
     const suggestColumnsFromSource = () => {
-        // Get all unique column names from source files
-        const allColumns = new Set();
-        Object.values(sourceColumns).forEach(columns => {
-            columns.forEach(col => allColumns.add(col));
+        // Get all unique column names from source files with their source references
+        const allColumns = new Map(); // Map to track column name -> source reference
+        Object.entries(sourceColumns).forEach(([alias, columns]) => {
+            columns.forEach(col => {
+                if (!allColumns.has(col)) {
+                    allColumns.set(col, `${alias}.${col}`);
+                }
+            });
         });
 
         // Create suggested columns
-        const suggestedColumns = Array.from(allColumns).map((col, index) => ({
+        const suggestedColumns = Array.from(allColumns.keys()).map((col, index) => ({
             id: `col_${Date.now()}_${index}`,
             name: col,
             type: guessColumnType(col),
@@ -168,12 +173,28 @@ const SchemaDefinitionStep = ({
             description: `Imported from source column: ${col}`
         }));
 
+        // Create direct mappings for suggested columns
+        const suggestedMappings = suggestedColumns.map(column => ({
+            id: `map_${Date.now()}_${column.id}`,
+            target_column: column.id,
+            mapping_type: 'direct',
+            enabled: true,
+            source: allColumns.get(column.name), // Use the source reference
+            transformation: null
+        }));
+
+        // Update schema
         onUpdate({
             ...outputDefinition,
             columns: suggestedColumns
         });
 
-        onSendMessage('system', `✅ Suggested ${suggestedColumns.length} columns based on source files`);
+        // Notify parent component about the suggested mappings
+        if (onSuggestMappings) {
+            onSuggestMappings(suggestedMappings);
+        }
+
+        onSendMessage('system', `✅ Suggested ${suggestedColumns.length} columns with direct mappings based on source files`);
     };
 
     const guessColumnType = (columnName) => {

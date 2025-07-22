@@ -561,6 +561,11 @@ const RightSidebar = ({
                     ) : (
                         <div className="space-y-3">
                             {localProcessedFiles.map((processedFile) => {
+
+                                if (processedFile.status === 'processing') {
+                                    console.error(processedFile);
+                                    return null;
+                                }
                                 const processInfo = getProcessTypeInfo(processedFile);
                                 const ProcessIcon = processInfo.icon;
                                 const summaryStats = getSummaryStats(processedFile);
@@ -611,16 +616,19 @@ const RightSidebar = ({
                                                         </div>
 
                                                         {/* ID and Time */}
-                                                        <div className="text-xs text-gray-500 mt-1">
-                                                            <div className="truncate">
-                                                                ID: {processInfo.id.slice(-8)} • {new Date(processedFile.created_at).toLocaleString('en-US', {
-                                                                month: 'short',
-                                                                day: 'numeric',
-                                                                hour: '2-digit',
-                                                                minute: '2-digit'
-                                                            })}
+                                                        {processInfo?.id && (
+                                                            <div className="text-xs text-gray-500 mt-1">
+                                                                <div className="truncate">
+                                                                    ID: {processInfo.id.slice(-8)} • {new Date(processedFile.created_at).toLocaleString('en-US', {
+                                                                    month: 'short',
+                                                                    day: 'numeric',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                })}
+                                                                </div>
                                                             </div>
-                                                        </div>
+                                                        )}
+
                                                     </div>
                                                 </div>
 
