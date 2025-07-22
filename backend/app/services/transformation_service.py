@@ -71,7 +71,7 @@ class TransformationEngine:
                 'validation_results': validation_results,
                 'errors': self.errors,
                 'warnings': self.warnings,
-                'row_count': len(result_df)
+                'output_row_count': len(result_df)
             }
 
         except Exception as e:

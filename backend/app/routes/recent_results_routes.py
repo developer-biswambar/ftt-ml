@@ -141,7 +141,7 @@ async def get_recent_results(limit: int = 5):
                         file_a=file_ids[0],
                         file_b=file_ids[1] if len(file_ids) > 1 else '',
                         summary={
-                            "input_records": transformation_details['results']['processing_info']['row_count'],
+                            "input_records": transformation_details['results']['processing_info']['input_row_count'],
                             'output_records': len(transformation_details['results']['data']),
                             'columns_generated': len(transformation_details['results']['data'].columns),
                             'configuration': transformation_details['results']['config'],

@@ -49,10 +49,12 @@ async def process_transformation(request: TransformationRequest):
     try:
         # Load source files into dataframes
         source_data = {}
+        total_input_rows =0
         for source_file in request.source_files:
             df = await get_file_dataframe(source_file)
             source_data[source_file.alias] = df
             logger.info(f"Loaded {source_file.alias}: {len(df)} rows")
+            total_input_rows += len(df)
 
         # Process transformation
         result_df, processing_info = engine.process_transformation(
@@ -61,6 +63,8 @@ async def process_transformation(request: TransformationRequest):
             preview_only=request.preview_only,
             row_limit=request.row_limit
         )
+
+        processing_info['input_row_count']= total_input_rows
 
         # Generate transformation ID
         transformation_id = generate_uuid('transform')
@@ -104,7 +108,7 @@ async def process_transformation(request: TransformationRequest):
 
         # Add preview data if requested
         if request.preview_only:
-            response.preview_data = result_df.head(request.row_limit or 10).to_dict('records')
+            response.preview_data = final_data_df.head(request.row_limit or 10).to_dict('records')
 
         return response
 
