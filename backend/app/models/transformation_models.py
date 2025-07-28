@@ -1,3 +1,5 @@
+# backend/app/models/transformation_models.py - Updated for rule-based transformations
+
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Union
 from pydantic import BaseModel, Field
@@ -35,12 +37,80 @@ class ExpansionType(str, Enum):
     DYNAMIC_EXPANSION = "dynamic_expansion"
 
 
+class MappingType(str, Enum):
+    DIRECT = "direct"
+    STATIC = "static"
+    DYNAMIC = "dynamic"
+
+
+class ConditionOperator(str, Enum):
+    EQUALS = "=="
+    NOT_EQUALS = "!="
+    GREATER_THAN = ">"
+    LESS_THAN = "<"
+    GREATER_EQUAL = ">="
+    LESS_EQUAL = "<="
+    CONTAINS = "contains"
+    STARTS_WITH = "startsWith"
+    ENDS_WITH = "endsWith"
+
+
 class SourceFile(BaseModel):
     file_id: str
     alias: str
     purpose: Optional[str] = None
 
 
+class DynamicCondition(BaseModel):
+    """Individual condition for dynamic column mapping"""
+    id: str
+    condition_column: str = Field(..., description="Source column to evaluate")
+    operator: ConditionOperator = Field(default=ConditionOperator.EQUALS)
+    condition_value: str = Field(..., description="Value to compare against")
+    output_value: str = Field(..., description="Value to output when condition is met")
+
+
+class RuleOutputColumn(BaseModel):
+    """Configuration for output column in transformation rules"""
+    id: str
+    name: str = Field(..., description="Output column name")
+    mapping_type: MappingType = Field(default=MappingType.DIRECT)
+
+    # Direct mapping
+    source_column: Optional[str] = Field(None, description="Source column for direct mapping")
+
+    # Static mapping
+    static_value: Optional[str] = Field(None, description="Static value for all rows")
+
+    # Dynamic mapping
+    dynamic_conditions: Optional[List[DynamicCondition]] = Field(default_factory=list)
+    default_value: Optional[str] = Field(None, description="Default value when no conditions match")
+
+
+class ConditionBuilder(BaseModel):
+    """Helper for building rule conditions"""
+    column: Optional[str] = None
+    operator: ConditionOperator = ConditionOperator.EQUALS
+    value: Optional[str] = None
+    logic: str = Field(default="simple", description="simple or advanced")
+
+
+class TransformationRule(BaseModel):
+    """Individual transformation rule with output column definitions"""
+    id: str
+    name: str = Field(..., description="Rule display name")
+    enabled: bool = Field(default=True)
+    priority: int = Field(default=0, description="Execution priority (lower = higher priority)")
+
+    # Condition for when this rule applies
+    condition: str = Field(default="", description="Condition expression")
+    condition_builder: Optional[ConditionBuilder] = Field(default_factory=ConditionBuilder)
+
+    # Output configuration
+    output_columns: List[RuleOutputColumn] = Field(default_factory=list)
+
+
+# Legacy support - keep existing OutputColumn for backwards compatibility
 class OutputColumn(BaseModel):
     id: str
     name: str
@@ -49,6 +119,7 @@ class OutputColumn(BaseModel):
     description: Optional[str] = None
     allowed_values: Optional[List[str]] = None
     default_value: Optional[Any] = None
+    required: bool = Field(default=True)
 
 
 class OutputDefinition(BaseModel):
@@ -64,6 +135,7 @@ class ExpansionStrategy(BaseModel):
 
 
 class RowGenerationRule(BaseModel):
+    """Legacy row generation rule - kept for backwards compatibility"""
     id: str
     name: str
     type: str = "expand"
@@ -79,6 +151,7 @@ class TransformationConfig(BaseModel):
 
 
 class ColumnMapping(BaseModel):
+    """Legacy column mapping - kept for backwards compatibility"""
     id: str = Field(default_factory=lambda: f"map_{datetime.now().timestamp()}")
     target_column: str
     mapping_type: TransformationType
@@ -96,24 +169,33 @@ class ValidationRule(BaseModel):
     severity: str = "error"  # error, warning
 
 
-class TransformationTemplate(BaseModel):
-    id: str
-    name: str
-    description: Optional[str] = None
-    category: str
-    tags: List[str] = []
-    source_requirements: Dict[str, Any] = {}  # Expected source columns/structure
-    output_definition: OutputDefinition
-    row_generation_rules: List[RowGenerationRule] = []
-    column_mappings: List[ColumnMapping] = []
-    validation_rules: List[ValidationRule] = []
-    sample_input: Optional[Dict[str, Any]] = None
-    sample_output: Optional[Dict[str, Any]] = None
+# New comprehensive transformation configuration
+class NewTransformationConfig(BaseModel):
+    """Updated transformation configuration with rule-based structure"""
+    name: Optional[str] = Field(None, description="Transformation name")
+    description: Optional[str] = Field(None, description="Transformation description")
+
+    # Source configuration
+    source_files: List[SourceFile] = Field(default_factory=list)
+
+    # New rule-based transformation
+    row_generation_rules: List[TransformationRule] = Field(default_factory=list)
+
+    # Output configuration
+    merge_datasets: bool = Field(default=True, description="Merge all rule outputs into single dataset")
+
+    # Validation
+    validation_rules: Optional[List[ValidationRule]] = Field(default_factory=list)
+
+    # Metadata
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
 
-class TransformationConfig(BaseModel):
+# Legacy transformation config for backwards compatibility
+class LegacyTransformationConfig(BaseModel):
+    """Legacy transformation config structure"""
     id: Optional[str] = None
     name: str
     description: Optional[str] = None
@@ -131,7 +213,7 @@ class TransformationRequest(BaseModel):
     process_name: str
     description: Optional[str] = None
     source_files: List[SourceFile]
-    transformation_config: TransformationConfig
+    transformation_config: Union[NewTransformationConfig, LegacyTransformationConfig, Dict[str, Any]]
     preview_only: bool = False
     row_limit: Optional[int] = None  # For preview mode
 
@@ -148,17 +230,108 @@ class TransformationResult(BaseModel):
     preview_data: Optional[List[Dict[str, Any]]] = None
 
 
+class DatasetInfo(BaseModel):
+    """Information about a generated dataset"""
+    name: str
+    rule_name: Optional[str] = None
+    row_count: int
+    column_count: int
+    file_id: Optional[str] = None  # ID for accessing via viewer
+
+
+class TransformationSummary(BaseModel):
+    """Summary of transformation results"""
+    transformation_id: str
+    name: str
+    created_at: datetime
+    total_input_rows: int
+    total_output_rows: int
+    processing_time_seconds: float
+    datasets: List[DatasetInfo]
+    merge_enabled: bool
+
+
+class TransformationTemplate(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    category: str
+    tags: List[str] = []
+    source_requirements: Dict[str, Any] = {}  # Expected source columns/structure
+
+    # Support both old and new config structures
+    transformation_config: Union[NewTransformationConfig, LegacyTransformationConfig]
+
+    # Legacy fields for backwards compatibility
+    output_definition: Optional[OutputDefinition] = None
+    row_generation_rules: Optional[List[RowGenerationRule]] = []
+    column_mappings: Optional[List[ColumnMapping]] = []
+    validation_rules: Optional[List[ValidationRule]] = []
+
+    sample_input: Optional[Dict[str, Any]] = None
+    sample_output: Optional[Dict[str, Any]] = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
 class LLMAssistanceRequest(BaseModel):
     assistance_type: str  # suggest_mappings, generate_transformation, validate_output
     source_columns: Optional[Dict[str, List[str]]] = None
     target_schema: Optional[OutputDefinition] = None
+    transformation_rules: Optional[List[TransformationRule]] = None
+    output_columns: Optional[List[RuleOutputColumn]] = None
     sample_data: Optional[List[Dict[str, Any]]] = None
     examples: Optional[List[Dict[str, Any]]] = None
-    context: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
 
 
 class LLMAssistanceResponse(BaseModel):
-    suggestions: List[Dict[str, Any]]
-    confidence_scores: Dict[str, float] = {}
+    success: bool = True
+    suggestions: List[Dict[str, Any]] = Field(default_factory=list)
+    confidence_scores: Dict[str, float] = Field(default_factory=dict)
     explanation: Optional[str] = None
-    warnings: List[str] = []
+    warnings: List[str] = Field(default_factory=list)
+    generated_rules: Optional[List[TransformationRule]] = None
+    generated_columns: Optional[List[RuleOutputColumn]] = None
+
+
+class ProcessingMetrics(BaseModel):
+    """Metrics from transformation processing"""
+    start_time: datetime
+    end_time: datetime
+    processing_time_seconds: float
+
+    input_metrics: Dict[str, Any]  # row counts, file sizes, etc.
+    output_metrics: Dict[str, Any]  # generated rows, columns, etc.
+
+    performance_metrics: Dict[str, Any]  # memory usage, etc.
+    quality_metrics: Dict[str, Any]  # validation results, etc.
+
+
+class TransformationError(BaseModel):
+    """Error information from transformation processing"""
+    error_type: str
+    error_message: str
+    error_location: Optional[str] = None  # rule name, column name, etc.
+    suggested_fix: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+
+class ExpressionValidationResult(BaseModel):
+    """Result of validating an expression"""
+    is_valid: bool
+    error_message: Optional[str] = None
+    suggested_correction: Optional[str] = None
+    available_columns: List[str] = Field(default_factory=list)
+
+
+class RuleExecutionResult(BaseModel):
+    """Result of executing a single transformation rule"""
+    rule_id: str
+    rule_name: str
+    success: bool
+    rows_processed: int
+    rows_generated: int
+    execution_time_seconds: float
+    errors: List[TransformationError] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)

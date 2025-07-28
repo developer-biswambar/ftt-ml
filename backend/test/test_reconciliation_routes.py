@@ -144,7 +144,6 @@ class TestReconciliationRoutes:
 
     # Test Column Unique Values Route
     @pytest.mark.unit
-
     async def test_get_column_unique_values_success(self):
         """Test successful retrieval of unique values for a column"""
         # Mock the get_file_by_id function from your file service
@@ -1162,7 +1161,6 @@ class TestReconciliationRoutes:
             ]
         }
 
-
     @pytest.mark.unit
     @pytest.mark.validation
     def test_get_column_unique_values_date_column(self):
@@ -2146,7 +2144,6 @@ class TestReconciliationRoutes:
                 {"file_id": "test_file_b_001", "role": "file_1", "label": "Bank Statements"}
             ]
         }
-
 
     @pytest.mark.asyncio
     async def test_get_column_unique_values_date_column(self):

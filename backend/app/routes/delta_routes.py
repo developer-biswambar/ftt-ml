@@ -641,8 +641,6 @@ async def get_file_by_id(file_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to retrieve file: {str(e)}")
 
 
-
-
 @router.post("/process/", response_model=DeltaResponse)
 async def process_delta_generation(request: JSONDeltaRequest):
     """Process delta generation with JSON input - File ID Version with Filter Support"""

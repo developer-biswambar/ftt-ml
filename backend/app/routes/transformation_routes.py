@@ -1,5 +1,4 @@
 import io
-import json
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -15,7 +14,10 @@ from app.models.transformation_models import (
     TransformationTemplate,
     LLMAssistanceRequest,
     LLMAssistanceResponse,
-    SourceFile
+    SourceFile,
+    TransformationRule,
+    OutputColumn,
+    DynamicCondition
 )
 from app.services.transformation_service import TransformationEngine, transformation_storage
 from app.utils.uuid_generator import generate_uuid
@@ -39,76 +41,338 @@ async def get_file_dataframe(file_ref: SourceFile) -> pd.DataFrame:
     return file_data["data"]
 
 
+def evaluate_condition(condition: str, row_data: Dict[str, Any], context: Dict[str, Any]) -> bool:
+    """Safely evaluate a condition string against row data"""
+    if not condition.strip():
+        return True
+
+    try:
+        # Create a safe evaluation context
+        eval_context = {
+            **row_data,
+            **context,
+            'abs': abs,
+            'len': len,
+            'str': str,
+            'int': int,
+            'float': float,
+            'bool': bool
+        }
+
+        # Replace column references like file_0.Column with actual values
+        safe_condition = condition
+        for key, value in eval_context.items():
+            if f".{key}" in safe_condition or safe_condition.startswith(key):
+                # Handle different value types
+                if isinstance(value, str):
+                    safe_condition = safe_condition.replace(key, f'"{value}"')
+                else:
+                    safe_condition = safe_condition.replace(key, str(value))
+
+        # Basic safety check - only allow simple expressions
+        allowed_chars = set('0123456789.+-*/()<>=!&|" \t\n')
+        if not all(c.isalnum() or c in allowed_chars for c in safe_condition):
+            logger.warning(f"Unsafe condition detected: {condition}")
+            return False
+
+        return eval(safe_condition)
+    except Exception as e:
+        logger.warning(f"Error evaluating condition '{condition}': {str(e)}")
+        return False
+
+
+def apply_column_mapping(mapping_config: Dict[str, Any], row_data: Dict[str, Any], context: Dict[str, Any]) -> Any:
+    """Apply column mapping configuration to get output value"""
+    mapping_type = mapping_config.get('mapping_type', 'direct')
+
+    if mapping_type == 'direct':
+        source_column = mapping_config.get('source_column', '')
+        return row_data.get(source_column, '')
+
+    elif mapping_type == 'static':
+        return mapping_config.get('static_value', '')
+
+    elif mapping_type == 'dynamic':
+        # Evaluate dynamic conditions
+        conditions = mapping_config.get('dynamic_conditions', [])
+        default_value = mapping_config.get('default_value', '')
+
+        for condition in conditions:
+            condition_column = condition.get('condition_column', '')
+            operator = condition.get('operator', '==')
+            condition_value = condition.get('condition_value', '')
+            output_value = condition.get('output_value', '')
+
+            if condition_column in row_data:
+                row_value = row_data[condition_column]
+
+                # Evaluate condition based on operator
+                condition_met = False
+                try:
+                    # Convert values for comparison - handle type conversion
+                    if operator in ['>', '<', '>=', '<=']:
+                        # For numerical comparisons, try to convert both to float
+                        try:
+                            row_value_num = float(str(row_value).replace(',', ''))
+                            condition_value_num = float(str(condition_value).replace(',', ''))
+
+                            if operator == '>':
+                                condition_met = row_value_num > condition_value_num
+                            elif operator == '<':
+                                condition_met = row_value_num < condition_value_num
+                            elif operator == '>=':
+                                condition_met = row_value_num >= condition_value_num
+                            elif operator == '<=':
+                                condition_met = row_value_num <= condition_value_num
+                        except (ValueError, TypeError):
+                            # If conversion fails, fall back to string comparison
+                            row_value_str = str(row_value)
+                            condition_value_str = str(condition_value)
+
+                            if operator == '>':
+                                condition_met = row_value_str > condition_value_str
+                            elif operator == '<':
+                                condition_met = row_value_str < condition_value_str
+                            elif operator == '>=':
+                                condition_met = row_value_str >= condition_value_str
+                            elif operator == '<=':
+                                condition_met = row_value_str <= condition_value_str
+                    else:
+                        # For string comparisons
+                        row_value_str = str(row_value)
+                        condition_value_str = str(condition_value)
+
+                        if operator == '==':
+                            condition_met = row_value_str == condition_value_str
+                        elif operator == '!=':
+                            condition_met = row_value_str != condition_value_str
+                        elif operator == 'contains':
+                            condition_met = condition_value_str in row_value_str
+                        elif operator == 'startsWith':
+                            condition_met = row_value_str.startswith(condition_value_str)
+                        elif operator == 'endsWith':
+                            condition_met = row_value_str.endswith(condition_value_str)
+
+                    if condition_met:
+                        return output_value
+
+                except Exception as e:
+                    logger.warning(f"Error evaluating dynamic condition: {str(e)}")
+                    continue
+
+        return default_value
+
+    return ''
+
+
+def process_transformation_rules(source_data: Dict[str, pd.DataFrame], config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Process transformation rules and generate output datasets"""
+    rules = config.get('row_generation_rules', [])
+    merge_datasets = config.get('merge_datasets', True)
+
+    all_results = []
+    rule_results = {}
+    processing_errors = []
+
+    # Get all source rows
+    source_rows = []
+    for alias, df in source_data.items():
+        for _, row in df.iterrows():
+            # Flatten row data with alias prefix
+            row_dict = {}
+            for col, value in row.items():
+                row_dict[f"{alias}.{col}"] = value
+            source_rows.append(row_dict)
+
+    for rule in rules:
+        if not rule.get('enabled', True):
+            continue
+
+        rule_name = rule.get('name', 'Unnamed Rule')
+        output_columns = rule.get('output_columns', [])
+
+        if not output_columns:
+            logger.warning(f"Rule '{rule_name}' has no output columns defined")
+            continue
+
+        rule_output_rows = []
+        rule_errors = []
+
+        # Process each source row
+        for source_row in source_rows:
+            try:
+                # Generate output row based on column mappings
+                output_row = {}
+                for column_config in output_columns:
+                    column_name = column_config.get('name', '')
+                    if column_name:
+                        try:
+                            output_row[column_name] = apply_column_mapping(column_config, source_row, {})
+                        except Exception as e:
+                            logger.error(f"Error processing column '{column_name}' in rule '{rule_name}': {str(e)}")
+                            output_row[column_name] = ''
+                            rule_errors.append(f"Column '{column_name}': {str(e)}")
+
+                if output_row:  # Only add if we have data
+                    rule_output_rows.append(output_row)
+
+            except Exception as e:
+                logger.error(f"Error processing row in rule '{rule_name}': {str(e)}")
+                rule_errors.append(f"Row processing error: {str(e)}")
+
+        # Store rule results
+        if rule_output_rows:
+            rule_df = pd.DataFrame(rule_output_rows)
+            rule_results[rule_name] = {
+                'data': rule_df,
+                'errors': rule_errors
+            }
+
+            if merge_datasets:
+                all_results.extend(rule_output_rows)
+
+        # Collect processing errors
+        if rule_errors:
+            processing_errors.extend([f"Rule '{rule_name}': {error}" for error in rule_errors])
+
+    # Return results with error information
+    if merge_datasets:
+        return [{
+            'merged_output': pd.DataFrame(all_results) if all_results else pd.DataFrame(),
+            'errors': processing_errors
+        }]
+    else:
+        return [{
+            'rule_name': name,
+            'data': result['data'],
+            'errors': result['errors']
+        } for name, result in rule_results.items()]
+
+
 @router.post("/process/", response_model=TransformationResult)
 async def process_transformation(request: TransformationRequest):
-    """Process data transformation based on configuration"""
+    """Process data transformation based on rule configuration"""
 
     start_time = datetime.now()
-    engine = TransformationEngine()
 
     try:
         # Load source files into dataframes
         source_data = {}
-        total_input_rows =0
+        total_input_rows = 0
         for source_file in request.source_files:
             df = await get_file_dataframe(source_file)
             source_data[source_file.alias] = df
             logger.info(f"Loaded {source_file.alias}: {len(df)} rows")
             total_input_rows += len(df)
 
-        # Process transformation
-        result_df, processing_info = engine.process_transformation(
-            source_data,
-            request.transformation_config,
-            preview_only=request.preview_only,
-            row_limit=request.row_limit
-        )
+        # Process transformation using new rule-based system
+        transformation_config = request.transformation_config.dict() if hasattr(request.transformation_config,
+                                                                                'dict') else request.transformation_config
+        result_datasets = process_transformation_rules(source_data, transformation_config)
 
-        processing_info['input_row_count']= total_input_rows
+        # Calculate totals and collect errors
+        total_output_rows = 0
+        all_errors = []
+        all_warnings = []
+
+        for dataset in result_datasets:
+            if 'data' in dataset:
+                total_output_rows += len(dataset['data'])
+            elif 'merged_output' in dataset:
+                total_output_rows += len(dataset['merged_output'])
+
+            # Collect errors from processing
+            if 'errors' in dataset and dataset['errors']:
+                all_errors.extend(dataset['errors'])
 
         # Generate transformation ID
         transformation_id = generate_uuid('transform')
+
         # Calculate processing time
         processing_time = (datetime.now() - start_time).total_seconds()
 
-        processing_info['processing_time'] = processing_time
-
-        column_ids = [col.id for col in request.transformation_config.output_definition.columns]
-
-        # Remove col ids from the result
-        final_data_df = result_df.drop(column_ids, axis=1)
+        processing_info = {
+            'input_row_count': total_input_rows,
+            'output_row_count': total_output_rows,
+            'processing_time': processing_time,
+            'rules_processed': len(
+                [r for r in transformation_config.get('row_generation_rules', []) if r.get('enabled', True)]),
+            'datasets_generated': len(result_datasets)
+        }
 
         # Store results if not preview
         if not request.preview_only:
+            # Store results in uploaded_files format so they can be viewed with existing viewer
+            from app.services.storage_service import uploaded_files
+
             storage_success = transformation_storage.store_results(
                 transformation_id,
                 {
-                    'data': final_data_df,
-                    'config': request.transformation_config.dict(),
+                    'datasets': result_datasets,
+                    'config': transformation_config,
                     'processing_info': processing_info
                 }
             )
+
+            # Also store each dataset as a viewable file
+            for i, dataset in enumerate(result_datasets):
+                if 'data' in dataset:
+                    df = dataset['data']
+                    dataset_name = dataset.get('rule_name', f'Rule_{i + 1}')
+                elif 'merged_output' in dataset:
+                    df = dataset['merged_output']
+                    dataset_name = 'Merged_Output'
+                else:
+                    continue
+
+                # Create file ID for this dataset
+                if transformation_config.get('merge_datasets', True):
+                    file_id = transformation_id
+                    filename = f"{transformation_config.get('name', 'Transformation')}_{dataset_name}.csv"
+                else:
+                    file_id = f"{transformation_id}_rule_{i}"
+                    filename = f"{transformation_config.get('name', 'Transformation')}_{dataset_name}.csv"
+
+                # Store in uploaded_files format
+                uploaded_files[file_id] = {
+                    "data": df,
+                    "info": {
+                        "filename": filename,
+                        "file_size_mb": round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2),
+                        "upload_time": datetime.now().isoformat(),
+                        "total_rows": len(df),
+                        "columns": list(df.columns),
+                        "file_type": "transformation_result",
+                        "transformation_id": transformation_id,
+                        "last_modified": datetime.now().isoformat()
+                    }
+                }
+
             if not storage_success:
                 logger.warning("Failed to store transformation results")
-
-        # Get total input rows
-        total_input_rows = sum(len(df) for df in source_data.values())
 
         # Prepare response
         response = TransformationResult(
             success=True,
             transformation_id=transformation_id,
             total_input_rows=total_input_rows,
-            total_output_rows=len(result_df),
+            total_output_rows=total_output_rows,
             processing_time_seconds=round(processing_time, 3),
-            validation_summary=processing_info.get('validation_results', {}),
-            warnings=processing_info.get('warnings', []),
-            errors=processing_info.get('errors', [])
+            validation_summary=processing_info,
+            warnings=all_warnings,
+            errors=all_errors
         )
 
         # Add preview data if requested
-        if request.preview_only:
-            response.preview_data = final_data_df.head(request.row_limit or 10).to_dict('records')
+        if request.preview_only and result_datasets:
+            preview_data = []
+            for dataset in result_datasets[:1]:  # Show first dataset for preview
+                if 'data' in dataset:
+                    preview_data = dataset['data'].head(request.row_limit or 10).to_dict('records')
+                elif 'merged_output' in dataset:
+                    preview_data = dataset['merged_output'].head(request.row_limit or 10).to_dict('records')
+                break
+            response.preview_data = preview_data
 
         return response
 
@@ -123,7 +387,8 @@ async def process_transformation(request: TransformationRequest):
 async def get_transformation_results(
         transformation_id: str,
         page: Optional[int] = 1,
-        page_size: Optional[int] = 1000
+        page_size: Optional[int] = 1000,
+        dataset_name: Optional[str] = None
 ):
     """Get transformation results with pagination"""
 
@@ -131,7 +396,28 @@ async def get_transformation_results(
     if not results:
         raise HTTPException(status_code=404, detail="Transformation ID not found")
 
-    df = results['results']['data']
+    datasets = results['results']['datasets']
+
+    # If specific dataset requested, return that one
+    if dataset_name:
+        target_dataset = None
+        for dataset in datasets:
+            if dataset.get('rule_name') == dataset_name or 'merged_output' in dataset:
+                target_dataset = dataset
+                break
+
+        if not target_dataset:
+            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_name}' not found")
+
+        df = target_dataset.get('data') or target_dataset.get('merged_output')
+    else:
+        # Return first dataset (merged or first rule)
+        if not datasets:
+            raise HTTPException(status_code=404, detail="No datasets found")
+
+        first_dataset = datasets[0]
+        df = first_dataset.get('data') or first_dataset.get('merged_output')
+
     total_rows = len(df)
 
     # Calculate pagination
@@ -148,14 +434,16 @@ async def get_transformation_results(
         'page': page,
         'page_size': page_size,
         'data': page_data,
-        'has_more': end_idx < total_rows
+        'has_more': end_idx < total_rows,
+        'available_datasets': [d.get('rule_name', 'merged_output') for d in datasets]
     }
 
 
 @router.get("/download/{transformation_id}")
 async def download_transformation_results(
         transformation_id: str,
-        format: str = "csv"
+        format: str = "csv",
+        dataset_name: Optional[str] = None
 ):
     """Download transformation results"""
 
@@ -163,8 +451,27 @@ async def download_transformation_results(
     if not results:
         raise HTTPException(status_code=404, detail="Transformation ID not found")
 
-    df = results['results']['data']
+    datasets = results['results']['datasets']
     config = results['results']['config']
+
+    # Select dataset to download
+    if dataset_name:
+        target_dataset = None
+        for dataset in datasets:
+            if dataset.get('rule_name') == dataset_name or (
+                    dataset_name == 'merged_output' and 'merged_output' in dataset):
+                target_dataset = dataset
+                break
+
+        if not target_dataset:
+            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_name}' not found")
+    else:
+        if not datasets:
+            raise HTTPException(status_code=404, detail="No datasets found")
+        target_dataset = datasets[0]
+
+    df = target_dataset.get('data') or target_dataset.get('merged_output')
+    dataset_display_name = target_dataset.get('rule_name', 'merged_output')
 
     try:
         if format.lower() == "csv":
@@ -175,22 +482,23 @@ async def download_transformation_results(
 
             # Convert to bytes
             output_bytes = io.BytesIO(output.getvalue().encode('utf-8'))
-            filename = f"transformation_{transformation_id}.csv"
+            filename = f"transformation_{transformation_id}_{dataset_display_name}.csv"
             media_type = "text/csv"
 
         elif format.lower() == "excel":
             # Generate Excel
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, sheet_name='Transformed Data', index=False)
+                df.to_excel(writer, sheet_name=dataset_display_name[:31], index=False)  # Excel sheet name limit
 
                 # Add metadata sheet
                 metadata = pd.DataFrame({
-                    'Property': ['Transformation ID', 'Created At', 'Total Rows', 'Source Files'],
+                    'Property': ['Transformation ID', 'Created At', 'Total Rows', 'Dataset', 'Source Files'],
                     'Value': [
                         transformation_id,
                         results['timestamp'].isoformat(),
                         len(df),
+                        dataset_display_name,
                         ', '.join([f['alias'] for f in config.get('source_files', [])])
                     ]
                 })
@@ -198,14 +506,14 @@ async def download_transformation_results(
 
             output.seek(0)
             output_bytes = output
-            filename = f"transformation_{transformation_id}.xlsx"
+            filename = f"transformation_{transformation_id}_{dataset_display_name}.xlsx"
             media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
         elif format.lower() == "json":
             # Generate JSON
             json_data = df.to_json(orient='records', indent=2)
             output_bytes = io.BytesIO(json_data.encode('utf-8'))
-            filename = f"transformation_{transformation_id}.json"
+            filename = f"transformation_{transformation_id}_{dataset_display_name}.json"
             media_type = "application/json"
 
         else:
@@ -281,99 +589,6 @@ async def get_transformation_template(template_id: str):
     return template
 
 
-@router.post("/assist/", response_model=LLMAssistanceResponse)
-async def get_llm_assistance(request: LLMAssistanceRequest):
-    """Get LLM assistance for transformation configuration"""
-
-    # This is a placeholder for LLM integration
-    # In production, this would call your LLM service
-
-    try:
-        if request.assistance_type == "suggest_mappings":
-            # Analyze source columns and target schema to suggest mappings
-            suggestions = []
-
-            if request.source_columns and request.target_schema:
-                # Simple heuristic matching for demo
-                source_cols = []
-                for file_alias, columns in request.source_columns.items():
-                    for col in columns:
-                        source_cols.append(f"{file_alias}.{col}")
-
-                for target_col in request.target_schema.columns:
-                    # Find best match
-                    best_match = None
-                    best_score = 0
-
-                    for source_col in source_cols:
-                        col_name = source_col.split('.')[-1].lower()
-                        target_name = target_col.name.lower()
-
-                        # Simple similarity check
-                        if col_name == target_name:
-                            best_match = source_col
-                            best_score = 1.0
-                        elif col_name in target_name or target_name in col_name:
-                            if best_score < 0.7:
-                                best_match = source_col
-                                best_score = 0.7
-
-                    if best_match:
-                        suggestions.append({
-                            'target_column': target_col.name,
-                            'source': best_match,
-                            'mapping_type': 'direct',
-                            'confidence': best_score
-                        })
-                    else:
-                        # Suggest static or computed mapping
-                        suggestions.append({
-                            'target_column': target_col.name,
-                            'mapping_type': 'static',
-                            'suggested_value': '',
-                            'confidence': 0.3
-                        })
-
-            return LLMAssistanceResponse(
-                suggestions=suggestions,
-                confidence_scores={s['target_column']: s['confidence'] for s in suggestions},
-                explanation="Mapping suggestions based on column name similarity"
-            )
-
-        elif request.assistance_type == "generate_transformation":
-            # Generate transformation based on examples
-            if request.examples:
-                # Analyze examples to generate transformation
-                return LLMAssistanceResponse(
-                    suggestions=[{
-                        'type': 'expression',
-                        'formula': 'IF({value} > 0, "D", "C")',
-                        'explanation': 'Based on examples, positive values map to "D", negative to "C"'
-                    }],
-                    confidence_scores={'transformation': 0.8}
-                )
-
-        elif request.assistance_type == "validate_output":
-            # Validate output against requirements
-            return LLMAssistanceResponse(
-                suggestions=[],
-                warnings=[
-                    "Missing required field: TaxID",
-                    "Date format should be DD/MM/YYYY"
-                ],
-                explanation="Validation based on common tax declaration requirements"
-            )
-
-        return LLMAssistanceResponse(
-            suggestions=[],
-            explanation="No assistance available for this request type"
-        )
-
-    except Exception as e:
-        logger.error(f"LLM assistance error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Assistance error: {str(e)}")
-
-
 @router.delete("/results/{transformation_id}")
 async def delete_transformation_results(transformation_id: str):
     """Delete transformation results"""
@@ -392,12 +607,12 @@ async def transformation_health_check():
         "status": "healthy",
         "service": "transformation",
         "features": [
-            "flexible_row_generation",
-            "advanced_column_mapping",
-            "multi_file_support",
-            "expression_evaluation",
+            "rule_based_transformation",
+            "multiple_output_datasets",
+            "conditional_logic",
+            "dynamic_column_mapping",
+            "dataset_merging",
             "template_system",
-            "llm_assistance",
             "multiple_output_formats"
         ]
     }

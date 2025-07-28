@@ -6,11 +6,10 @@ import os
 import time
 from typing import List, Dict, Any
 
+from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 from app.models.schemas import ExtractedField, ExtractionRow
-
-from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 

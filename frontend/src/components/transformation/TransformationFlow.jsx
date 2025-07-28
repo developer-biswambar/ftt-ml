@@ -16,7 +16,6 @@ import {
     Copy,
     Layers
 } from 'lucide-react';
-import SchemaDefinitionStep from './SchemaDefinitionStep';
 import RowGenerationStep from './RowGenerationStep';
 import ColumnMappingStep from './ColumnMappingStep';
 import PreviewStep from './PreviewStep';
@@ -38,27 +37,20 @@ const TransformationFlow = ({
         name: '',
         description: '',
         source_files: [],
-        output_definition: {
-            columns: [],
-            format: 'csv',
-            include_headers: true
-        },
         row_generation_rules: [],
-        column_mappings: [],
+        merge_datasets: false, // Changed from true to false
         validation_rules: []
     });
 
-    const [previewData, setPreviewData] = useState(null);
+    const [generatedResults, setGeneratedResults] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [validationErrors, setValidationErrors] = useState([]);
 
-    // Step definitions
+    // Updated step definitions (removed schema_definition and column_mapping)
     const steps = [
         {id: 'file_selection', title: 'Select Files', icon: FileText},
-        {id: 'schema_definition', title: 'Define Output', icon: Layers},
-        {id: 'row_generation', title: 'Row Generation', icon: Copy},
-        {id: 'column_mapping', title: 'Column Mapping', icon: Target},
-        {id: 'preview', title: 'Preview & Generate', icon: Eye}
+        {id: 'row_generation', title: 'Configure Rules', icon: Copy},
+        {id: 'preview', title: 'Generate & View', icon: Eye}
     ];
 
     // Initialize with selected files
@@ -96,9 +88,9 @@ const TransformationFlow = ({
         if (currentIndex < steps.length - 1) {
             setCurrentStep(steps[currentIndex + 1].id);
 
-            // Load preview when reaching preview step
+            // Generate results when reaching preview step
             if (steps[currentIndex + 1].id === 'preview') {
-                await loadPreview();
+                await generateResults();
             }
         }
     };
@@ -122,34 +114,21 @@ const TransformationFlow = ({
                 }
                 break;
 
-            case 'schema_definition': {
-                if (config.output_definition.columns.length === 0) {
-                    errors.push('Please define at least one output column');
+            case 'row_generation':
+                if (config.row_generation_rules.length === 0) {
+                    errors.push('Please define at least one transformation rule');
                 }
-                // Check for duplicate column names
-                const columnNames = config.output_definition.columns.map(c => c.name);
-                const duplicates = columnNames.filter((name, index) => columnNames.indexOf(name) !== index);
-                if (duplicates.length > 0) {
-                    errors.push(`Duplicate column names: ${[...new Set(duplicates)].join(', ')}`);
-                }
-                break;
-            }
 
-            case 'column_mapping':
-                // Check if all required columns have mappings
-            {
-                const requiredColumns = config.output_definition.columns
-                    .filter(col => col.required)
-                    .map(col => col.id);
-                const mappedColumns = config.column_mappings
-                    .filter(m => m.enabled)
-                    .map(m => m.target_column);
-                const unmappedRequired = requiredColumns.filter(col => !mappedColumns.includes(col));
-                if (unmappedRequired.length > 0) {
-                    errors.push(`Required columns without mappings: ${unmappedRequired.length}`);
-                }
+                // Validate each rule has required configuration
+                config.row_generation_rules.forEach((rule, index) => {
+                    if (!rule.name || rule.name.trim() === '') {
+                        errors.push(`Rule ${index + 1}: Please provide a rule name`);
+                    }
+                    if (!rule.output_columns || rule.output_columns.length === 0) {
+                        errors.push(`Rule ${index + 1}: Please define at least one output column`);
+                    }
+                });
                 break;
-            }
         }
 
         return {
@@ -158,50 +137,37 @@ const TransformationFlow = ({
         };
     };
 
-    // Preview loading
-    const loadPreview = async () => {
+    // Generate results for all rules
+    const generateResults = async () => {
         setIsProcessing(true);
         try {
             const response = await transformationApiService.processTransformation({
-                process_name: config.name || 'Preview Transformation',
-                description: config.description,
-                source_files: config.source_files,
-                transformation_config: config,
-                preview_only: true,
-                row_limit: 20
-            });
-
-            if (response.success) {
-                setPreviewData(response.preview_data);
-                onSendMessage('system', '✅ Preview generated successfully');
-            } else {
-                onSendMessage('system', `❌ Preview failed: ${response.errors.join(', ')}`);
-            }
-        } catch (error) {
-            onSendMessage('system', `❌ Error generating preview: ${error.message}`);
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-    // Process transformation
-    const configureAndStartTransformation = async () => {
-        setIsProcessing(true);
-        try {
-            const request = {
                 process_name: config.name || 'Data Transformation',
                 description: config.description,
                 source_files: config.source_files,
                 transformation_config: config,
                 preview_only: false
-            };
+            });
 
-            onSendMessage('system', '🎉 File Transformation configuration completed! Starting process...');
-            onTransformationFlowStart(request);
+            if (response.success) {
+                setGeneratedResults(response);
+                onSendMessage('system', '✅ Transformation completed successfully');
 
-
+                // Show warnings if any
+                if (response.warnings && response.warnings.length > 0) {
+                    onSendMessage('system', `⚠️ Warnings: ${response.warnings.join(', ')}`);
+                }
+            } else {
+                setGeneratedResults(response);
+                onSendMessage('system', `❌ Transformation failed: ${response.errors?.join(', ') || 'Unknown error'}`);
+            }
         } catch (error) {
             onSendMessage('system', `❌ Error processing transformation: ${error.message}`);
+            setGeneratedResults({
+                success: false,
+                errors: [error.message],
+                warnings: []
+            });
         } finally {
             setIsProcessing(false);
         }
@@ -219,11 +185,20 @@ const TransformationFlow = ({
         return columns;
     };
 
-    const handleSuggestMappings = (suggestedMappings) => {
-        setConfig(prev => ({
-            ...prev,
-            column_mappings: suggestedMappings
-        }));
+    // Helper function to open file viewer
+    const openFileViewer = (fileId) => {
+        const viewerUrl = `/viewer/${fileId}`;
+        const newWindow = window.open(
+            viewerUrl,
+            `viewer_${fileId}`,
+            'toolbar=yes,scrollbars=yes,resizable=yes,width=1400,height=900,menubar=yes,location=yes,directories=no,status=yes'
+        );
+
+        if (newWindow) {
+            newWindow.focus();
+        } else {
+            window.open(viewerUrl, '_blank');
+        }
     };
 
     // Step content renderer
@@ -295,18 +270,9 @@ const TransformationFlow = ({
                                 rows={3}
                             />
                         </div>
-                    </div>
-                );
 
-            case 'schema_definition':
-                return (
-                    <SchemaDefinitionStep
-                        outputDefinition={config.output_definition}
-                        onUpdate={(updated) => setConfig(prev => ({...prev, output_definition: updated}))}
-                        onSuggestMappings={handleSuggestMappings}
-                        sourceColumns={getSourceColumns()}
-                        onSendMessage={onSendMessage}
-                    />
+
+                    </div>
                 );
 
             case 'row_generation':
@@ -315,19 +281,6 @@ const TransformationFlow = ({
                         rules={config.row_generation_rules}
                         onUpdate={(rules) => setConfig(prev => ({...prev, row_generation_rules: rules}))}
                         sourceColumns={getSourceColumns()}
-                        outputSchema={config.output_definition}
-                        onSendMessage={onSendMessage}
-                    />
-                );
-
-            case 'column_mapping':
-                return (
-                    <ColumnMappingStep
-                        mappings={config.column_mappings}
-                        onUpdate={(mappings) => setConfig(prev => ({...prev, column_mappings: mappings}))}
-                        sourceColumns={getSourceColumns()}
-                        outputSchema={config.output_definition}
-                        rowGenerationRules={config.row_generation_rules}
                         onSendMessage={onSendMessage}
                     />
                 );
@@ -336,10 +289,12 @@ const TransformationFlow = ({
                 return (
                     <PreviewStep
                         config={config}
-                        previewData={previewData}
+                        generatedResults={generatedResults}
                         isLoading={isProcessing}
-                        onRefresh={loadPreview}
-                        onProcess={configureAndStartTransformation}
+                        onRefresh={generateResults}
+                        onViewResults={openFileViewer}
+                        onRetry={() => setCurrentStep('row_generation')}
+                        onUpdateConfig={setConfig}
                     />
                 );
 

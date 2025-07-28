@@ -1,9 +1,8 @@
 # tests/test_file_routes.py
-import pytest
 import io
-import json
 from unittest.mock import patch, MagicMock
-from fastapi import HTTPException
+
+import pytest
 
 
 class TestFileUpload:

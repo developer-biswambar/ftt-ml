@@ -1,10 +1,8 @@
 # tests/test_save_results_routes.py
-import pytest
-import pandas as pd
-import io
-import uuid
-from datetime import datetime
 from unittest.mock import patch, MagicMock
+
+import pandas as pd
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -955,8 +953,6 @@ class TestSaveResultsErrorHandling:
         )
         assert response.status_code == 422
 
-
-
     @pytest.mark.save_results
     @pytest.mark.error
     @patch('app.routes.save_results_routes.logger')
@@ -980,8 +976,6 @@ class TestSaveResultsErrorHandling:
 
             assert response.status_code == 500
             mock_logger.error.assert_called()
-
-
 
 
 class TestSaveResultsEdgeCases:

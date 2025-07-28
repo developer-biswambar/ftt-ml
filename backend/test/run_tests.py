@@ -4,9 +4,9 @@ Test runner script for the file management API
 Usage: python run_tests.py [options]
 """
 
+import argparse
 import subprocess
 import sys
-import argparse
 
 
 def run_command(cmd):

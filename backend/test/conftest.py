@@ -1,15 +1,9 @@
 # test/conftest.py
-import pytest
-import pandas as pd
-import io
-import os
-import tempfile
-from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 from typing import Dict, Any
 
+import pytest
+
 # Import your FastAPI routers based on your project structure
-from fastapi import FastAPI
 
 # Import routers safely with correct paths
 try:
@@ -824,12 +818,7 @@ def pytest_configure(config):
 # Add missing import for contextlib
 import contextlib  # tests/conftest.py
 import pytest
-import pandas as pd
-import io
-import os
-import tempfile
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 from typing import Dict, Any
 
 # Import your FastAPI routers

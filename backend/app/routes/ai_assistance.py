@@ -1,6 +1,7 @@
 # backend/app/api/routes/ai_assistance.py
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.services.openai_service import openai_service

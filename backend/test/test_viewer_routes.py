@@ -1,10 +1,8 @@
 # tests/test_viewer_routes.py
-import pytest
+from unittest.mock import patch
+
 import pandas as pd
-import io
-import json
-from datetime import datetime
-from unittest.mock import patch, MagicMock
+import pytest
 
 
 class TestGetFileData:

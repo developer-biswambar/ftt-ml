@@ -20,9 +20,9 @@ Examples:
     python run_reconciliation_tests.py unit
 """
 
+import os
 import subprocess
 import sys
-import os
 
 
 def run_tests(test_type="all"):

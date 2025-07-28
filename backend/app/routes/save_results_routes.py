@@ -147,7 +147,6 @@ class ResultsSaver:
             # Import delta storage from existing routes
             from app.services.transformation_service import transformation_storage
 
-
             if not transformation_storage.isExist(file_trasnformation_id):
                 raise HTTPException(status_code=404, detail="File trasnformation ID not found")
 
@@ -238,7 +237,7 @@ async def save_results_to_server(request: SaveResultsRequest):
         saver = ResultsSaver()
 
         # Validate process type
-        if request.process_type not in ["reconciliation", "delta","file-transformation"]:
+        if request.process_type not in ["reconciliation", "delta", "file-transformation"]:
             raise HTTPException(status_code=400, detail="process_type must be 'reconciliation' or 'delta'")
 
         # Get the appropriate data based on process type

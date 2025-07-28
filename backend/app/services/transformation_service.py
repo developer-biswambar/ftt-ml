@@ -1,24 +1,20 @@
-import pandas as pd
-import numpy as np
-import json
-import re
+import ast
 import logging
+import operator
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Union
-from io import StringIO, BytesIO
-import ast
-import operator
+
+import numpy as np
+import pandas as pd
 
 from app.models.transformation_models import (
     TransformationConfig,
     ColumnMapping,
-    RowGenerationRule,
     ExpansionType,
     TransformationType,
     ValidationRule,
-    OutputDefinition
+    OutputDefinition, RowGenerationRule
 )
-from app.utils.uuid_generator import generate_uuid
 
 logger = logging.getLogger(__name__)
 
@@ -227,7 +223,7 @@ class TransformationEngine:
         if mapping.mapping_type == TransformationType.DIRECT:
             # Direct mapping from source
             if mapping.source:
-                 return self._get_value_from_path(row, mapping.source)
+                return self._get_value_from_path(row, mapping.source)
             return None
 
         elif mapping.mapping_type == TransformationType.STATIC:
@@ -330,7 +326,7 @@ class TransformationEngine:
             # If file_alias is in data context, look there
             if file_alias in self.data_context:
                 # This is simplified - in reality you'd need row matching logic
-                 return None
+                return None
             else:
                 # Try to get from current row
                 return row.get(column_name)

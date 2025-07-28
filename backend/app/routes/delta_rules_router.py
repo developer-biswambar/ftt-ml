@@ -231,7 +231,7 @@ async def update_delta_rule(rule_id: str, updates: DeltaRuleUpdate):
             rule["template_id"] = updates.metadata.template_id if updates.metadata.template_id is not None else rule[
                 "template_id"]
             rule["template_name"] = updates.metadata.template_name if updates.metadata.template_name is not None else \
-            rule["template_name"]
+                rule["template_name"]
 
         # Update rule config if provided
         if updates.rule_config:
@@ -379,6 +379,7 @@ async def get_delta_rule_categories():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get categories: {str(e)}")
+
 
 # Additional utility endpoints
 
