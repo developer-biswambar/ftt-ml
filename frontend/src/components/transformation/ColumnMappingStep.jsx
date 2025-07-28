@@ -14,8 +14,12 @@ import {
     Search,
     Database,
     FileText,
-    Zap
+    Zap,
+    Lightbulb,
+    Sparkles,
+    Brain
 } from 'lucide-react';
+import { aiAssistanceService } from '../../services/aiAssistanceService';
 
 const ColumnMappingStep = ({
     mappings,
@@ -28,8 +32,11 @@ const ColumnMappingStep = ({
     const [expandedMappings, setExpandedMappings] = useState({});
     const [showAIAssistant, setShowAIAssistant] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [intelligentSuggestions, setIntelligentSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(true);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-    // Initialize mappings for all output columns
+    // Only show AI suggestions when explicitly requested - no local suggestions
     useEffect(() => {
         const existingMappingIds = mappings.map(m => m.target_column);
         const newMappings = [...mappings];
@@ -52,7 +59,162 @@ const ColumnMappingStep = ({
         if (newMappings.length !== mappings.length) {
             onUpdate(newMappings);
         }
-    }, [outputSchema.columns]);
+
+        // Remove automatic local suggestions - start with empty state
+        setIntelligentSuggestions([]);
+        if (mappings.length > 0 && Object.keys(sourceColumns).length > 0) {
+            onSendMessage('system', `🔍 Data loaded. Click "Get AI Suggestions" for intelligent mapping recommendations.`);
+        }
+    }, [outputSchema.columns, mappings.length, sourceColumns]);
+
+    const analyzeAndSuggestIntelligentMappings = async () => {
+        setIsAnalyzing(true);
+
+        try {
+            // Get AI-powered suggestions only
+            const aiResponse = await aiAssistanceService.suggestColumnMappings({
+                sourceColumns,
+                outputSchema: {
+                    columns: outputSchema.columns,
+                    format: outputSchema.format
+                },
+                existingMappings: mappings,
+                context: {
+                    transformationType: 'column_mapping',
+                    industry: 'general'
+                }
+            });
+
+            let suggestions = [];
+
+            if (aiResponse.success && aiResponse.content) {
+                try {
+                    // Parse AI response more carefully
+                    let aiSuggestions = [];
+                    const content = aiResponse.content;
+
+                    // Check if content is a text description instead of JSON
+                    if (!content.trim().startsWith('{') || content.includes('mapping strategies')) {
+                        // Handle text response by extracting suggestions
+                        onSendMessage('system', `💬 AI provided text suggestions: ${content.substring(0, 200)}...`);
+
+                        // Extract suggestions from text content
+                        if (content.toLowerCase().includes('expression') && content.toLowerCase().includes('total')) {
+                            aiSuggestions = [{
+                                target_column: 'total_amount',
+                                mapping_type: 'expression',
+                                title: 'Calculate Total Amount',
+                                description: 'Sum base amount and tax amount',
+                                confidence: 0.8,
+                                reasoning: 'AI suggested expression mapping for total calculation',
+                                auto_config: {
+                                    mapping_type: 'expression',
+                                    transformation: {
+                                        type: 'expression',
+                                        config: {
+                                            formula: '{Net_Amount} + {Tax_Amount}',
+                                            variables: {
+                                                'Net_Amount': 'file_0.Net_Amount',
+                                                'Tax_Amount': 'file_0.Tax_Amount'
+                                            }
+                                        }
+                                    }
+                                }
+                            }];
+                        }
+
+                        if (content.toLowerCase().includes('sequential') && content.toLowerCase().includes('id')) {
+                            aiSuggestions.push({
+                                target_column: 'record_id',
+                                mapping_type: 'sequence',
+                                title: 'Generate Record IDs',
+                                description: 'Auto-generate sequential record identifiers',
+                                confidence: 0.9,
+                                reasoning: 'AI suggested sequential generation for ID fields',
+                                auto_config: {
+                                    mapping_type: 'sequence',
+                                    transformation: {
+                                        type: 'sequence',
+                                        config: {
+                                            start: 1,
+                                            increment: 1,
+                                            padding: 3,
+                                            prefix: 'REC-'
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    } else {
+                        // Try to parse as JSON
+                        const parsed = JSON.parse(content);
+
+                        // Handle different response formats
+                        if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
+                            aiSuggestions = parsed.suggestions;
+                        } else if (Array.isArray(parsed)) {
+                            aiSuggestions = parsed;
+                        } else if (parsed.column_mappings && Array.isArray(parsed.column_mappings)) {
+                            aiSuggestions = parsed.column_mappings;
+                        }
+                    }
+
+                    // Convert AI suggestions to our format
+                    const formattedAISuggestions = aiSuggestions.map((s, index) => ({
+                        id: `ai_${Date.now()}_${index}`,
+                        targetColumn: s.target_column || s.targetColumn || `unknown_${index}`,
+                        type: s.mapping_type || s.type || 'direct',
+                        title: s.title || 'AI Mapping Suggestion',
+                        description: s.description || 'AI-generated mapping suggestion',
+                        confidence: s.confidence || 0.8,
+                        reasoning: s.reasoning || 'Generated by AI analysis',
+                        source: 'ai',
+                        autoConfig: s.auto_config || s.autoConfig || {
+                            mapping_type: s.mapping_type || 'direct',
+                            transformation: s.transformation || null
+                        }
+                    }));
+
+                    suggestions = formattedAISuggestions;
+
+                    if (formattedAISuggestions.length > 0) {
+                        onSendMessage('system', `🧠 AI Analysis Complete: Found ${formattedAISuggestions.length} AI-powered mapping suggestions`);
+                    } else {
+                        onSendMessage('system', `🧠 AI Analysis Complete: No specific mapping suggestions found for your data structure.`);
+                    }
+                } catch (parseError) {
+                    console.warn('Failed to parse AI column mapping suggestions:', parseError);
+                    onSendMessage('system', `⚠️ AI response received but couldn't parse suggestions.`);
+                    suggestions = [];
+                }
+            } else {
+                onSendMessage('system', `⚠️ AI analysis failed. Please try again.`);
+                suggestions = [];
+            }
+
+            setIntelligentSuggestions(suggestions);
+            setIsAnalyzing(false);
+
+        } catch (error) {
+            console.error('AI mapping analysis error:', error);
+            setIntelligentSuggestions([]);
+            setIsAnalyzing(false);
+            onSendMessage('system', `❌ AI analysis failed: ${error.message}. Please try again.`);
+        }
+    };
+
+    const applyIntelligentSuggestion = (suggestion) => {
+        const mappingIndex = mappings.findIndex(m => m.target_column === suggestion.targetColumn);
+        if (mappingIndex !== -1) {
+            updateMapping(mappingIndex, suggestion.autoConfig);
+            setIntelligentSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+            onSendMessage('system', `✅ Applied AI suggestion: ${suggestion.title}`);
+        }
+    };
+
+    const dismissIntelligentSuggestion = (suggestionId) => {
+        setIntelligentSuggestions(prev => prev.filter(s => s.id !== suggestionId));
+    };
 
     const mappingTypes = [
         { value: 'direct', label: 'Direct Mapping', icon: Link },
@@ -61,7 +223,7 @@ const ColumnMappingStep = ({
         { value: 'conditional', label: 'Conditional', icon: ToggleLeft },
         { value: 'sequence', label: 'Sequential', icon: Hash },
         { value: 'lookup', label: 'Lookup', icon: Search },
-        { value: 'custom_function', label: 'Custom Function', icon: Function }
+        { value: 'custom_function', label: 'Custom Function', icon: Code }
     ];
 
     const updateMapping = (index, updates) => {
@@ -254,251 +416,29 @@ const ColumnMappingStep = ({
                                 className="w-full px-3 py-2 border border-gray-300 rounded font-mono text-sm"
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                Use {'{column_name}'} to reference values. Supports: +, -, *, /, ABS, ROUND, MIN, MAX
+                                Enter lookup mappings as key=value pairs, one per line
                             </p>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Variable Mappings
-                            </label>
-                            <div className="space-y-2">
-                                {Object.entries(mapping.transformation?.config?.variables || {}).map(([varName, varSource]) => (
-                                    <div key={varName} className="flex items-center space-x-2">
-                                        <span className="w-24 text-sm font-mono">{`{${varName}}`}</span>
-                                        <select
-                                            value={varSource}
-                                            onChange={(e) => {
-                                                const variables = { ...mapping.transformation?.config?.variables };
-                                                variables[varName] = e.target.value;
-                                                updateMapping(index, {
-                                                    transformation: {
-                                                        ...mapping.transformation,
-                                                        config: {
-                                                            ...mapping.transformation?.config,
-                                                            variables
-                                                        }
-                                                    }
-                                                });
-                                            }}
-                                            className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                                        >
-                                            <option value="">Select source...</option>
-                                            {allColumns.map(col => (
-                                                <option key={col.value} value={col.value}>
-                                                    {col.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                ))}
-                            </div>
-                            <button
-                                onClick={() => {
-                                    // Extract variables from formula
-                                    const formula = mapping.transformation?.config?.formula || '';
-                                    const matches = formula.match(/\{(\w+)\}/g) || [];
-                                    const variables = {};
-                                    matches.forEach(match => {
-                                        const varName = match.slice(1, -1);
-                                        variables[varName] = mapping.transformation?.config?.variables?.[varName] || '';
-                                    });
-                                    updateMapping(index, {
-                                        transformation: {
-                                            ...mapping.transformation,
-                                            config: {
-                                                ...mapping.transformation?.config,
-                                                variables
-                                            }
-                                        }
-                                    });
-                                }}
-                                className="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-                            >
-                                Extract Variables from Formula
-                            </button>
-                        </div>
-                    </div>
-                );
-
-            case 'conditional':
-                return (
-                    <div className="space-y-3">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Condition
+                                Default Value (when key not found)
                             </label>
                             <input
                                 type="text"
-                                value={mapping.transformation?.config?.condition || ''}
+                                value={mapping.transformation?.config?.default_value || ''}
                                 onChange={(e) => updateMapping(index, {
                                     transformation: {
-                                        type: 'conditional',
+                                        type: 'lookup',
                                         config: {
                                             ...mapping.transformation?.config,
-                                            condition: e.target.value
+                                            default_value: e.target.value
                                         }
                                     }
                                 })}
-                                placeholder="e.g., Amount > 0"
+                                placeholder="Default value"
                                 className="w-full px-3 py-2 border border-gray-300 rounded"
                             />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    If True
-                                </label>
-                                <input
-                                    type="text"
-                                    value={mapping.transformation?.config?.true_value || ''}
-                                    onChange={(e) => updateMapping(index, {
-                                        transformation: {
-                                            type: 'conditional',
-                                            config: {
-                                                ...mapping.transformation?.config,
-                                                true_value: e.target.value
-                                            }
-                                        }
-                                    })}
-                                    placeholder="Value when true"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    If False
-                                </label>
-                                <input
-                                    type="text"
-                                    value={mapping.transformation?.config?.false_value || ''}
-                                    onChange={(e) => updateMapping(index, {
-                                        transformation: {
-                                            type: 'conditional',
-                                            config: {
-                                                ...mapping.transformation?.config,
-                                                false_value: e.target.value
-                                            }
-                                        }
-                                    })}
-                                    placeholder="Value when false"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                );
-
-            case 'sequence':
-                return (
-                    <div className="space-y-3">
-                        <div className="grid grid-cols-3 gap-3">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Start Value
-                                </label>
-                                <input
-                                    type="number"
-                                    value={mapping.transformation?.config?.start || 1}
-                                    onChange={(e) => updateMapping(index, {
-                                        transformation: {
-                                            type: 'sequence',
-                                            config: {
-                                                ...mapping.transformation?.config,
-                                                start: parseInt(e.target.value) || 1
-                                            }
-                                        }
-                                    })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Increment
-                                </label>
-                                <input
-                                    type="number"
-                                    value={mapping.transformation?.config?.increment || 1}
-                                    onChange={(e) => updateMapping(index, {
-                                        transformation: {
-                                            type: 'sequence',
-                                            config: {
-                                                ...mapping.transformation?.config,
-                                                increment: parseInt(e.target.value) || 1
-                                            }
-                                        }
-                                    })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Padding
-                                </label>
-                                <input
-                                    type="number"
-                                    value={mapping.transformation?.config?.padding || 0}
-                                    onChange={(e) => updateMapping(index, {
-                                        transformation: {
-                                            type: 'sequence',
-                                            config: {
-                                                ...mapping.transformation?.config,
-                                                padding: parseInt(e.target.value) || 0
-                                            }
-                                        }
-                                    })}
-                                    min="0"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Prefix
-                                </label>
-                                <input
-                                    type="text"
-                                    value={mapping.transformation?.config?.prefix || ''}
-                                    onChange={(e) => updateMapping(index, {
-                                        transformation: {
-                                            type: 'sequence',
-                                            config: {
-                                                ...mapping.transformation?.config,
-                                                prefix: e.target.value
-                                            }
-                                        }
-                                    })}
-                                    placeholder="e.g., REC-"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Suffix
-                                </label>
-                                <input
-                                    type="text"
-                                    value={mapping.transformation?.config?.suffix || ''}
-                                    onChange={(e) => updateMapping(index, {
-                                        transformation: {
-                                            type: 'sequence',
-                                            config: {
-                                                ...mapping.transformation?.config,
-                                                suffix: e.target.value
-                                            }
-                                        }
-                                    })}
-                                    placeholder="e.g., -2024"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded"
-                                />
-                            </div>
                         </div>
                     </div>
                 );
@@ -577,6 +517,82 @@ const ColumnMappingStep = ({
                 <p className="text-sm text-gray-600">
                     Define how to populate each output column from your source data.
                 </p>
+            </div>
+
+            {/* Intelligent AI Suggestions - Always show button */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                        <Brain size={20} className="text-blue-600" />
+                        <span className="font-medium text-blue-800">Intelligent Mapping Suggestions</span>
+                        {isAnalyzing && (
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
+                        )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <button
+                            onClick={analyzeAndSuggestIntelligentMappings}
+                            disabled={isAnalyzing}
+                            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:opacity-50"
+                        >
+                            {isAnalyzing ? 'Analyzing...' : 'Get AI Suggestions'}
+                        </button>
+                        {intelligentSuggestions.length > 0 && (
+                            <button
+                                onClick={() => setShowSuggestions(!showSuggestions)}
+                                className="text-blue-600 hover:text-blue-800 text-sm"
+                            >
+                                {showSuggestions ? 'Hide' : 'Show'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {isAnalyzing ? (
+                    <p className="text-sm text-blue-700">🧠 Analyzing column patterns and suggesting optimal mappings...</p>
+                ) : intelligentSuggestions.length > 0 && showSuggestions ? (
+                    <div className="space-y-2">
+                        {intelligentSuggestions.map(suggestion => (
+                            <div key={suggestion.id} className="bg-white border border-blue-200 rounded p-3">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        <div className="flex items-center space-x-2 mb-1">
+                                            <Lightbulb size={14} className="text-blue-600" />
+                                            <span className="text-sm font-medium text-gray-800">{suggestion.title}</span>
+                                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                                {Math.round(suggestion.confidence * 100)}%
+                                            </span>
+                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                                AI-Powered
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-gray-600 mb-1">{suggestion.description}</p>
+                                        <p className="text-xs text-gray-500 italic">{suggestion.reasoning}</p>
+                                    </div>
+                                    <div className="flex space-x-1 ml-3">
+                                        <button
+                                            onClick={() => applyIntelligentSuggestion(suggestion)}
+                                            className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                                        >
+                                            Apply
+                                        </button>
+                                        <button
+                                            onClick={() => dismissIntelligentSuggestion(suggestion.id)}
+                                            className="px-2 py-1 text-gray-400 hover:text-gray-600 text-xs"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : !isAnalyzing ? (
+                    <div className="text-center py-4">
+                        <p className="text-sm text-blue-700 mb-2">Get AI-powered suggestions for column mappings.</p>
+                        <p className="text-xs text-gray-600">Click "Get AI Suggestions" to analyze your data and recommend intelligent mapping strategies.</p>
+                    </div>
+                ) : null}
             </div>
 
             {/* Toolbar */}
@@ -703,6 +719,8 @@ const ColumnMappingStep = ({
                                                     ? `${column.name} = ${mapping.transformation?.config?.formula}`
                                                     : mapping.mapping_type === 'sequence'
                                                     ? `${column.name} = ${mapping.transformation?.config?.prefix}[${mapping.transformation?.config?.start}...]${mapping.transformation?.config?.suffix}`
+                                                    : mapping.mapping_type === 'lookup'
+                                                    ? `${column.name} = lookup(${mapping.transformation?.config?.key_column})`
                                                     : `${column.name} (${mapping.mapping_type})`
                                                 }
                                             </p>
@@ -727,6 +745,7 @@ const ColumnMappingStep = ({
                             <li><strong>Expression:</strong> Calculate using a formula</li>
                             <li><strong>Conditional:</strong> Set value based on conditions</li>
                             <li><strong>Sequential:</strong> Generate incrementing numbers</li>
+                            <li><strong>Lookup:</strong> Transform values using a lookup table</li>
                             <li><strong>Custom:</strong> Use JavaScript for complex logic</li>
                         </ul>
                     </div>

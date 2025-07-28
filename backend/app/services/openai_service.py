@@ -2,23 +2,26 @@
 import asyncio
 import json
 import logging
+import os
 import time
-from typing import List
+from typing import List, Dict, Any
 
 from openai import AsyncOpenAI
 
-from app.config.settings import settings
 from app.models.schemas import ExtractedField, ExtractionRow
+
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
 
 class OpenAIService:
     def __init__(self):
-        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        self.model = settings.OPENAI_MODEL
-        self.max_tokens = settings.OPENAI_MAX_TOKENS
-        self.temperature = settings.OPENAI_TEMPERATURE
+        load_dotenv()
+        self.client = AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        self.model = os.getenv('OPENAI_MODEL')
+        self.max_tokens = int(os.getenv('OPENAI_MAX_TOKENS'))
+        self.temperature = os.getenv('OPENAI_TEMPERATURE')
 
     async def extract_financial_data(
             self,
@@ -50,6 +53,269 @@ class OpenAIService:
             logger.error(f"Error in OpenAI extraction: {str(e)}")
             # Return failed extraction rows
             return self._create_failed_rows(text_batch, str(e))
+
+    async def call_openai_generic(
+            self,
+            system_prompt: str = None,
+            user_prompt: str = None,
+            messages: List[Dict[str, str]] = None,
+            temperature: float = None,
+            max_tokens: int = None,
+            response_format: Dict[str, str] = None
+    ) -> str:
+        """
+        Generic OpenAI API call without predefined prompts
+        Can be used for any custom AI assistance tasks
+        """
+        try:
+            # Use provided values or defaults
+            temp = temperature if temperature is not None else self.temperature
+            tokens = max_tokens if max_tokens is not None else self.max_tokens
+
+            # Build messages array
+            if messages:
+                message_list = messages
+            else:
+                message_list = []
+                if system_prompt:
+                    message_list.append({"role": "system", "content": system_prompt})
+                if user_prompt:
+                    message_list.append({"role": "user", "content": user_prompt})
+
+            if not message_list:
+                raise ValueError("Must provide either messages array or system/user prompts")
+
+            # Prepare API call parameters
+            api_params = {
+                "model": self.model,
+                "messages": message_list,
+                "temperature": temp,
+                "max_tokens": tokens
+            }
+
+            # Add response format if specified
+            if response_format:
+                api_params["response_format"] = response_format
+
+            response = await self.client.chat.completions.create(**api_params)
+
+            return response.choices[0].message.content
+
+        except Exception as e:
+            if "rate_limit" in str(e).lower():
+                logger.warning("OpenAI rate limit hit, waiting...")
+                await asyncio.sleep(10)
+                return await self.call_openai_generic(
+                    system_prompt, user_prompt, messages, temperature, max_tokens, response_format
+                )
+            else:
+                logger.error(f"OpenAI API error: {str(e)}")
+                raise
+
+    async def suggest_transformation_rules(
+            self,
+            source_columns: Dict[str, List[str]],
+            output_schema: Dict[str, Any],
+            transformation_context: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """
+        Use OpenAI to analyze data structure and suggest intelligent transformation rules
+        """
+        try:
+            system_prompt = self._build_transformation_system_prompt()
+            user_prompt = self._build_transformation_user_prompt(
+                source_columns, output_schema, transformation_context
+            )
+
+            start_time = time.time()
+
+            response = await self.call_openai_generic(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                temperature=0.3,  # Lower temperature for more consistent suggestions
+                response_format={"type": "json_object"}
+            )
+
+            processing_time = time.time() - start_time
+
+            # Parse and validate response
+            suggestions = self._parse_transformation_response(response)
+
+            logger.info(f"Generated transformation suggestions in {processing_time:.2f}s")
+
+            return {
+                "success": True,
+                "suggestions": suggestions,
+                "processing_time": processing_time,
+                "model_used": self.model
+            }
+
+        except Exception as e:
+            logger.error(f"Error generating transformation suggestions: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "suggestions": {"row_generation": [], "column_mappings": []}
+            }
+
+    def _build_transformation_system_prompt(self) -> str:
+        """Build system prompt for transformation rule suggestions"""
+        return """
+You are an expert data transformation specialist. Your task is to analyze source data structures and suggest intelligent transformation rules for converting data into a target schema.
+
+TRANSFORMATION CAPABILITIES:
+1. ROW GENERATION RULES:
+   - duplicate: Simple row duplication
+   - fixed_expansion: Create multiple rows with fixed values
+   - conditional_expansion: Create rows based on conditions
+   - expand_from_list: Expand rows for each value in a list
+   - localization_expansion: Expand for different locales/regions
+
+2. COLUMN MAPPING TYPES:
+   - direct: Direct column-to-column mapping
+   - static: Set fixed values
+   - expression: Mathematical/logical expressions
+   - conditional: If-then-else logic
+   - sequence: Generate sequential numbers/IDs
+   - custom_function: JavaScript functions for complex logic
+
+ANALYSIS FOCUS:
+- Identify patterns in column names (tax, amount, id, date, status, etc.)
+- Detect business logic requirements (calculations, validations, formatting)
+- Suggest data normalization and denormalization patterns
+- Recommend row expansion for business scenarios
+- Propose intelligent default values and transformations
+
+OUTPUT FORMAT:
+Return a JSON object with this structure:
+{
+  "row_generation": [
+    {
+      "confidence": 0.85,
+      "title": "Tax Line Item Expansion",
+      "description": "Create separate line items for tax calculations",
+      "reasoning": "Detected tax columns - expand for detailed reporting",
+      "rule_type": "fixed_expansion",
+      "auto_config": {
+        "name": "Tax Line Items",
+        "type": "expand",
+        "strategy": {
+          "type": "fixed_expansion",
+          "config": {
+            "expansions": [
+              {"set_values": {"line_type": "base_amount"}},
+              {"set_values": {"line_type": "tax_amount"}}
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "column_mappings": [
+    {
+      "confidence": 0.9,
+      "target_column": "total_amount",
+      "title": "Calculate Total Amount",
+      "description": "Sum base amount and tax amount",
+      "reasoning": "Detected total pattern with component amounts available",
+      "mapping_type": "expression",
+      "auto_config": {
+        "mapping_type": "expression",
+        "transformation": {
+          "type": "expression",
+          "config": {
+            "formula": "{base_amount} + {tax_amount}",
+            "variables": {
+              "base_amount": "file_0.amount",
+              "tax_amount": "file_0.tax"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+
+IMPORTANT:
+- Always return valid JSON
+- Provide confidence scores (0.0-1.0)
+- Include clear reasoning for each suggestion
+- Generate practical, implementable configurations
+- Focus on common business patterns and requirements
+"""
+
+    def _build_transformation_user_prompt(
+            self,
+            source_columns: Dict[str, List[str]],
+            output_schema: Dict[str, Any],
+            transformation_context: Dict[str, Any] = None
+    ) -> str:
+        """Build user prompt for transformation analysis"""
+
+        context_info = ""
+        if transformation_context:
+            context_info = f"""
+TRANSFORMATION CONTEXT:
+- Name: {transformation_context.get('name', 'N/A')}
+- Description: {transformation_context.get('description', 'N/A')}
+- Industry/Domain: {transformation_context.get('industry', 'General')}
+"""
+
+        return f"""
+Please analyze the following data structure and suggest intelligent transformation rules:
+
+SOURCE DATA STRUCTURE:
+{json.dumps(source_columns, indent=2)}
+
+TARGET OUTPUT SCHEMA:
+{json.dumps(output_schema, indent=2)}
+
+{context_info}
+
+ANALYSIS REQUEST:
+1. Analyze column name patterns and data types
+2. Identify potential business logic requirements
+3. Suggest row generation rules for data expansion/normalization
+4. Recommend column mapping strategies
+5. Provide confidence scores and clear reasoning
+
+Focus on practical, commonly-used transformation patterns that would be valuable for business data processing.
+"""
+
+    def _parse_transformation_response(self, response: str) -> Dict[str, Any]:
+        """Parse and validate transformation suggestions response"""
+        try:
+            # Clean response if wrapped in markdown
+            if response.startswith('```json'):
+                response = response.replace('```json', '').replace('```', '').strip()
+
+            parsed_data = json.loads(response)
+
+            # Validate structure
+            suggestions = {
+                "row_generation": parsed_data.get("row_generation", []),
+                "column_mappings": parsed_data.get("column_mappings", [])
+            }
+
+            # Validate each suggestion has required fields
+            for suggestion in suggestions["row_generation"]:
+                if not all(key in suggestion for key in ["confidence", "title", "rule_type"]):
+                    logger.warning(f"Invalid row generation suggestion: {suggestion}")
+
+            for suggestion in suggestions["column_mappings"]:
+                if not all(key in suggestion for key in ["confidence", "title", "mapping_type"]):
+                    logger.warning(f"Invalid column mapping suggestion: {suggestion}")
+
+            return suggestions
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse transformation response as JSON: {str(e)}")
+            logger.error(f"Raw response: {response}")
+            return {"row_generation": [], "column_mappings": []}
+
+        except Exception as e:
+            logger.error(f"Error parsing transformation response: {str(e)}")
+            return {"row_generation": [], "column_mappings": []}
 
     def _build_system_prompt(self) -> str:
         """Build the system prompt for financial data extraction"""

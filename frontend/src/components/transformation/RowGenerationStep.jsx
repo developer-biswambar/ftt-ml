@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Plus,
     Minus,
@@ -12,8 +12,11 @@ import {
     Layers,
     Code,
     FileText,
-    ToggleLeft
+    ToggleLeft,
+    Lightbulb,
+    Sparkles
 } from 'lucide-react';
+import { aiAssistanceService } from '../../services/aiAssistanceService';
 
 const RowGenerationStep = ({
     rules,
@@ -23,6 +26,9 @@ const RowGenerationStep = ({
     onSendMessage
 }) => {
     const [expandedRules, setExpandedRules] = useState({});
+    const [aiSuggestions, setAiSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(true);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     const expansionTypes = [
         { value: 'duplicate', label: 'Simple Duplication', icon: Copy },
@@ -32,6 +38,345 @@ const RowGenerationStep = ({
         { value: 'expand_from_file', label: 'From File', icon: FileText },
         { value: 'dynamic_expansion', label: 'Dynamic', icon: Code }
     ];
+
+    // // AI Suggestions Effect - Only run when explicitly requested
+    // useEffect(() => {
+    //     // Remove automatic AI analysis - only run local heuristics by default
+    //     if (Object.keys(sourceColumns).length > 0 && outputSchema.columns.length > 0) {
+    //         generateLocalSuggestionsOnly();
+    //     }
+    // }, [sourceColumns, outputSchema.columns]);
+
+    const generateLocalSuggestionsOnly = () => {
+        const localSuggestions = generateLocalSuggestions();
+        setAiSuggestions(localSuggestions);
+        if (localSuggestions.length > 0) {
+            onSendMessage('system', `🔍 Found ${localSuggestions.length} pattern-based suggestions. Click "Get AI Suggestions" for advanced analysis.`);
+        }
+    };
+
+    const analyzeDataAndSuggestRules = async () => {
+        setIsAnalyzing(true);
+
+        try {
+            // Get current local suggestions
+            const localSuggestions = generateLocalSuggestions();
+
+            // Get AI-powered suggestions
+            const aiResponse = await aiAssistanceService.suggestRowGenerationRules({
+                sourceColumns,
+                outputSchema: {
+                    columns: outputSchema.columns,
+                    format: outputSchema.format
+                },
+                existingRules: rules,
+                context: {
+                    transformationType: 'row_generation',
+                    industry: 'general'
+                }
+            });
+
+            let suggestions = localSuggestions;
+
+            if (aiResponse.success && aiResponse.content) {
+                try {
+                    // Parse AI response more carefully
+                    let aiSuggestions = [];
+                    const content = aiResponse.content;
+
+                    // Check if content is a text description instead of JSON
+                    if (content.includes('suggestions for row generation') || content.includes('Conditional Expansion') || !content.trim().startsWith('{')) {
+                        // Handle text response by converting to our format
+                        onSendMessage('system', `💬 AI provided text suggestions: ${content.substring(0, 200)}...`);
+
+                        // Create a simple suggestion based on text content
+                        if (content.toLowerCase().includes('conditional') && content.toLowerCase().includes('settlement')) {
+                            aiSuggestions = [{
+                                rule_type: 'conditional_expansion',
+                                title: 'Settlement Status Expansion',
+                                description: 'Create different rows based on settlement status',
+                                confidence: 0.7,
+                                reasoning: 'AI suggested conditional expansion based on settlement status',
+                                auto_config: {
+                                    name: 'Settlement Status Rule',
+                                    type: 'expand',
+                                    strategy: {
+                                        type: 'conditional_expansion',
+                                        config: {
+                                            condition: 'Settlement_Status == "Pending"',
+                                            true_expansions: [{ set_values: { 'status_type': 'pending' } }],
+                                            false_expansions: [{ set_values: { 'status_type': 'completed' } }]
+                                        }
+                                    }
+                                }
+                            }];
+                        }
+
+                        if (content.toLowerCase().includes('line item') && content.toLowerCase().includes('financial')) {
+                            aiSuggestions.push({
+                                rule_type: 'fixed_expansion',
+                                title: 'Financial Line Items',
+                                description: 'Expand rows for financial line item breakdown',
+                                confidence: 0.8,
+                                reasoning: 'AI suggested line item expansion for financial data',
+                                auto_config: {
+                                    name: 'Financial Line Items',
+                                    type: 'expand',
+                                    strategy: {
+                                        type: 'fixed_expansion',
+                                        config: {
+                                            expansions: [
+                                                { set_values: { 'line_type': 'base_amount' } },
+                                                { set_values: { 'line_type': 'tax_amount' } }
+                                            ]
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    } else {
+                        // Try to parse as JSON
+                        const parsed = JSON.parse(content);
+
+                        // Handle different response formats
+                        if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
+                            aiSuggestions = parsed.suggestions;
+                        } else if (Array.isArray(parsed)) {
+                            aiSuggestions = parsed;
+                        } else if (parsed.row_generation && Array.isArray(parsed.row_generation)) {
+                            aiSuggestions = parsed.row_generation;
+                        }
+                    }
+
+                    // Convert AI suggestions to our format
+                    const formattedAISuggestions = aiSuggestions.map((s, index) => ({
+                        id: `ai_${Date.now()}_${index}`,
+                        type: s.rule_type || s.type || 'duplicate',
+                        title: s.title || 'AI Suggestion',
+                        description: s.description || 'AI-generated suggestion',
+                        confidence: s.confidence || 0.8,
+                        reasoning: s.reasoning || 'Generated by AI analysis',
+                        source: 'ai',
+                        autoConfig: s.auto_config || s.autoConfig || {
+                            name: s.title || 'AI Rule',
+                            type: 'expand',
+                            strategy: {
+                                type: s.rule_type || 'duplicate',
+                                config: s.config || { count: 2 }
+                            }
+                        }
+                    }));
+
+                    // Merge suggestions with local ones
+                    suggestions = [
+                        ...formattedAISuggestions,
+                        ...localSuggestions.map(s => ({ ...s, source: 'heuristic' }))
+                    ];
+
+                    onSendMessage('system', `🤖 AI Analysis Complete: Found ${formattedAISuggestions.length} AI suggestions + ${localSuggestions.length} pattern-based`);
+                } catch (parseError) {
+                    console.warn('Failed to parse AI suggestions:', parseError);
+                    onSendMessage('system', `⚠️ AI response received but couldn't parse suggestions. Using pattern-based suggestions.`);
+                    suggestions = localSuggestions.map(s => ({ ...s, source: 'heuristic' }));
+                }
+            } else {
+                onSendMessage('system', `⚠️ AI analysis failed. Using pattern-based suggestions only.`);
+                suggestions = localSuggestions.map(s => ({ ...s, source: 'heuristic' }));
+            }
+
+            setAiSuggestions(suggestions);
+            setIsAnalyzing(false);
+
+        } catch (error) {
+            console.error('AI analysis error:', error);
+            // Fallback to local suggestions only
+            const localSuggestions = generateLocalSuggestions();
+            setAiSuggestions(localSuggestions.map(s => ({ ...s, source: 'heuristic' })));
+            setIsAnalyzing(false);
+            onSendMessage('system', `❌ AI analysis failed: ${error.message}. Using pattern-based suggestions.`);
+        }
+    };
+
+    const generateLocalSuggestions = () => {
+        // Keep existing local heuristic logic as fallback
+        const suggestions = [];
+        const allSourceColumns = Object.values(sourceColumns).flat();
+        const outputColumns = outputSchema.columns;
+
+        // Pattern 1: Detect potential expansion scenarios
+        const categoryColumns = allSourceColumns.filter(col =>
+            col.toLowerCase().includes('type') ||
+            col.toLowerCase().includes('category') ||
+            col.toLowerCase().includes('status')
+        );
+
+        if (categoryColumns.length > 0) {
+            suggestions.push({
+                id: 'category_expansion',
+                type: 'conditional_expansion',
+                title: 'Conditional Row Expansion',
+                description: `Create different rows based on ${categoryColumns[0]} values`,
+                confidence: 0.8,
+                reasoning: `Found category column "${categoryColumns[0]}" - consider expanding rows conditionally`,
+                source: 'heuristic',
+                autoConfig: {
+                    name: `Expand by ${categoryColumns[0]}`,
+                    type: 'expand',
+                    strategy: {
+                        type: 'conditional_expansion',
+                        config: {
+                            condition: `${categoryColumns[0]} == "SpecificValue"`,
+                            true_expansions: [{ set_values: { 'expansion_type': 'primary' } }],
+                            false_expansions: [{ set_values: { 'expansion_type': 'secondary' } }]
+                        }
+                    }
+                }
+            });
+        }
+
+        // Pattern 2: Detect amount/quantity columns for duplication
+        const quantityColumns = allSourceColumns.filter(col =>
+            col.toLowerCase().includes('quantity') ||
+            col.toLowerCase().includes('count') ||
+            col.toLowerCase().includes('amount')
+        );
+
+        if (quantityColumns.length > 0) {
+            suggestions.push({
+                id: 'quantity_duplication',
+                type: 'duplicate',
+                title: 'Quantity-Based Duplication',
+                description: `Duplicate rows based on ${quantityColumns[0]} values`,
+                confidence: 0.7,
+                reasoning: `Found quantity column "${quantityColumns[0]}" - each row could be duplicated based on quantity`,
+                source: 'heuristic',
+                autoConfig: {
+                    name: `Duplicate by ${quantityColumns[0]}`,
+                    type: 'expand',
+                    strategy: {
+                        type: 'duplicate',
+                        config: { count: 2 }
+                    }
+                }
+            });
+        }
+
+        // Pattern 3: Detect multi-value scenarios
+        const addressColumns = allSourceColumns.filter(col =>
+            col.toLowerCase().includes('address') ||
+            col.toLowerCase().includes('location')
+        );
+
+        if (addressColumns.length > 1) {
+            suggestions.push({
+                id: 'address_expansion',
+                type: 'fixed_expansion',
+                title: 'Address Normalization',
+                description: 'Expand rows to normalize address components',
+                confidence: 0.6,
+                reasoning: 'Multiple address fields detected - consider expanding for address normalization',
+                source: 'heuristic',
+                autoConfig: {
+                    name: 'Address Expansion',
+                    type: 'expand',
+                    strategy: {
+                        type: 'fixed_expansion',
+                        config: {
+                            expansions: [
+                                { set_values: { 'address_type': 'billing' } },
+                                { set_values: { 'address_type': 'shipping' } }
+                            ]
+                        }
+                    }
+                }
+            });
+        }
+
+        // Pattern 4: Detect tax/financial scenarios
+        const taxColumns = allSourceColumns.filter(col =>
+            col.toLowerCase().includes('tax') ||
+            col.toLowerCase().includes('vat') ||
+            col.toLowerCase().includes('rate')
+        );
+
+        if (taxColumns.length > 0 && outputColumns.some(col => col.name.toLowerCase().includes('line'))) {
+            suggestions.push({
+                id: 'tax_line_expansion',
+                type: 'fixed_expansion',
+                title: 'Tax Line Item Expansion',
+                description: 'Create separate line items for tax calculations',
+                confidence: 0.9,
+                reasoning: 'Tax columns and line item structure detected - expand for detailed tax reporting',
+                source: 'heuristic',
+                autoConfig: {
+                    name: 'Tax Line Items',
+                    type: 'expand',
+                    strategy: {
+                        type: 'fixed_expansion',
+                        config: {
+                            expansions: [
+                                { set_values: { 'line_type': 'base_amount', 'tax_applicable': 'false' } },
+                                { set_values: { 'line_type': 'tax_amount', 'tax_applicable': 'true' } }
+                            ]
+                        }
+                    }
+                }
+            });
+        }
+
+        // Pattern 5: Detect country/region columns for localization
+        const locationColumns = allSourceColumns.filter(col =>
+            col.toLowerCase().includes('country') ||
+            col.toLowerCase().includes('region') ||
+            col.toLowerCase().includes('locale')
+        );
+
+        if (locationColumns.length > 0) {
+            suggestions.push({
+                id: 'localization_expansion',
+                type: 'expand_from_list',
+                title: 'Localization Expansion',
+                description: 'Expand for multiple countries/regions',
+                confidence: 0.6,
+                reasoning: `Found location column "${locationColumns[0]}" - consider expanding for localization`,
+                source: 'heuristic',
+                autoConfig: {
+                    name: 'Country Expansion',
+                    type: 'expand',
+                    strategy: {
+                        type: 'expand_from_list',
+                        config: {
+                            target_column: 'country_code',
+                            values: ['US', 'CA', 'UK', 'DE', 'FR']
+                        }
+                    }
+                }
+            });
+        }
+
+        return suggestions;
+    };
+
+    const applySuggestion = (suggestion) => {
+        const newRule = {
+            id: `rule_${Date.now()}`,
+            ...suggestion.autoConfig,
+            enabled: true,
+            priority: rules.length
+        };
+
+        onUpdate([...rules, newRule]);
+        setExpandedRules({ ...expandedRules, [newRule.id]: true });
+
+        // Remove applied suggestion
+        setAiSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+
+        onSendMessage('system', `✅ Applied AI suggestion: ${suggestion.title}`);
+    };
+
+    const dismissSuggestion = (suggestionId) => {
+        setAiSuggestions(prev => prev.filter(s => s.id !== suggestionId));
+    };
 
     const addRule = () => {
         const newRule = {
@@ -377,6 +722,101 @@ const RowGenerationStep = ({
                     Rules are applied in priority order.
                 </p>
             </div>
+
+            {/* AI Suggestions Section */}
+            {(aiSuggestions.length > 0 || isAnalyzing) && showSuggestions && (
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                            <Sparkles size={20} className="text-purple-600" />
+                            <span className="font-medium text-purple-800">AI-Powered Suggestions</span>
+                            {isAnalyzing && (
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-600 border-t-transparent"></div>
+                            )}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <button
+                                onClick={analyzeDataAndSuggestRules}
+                                disabled={isAnalyzing}
+                                className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 disabled:opacity-50"
+                            >
+                                {isAnalyzing ? 'Analyzing...' : 'Get AI Suggestions'}
+                            </button>
+                            <button
+                                onClick={() => setShowSuggestions(false)}
+                                className="text-purple-600 hover:text-purple-800 text-sm"
+                            >
+                                Hide
+                            </button>
+                        </div>
+                    </div>
+
+                    {isAnalyzing ? (
+                        <p className="text-sm text-purple-700">🤖 Analyzing your data patterns for intelligent rule suggestions...</p>
+                    ) : aiSuggestions.length > 0 ? (
+                        <div className="space-y-3">
+                            {aiSuggestions.map(suggestion => (
+                                <div key={suggestion.id} className="bg-white border border-purple-200 rounded-lg p-3">
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                            <div className="flex items-center space-x-2 mb-1">
+                                                <Lightbulb size={16} className="text-purple-600" />
+                                                <span className="font-medium text-gray-800">{suggestion.title}</span>
+                                                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                                                    {Math.round(suggestion.confidence * 100)}% confidence
+                                                </span>
+                                                {suggestion.source === 'ai' && (
+                                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                                        AI-Powered
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-gray-600 mb-1">{suggestion.description}</p>
+                                            <p className="text-xs text-gray-500 italic">{suggestion.reasoning}</p>
+                                        </div>
+                                        <div className="flex space-x-2 ml-3">
+                                            <button
+                                                onClick={() => applySuggestion(suggestion)}
+                                                className="px-3 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600"
+                                            >
+                                                Apply
+                                            </button>
+                                            <button
+                                                onClick={() => dismissSuggestion(suggestion.id)}
+                                                className="px-2 py-1 text-gray-400 hover:text-gray-600 text-xs"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-4">
+                            <p className="text-sm text-purple-700 mb-2">No suggestions available yet.</p>
+                            <button
+                                onClick={analyzeDataAndSuggestRules}
+                                disabled={isAnalyzing}
+                                className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50"
+                            >
+                                Get AI Suggestions
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Show Suggestions Button (when hidden) */}
+            {!showSuggestions && (aiSuggestions.length > 0 || !isAnalyzing) && (
+                <button
+                    onClick={() => setShowSuggestions(true)}
+                    className="flex items-center space-x-2 px-3 py-2 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                >
+                    <Sparkles size={16} />
+                    <span>Show AI Suggestions ({aiSuggestions.length})</span>
+                </button>
+            )}
 
             {/* Add Rule Button */}
             <div className="flex justify-between items-center">
