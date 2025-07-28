@@ -1,5 +1,5 @@
 // src/services/deltaRuleManagementService.js - Delta Rule Management Service
-import { apiService } from './defaultApi.js';
+import {apiService} from './defaultApi.js';
 
 class DeltaRuleManagementService {
     constructor() {
@@ -79,7 +79,7 @@ class DeltaRuleManagementService {
 
     sanitizeRuleConfig(config) {
         // Remove file-specific references to make rules reusable
-        const sanitized = { ...config };
+        const sanitized = {...config};
 
         // Process Files configuration - remove file-specific names but keep structure
         if (sanitized.Files) {
@@ -108,7 +108,7 @@ class DeltaRuleManagementService {
 
     adaptRuleToFiles(savedRule, fileColumns) {
         // Adapt a saved rule to work with new files
-        const adaptedConfig = { ...savedRule.rule_config };
+        const adaptedConfig = {...savedRule.rule_config};
         const warnings = [];
         const errors = [];
 
@@ -294,21 +294,21 @@ class DeltaRuleManagementService {
             try {
                 const savedRule = await apiService.saveDeltaRule(sanitizedConfig, metadata);
                 this.addToRecentRules(savedRule);
-                return { success: true, rule: savedRule };
+                return {success: true, rule: savedRule};
             } catch (backendError) {
                 console.warn('Backend save failed, falling back to local storage:', backendError);
 
                 // Fallback to local storage
                 const localSuccess = this.saveRuleLocally(rule);
                 if (localSuccess) {
-                    return { success: true, rule, isLocal: true };
+                    return {success: true, rule, isLocal: true};
                 } else {
                     throw new Error('Failed to save rule locally');
                 }
             }
         } catch (error) {
             console.error('Error saving delta rule:', error);
-            return { success: false, error: error.message };
+            return {success: false, error: error.message};
         }
     }
 
@@ -318,9 +318,9 @@ class DeltaRuleManagementService {
             try {
                 const rules = templateId
                     ? await apiService.getDeltaRulesByTemplate(templateId)
-                    : await apiService.listDeltaRules({ limit: 50 });
+                    : await apiService.listDeltaRules({limit: 50});
 
-                return { success: true, rules, source: 'backend' };
+                return {success: true, rules, source: 'backend'};
             } catch (backendError) {
                 console.warn('Backend load failed, falling back to local storage:', backendError);
 
@@ -330,11 +330,11 @@ class DeltaRuleManagementService {
                     ? localRules.filter(r => r.template_id === templateId)
                     : localRules;
 
-                return { success: true, rules: filteredRules, source: 'local' };
+                return {success: true, rules: filteredRules, source: 'local'};
             }
         } catch (error) {
             console.error('Error loading delta rules:', error);
-            return { success: false, error: error.message, rules: [] };
+            return {success: false, error: error.message, rules: []};
         }
     }
 
@@ -343,7 +343,7 @@ class DeltaRuleManagementService {
             // Try backend first
             try {
                 const updatedRule = await apiService.updateDeltaRule(ruleId, updates);
-                return { success: true, rule: updatedRule };
+                return {success: true, rule: updatedRule};
             } catch (backendError) {
                 console.warn('Backend update failed, trying local storage:', backendError);
 
@@ -352,14 +352,14 @@ class DeltaRuleManagementService {
                 if (localSuccess) {
                     const localRules = this.getLocalRules();
                     const updatedRule = localRules.find(r => r.id === ruleId);
-                    return { success: true, rule: updatedRule, isLocal: true };
+                    return {success: true, rule: updatedRule, isLocal: true};
                 } else {
                     throw new Error('Failed to update rule locally');
                 }
             }
         } catch (error) {
             console.error('Error updating delta rule:', error);
-            return { success: false, error: error.message };
+            return {success: false, error: error.message};
         }
     }
 
@@ -368,21 +368,21 @@ class DeltaRuleManagementService {
             // Try backend first
             try {
                 await apiService.deleteDeltaRule(ruleId);
-                return { success: true };
+                return {success: true};
             } catch (backendError) {
                 console.warn('Backend delete failed, trying local storage:', backendError);
 
                 // Fallback to local storage
                 const localSuccess = this.deleteRuleLocally(ruleId);
                 if (localSuccess) {
-                    return { success: true, isLocal: true };
+                    return {success: true, isLocal: true};
                 } else {
                     throw new Error('Failed to delete rule locally');
                 }
             }
         } catch (error) {
             console.error('Error deleting delta rule:', error);
-            return { success: false, error: error.message };
+            return {success: false, error: error.message};
         }
     }
 
@@ -391,7 +391,7 @@ class DeltaRuleManagementService {
             // Try backend first
             try {
                 await apiService.markDeltaRuleAsUsed(ruleId);
-                return { success: true };
+                return {success: true};
             } catch (backendError) {
                 console.warn('Backend mark-as-used failed, trying local storage:', backendError);
 
@@ -404,11 +404,11 @@ class DeltaRuleManagementService {
                     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(localRules));
                 }
 
-                return { success: true, isLocal: true };
+                return {success: true, isLocal: true};
             }
         } catch (error) {
             console.error('Error marking delta rule as used:', error);
-            return { success: false, error: error.message };
+            return {success: false, error: error.message};
         }
     }
 
@@ -495,7 +495,7 @@ class DeltaRuleManagementService {
             };
 
             const blob = new Blob([JSON.stringify(exportData, null, 2)],
-                { type: 'application/json' });
+                {type: 'application/json'});
 
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -506,10 +506,10 @@ class DeltaRuleManagementService {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            return { success: true };
+            return {success: true};
         } catch (error) {
             console.error('Error exporting delta rules:', error);
-            return { success: false, error: error.message };
+            return {success: false, error: error.message};
         }
     }
 
@@ -536,7 +536,7 @@ class DeltaRuleManagementService {
 
                     const result = await this.saveRule(
                         rule.rule_config,
-                        { id: rule.template_id, name: rule.template_name },
+                        {id: rule.template_id, name: rule.template_name},
                         {
                             name: `${rule.name} (Imported)`,
                             description: rule.description,
@@ -557,10 +557,10 @@ class DeltaRuleManagementService {
                 }
             }
 
-            return { success: true, results: importResults };
+            return {success: true, results: importResults};
         } catch (error) {
             console.error('Error importing delta rules:', error);
-            return { success: false, error: error.message };
+            return {success: false, error: error.message};
         }
     }
 

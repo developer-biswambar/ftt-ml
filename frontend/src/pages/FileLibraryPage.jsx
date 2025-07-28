@@ -1,33 +1,26 @@
 // src/pages/FileLibraryPage.jsx - Updated with FileUploadModal and Multiple File Support
-import React, { useState, useEffect, useRef } from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
-    Upload,
-    RefreshCw,
-    Eye,
-    Trash2,
-    FileText,
-    Search,
-    Filter,
-    Download,
-    Calendar,
-    HardDrive,
-    Columns,
-    Rows,
     AlertTriangle,
-    X,
-    CheckCircle,
     ArrowLeft,
+    Calendar,
+    CheckCircle,
+    Columns,
+    Download,
+    Eye,
+    FileText,
     Grid,
-    List,
-    SortAsc,
-    SortDesc,
-    Sheet,
+    HardDrive,
     Home,
-    Plus,
-    MoreVertical,
-    Info
+    List,
+    RefreshCw,
+    Rows,
+    Search,
+    Trash2,
+    Upload,
+    X
 } from 'lucide-react';
-import { apiService } from '../services/defaultApi.js';
+import {apiService} from '../services/defaultApi.js';
 import FileUploadModal from '../fileManagement/FileUploadModal.jsx';
 
 const FileLibraryPage = () => {
@@ -391,7 +384,8 @@ const FileLibraryPage = () => {
                         <div className="relative">
                             <span className="text-2xl">{getFileTypeIcon(file.filename)}</span>
                             {isSelected && (
-                                <CheckCircle className="absolute -top-1 -right-1 text-blue-600 bg-white rounded-full" size={16} />
+                                <CheckCircle className="absolute -top-1 -right-1 text-blue-600 bg-white rounded-full"
+                                             size={16}/>
                             )}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -400,8 +394,8 @@ const FileLibraryPage = () => {
                             </h3>
                             <div className="flex items-center space-x-2 mt-1">
                                 <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                    isExcel 
-                                        ? 'bg-green-100 text-green-700' 
+                                    isExcel
+                                        ? 'bg-green-100 text-green-700'
                                         : 'bg-blue-100 text-blue-700'
                                 }`}>
                                     {isExcel ? 'Excel' : 'CSV'}
@@ -424,7 +418,7 @@ const FileLibraryPage = () => {
                                 className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors duration-200"
                                 title="View File"
                             >
-                                <Eye size={16} />
+                                <Eye size={16}/>
                             </button>
                             <button
                                 onClick={(e) => {
@@ -434,14 +428,14 @@ const FileLibraryPage = () => {
                                 className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-colors duration-200"
                                 title="Download File"
                             >
-                                <Download size={16} />
+                                <Download size={16}/>
                             </button>
                             <button
                                 onClick={(e) => handleDeleteFile(file, e)}
                                 className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-200"
                                 title="Delete File"
                             >
-                                <Trash2 size={16} />
+                                <Trash2 size={16}/>
                             </button>
                         </div>
                     </div>
@@ -450,22 +444,22 @@ const FileLibraryPage = () => {
                 <div className="space-y-2 text-sm text-gray-600">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-1">
-                            <Rows size={14} />
+                            <Rows size={14}/>
                             <span>{file.total_rows?.toLocaleString()} rows</span>
                         </div>
                         <div className="flex items-center space-x-1">
-                            <Columns size={14} />
+                            <Columns size={14}/>
                             <span>{file.total_columns} cols</span>
                         </div>
                     </div>
 
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-1">
-                            <HardDrive size={14} />
+                            <HardDrive size={14}/>
                             <span>{formatFileSize(file.file_size_mb)}</span>
                         </div>
                         <div className="flex items-center space-x-1">
-                            <Calendar size={14} />
+                            <Calendar size={14}/>
                             <span className="text-xs">{formatUploadTime(file.upload_time)}</span>
                         </div>
                     </div>
@@ -507,8 +501,9 @@ const FileLibraryPage = () => {
                             <div className="relative">
                                 <span className="text-2xl">{getFileTypeIcon(file.filename)}</span>
                                 {isSelected && (
-                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
-                                        <CheckCircle className="text-white" size={10} />
+                                    <div
+                                        className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
+                                        <CheckCircle className="text-white" size={10}/>
                                     </div>
                                 )}
                             </div>
@@ -517,15 +512,17 @@ const FileLibraryPage = () => {
                                     {displayName}
                                 </div>
                                 <div className="flex items-center space-x-2 mt-1">
-                                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                        isExcel 
-                                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                                            : 'bg-blue-100 text-blue-800 border border-blue-200'
-                                    }`}>
+                                    <span
+                                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                            isExcel
+                                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                                : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                        }`}>
                                         {isExcel ? '📊 Excel' : '📄 CSV'}
                                     </span>
                                     {file.sheet_name && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                        <span
+                                            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
                                             📋 {file.sheet_name}
                                         </span>
                                     )}
@@ -536,7 +533,7 @@ const FileLibraryPage = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                        <Rows className="text-gray-400" size={16} />
+                        <Rows className="text-gray-400" size={16}/>
                         <span className="text-sm font-medium text-gray-900">
                             {file.total_rows?.toLocaleString()}
                         </span>
@@ -544,7 +541,7 @@ const FileLibraryPage = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                        <Columns className="text-gray-400" size={16} />
+                        <Columns className="text-gray-400" size={16}/>
                         <span className="text-sm font-medium text-gray-900">
                             {file.total_columns}
                         </span>
@@ -552,7 +549,7 @@ const FileLibraryPage = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                        <HardDrive className="text-gray-400" size={16} />
+                        <HardDrive className="text-gray-400" size={16}/>
                         <span className="text-sm font-medium text-gray-900">
                             {formatFileSize(file.file_size_mb)}
                         </span>
@@ -560,7 +557,7 @@ const FileLibraryPage = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                        <Calendar className="text-gray-400" size={14} />
+                        <Calendar className="text-gray-400" size={14}/>
                         <div className="text-sm text-gray-600">
                             <div className="font-medium">
                                 {new Date(file.upload_time).toLocaleDateString()}
@@ -581,7 +578,7 @@ const FileLibraryPage = () => {
                             className="inline-flex items-center justify-center w-8 h-8 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-all duration-200 group"
                             title="View File"
                         >
-                            <Eye size={16} className="group-hover:scale-110 transition-transform duration-200" />
+                            <Eye size={16} className="group-hover:scale-110 transition-transform duration-200"/>
                         </button>
                         <button
                             onClick={(e) => {
@@ -591,14 +588,14 @@ const FileLibraryPage = () => {
                             className="inline-flex items-center justify-center w-8 h-8 text-green-600 hover:text-green-800 hover:bg-green-100 rounded-lg transition-all duration-200 group"
                             title="Download File"
                         >
-                            <Download size={16} className="group-hover:scale-110 transition-transform duration-200" />
+                            <Download size={16} className="group-hover:scale-110 transition-transform duration-200"/>
                         </button>
                         <button
                             onClick={(e) => handleDeleteFile(file, e)}
                             className="inline-flex items-center justify-center w-8 h-8 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-lg transition-all duration-200 group"
                             title="Delete File"
                         >
-                            <Trash2 size={16} className="group-hover:scale-110 transition-transform duration-200" />
+                            <Trash2 size={16} className="group-hover:scale-110 transition-transform duration-200"/>
                         </button>
                     </div>
                 </td>
@@ -629,11 +626,13 @@ const FileLibraryPage = () => {
                                 className="p-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all duration-200 group"
                                 title="Close Window"
                             >
-                                <ArrowLeft size={20} className="group-hover:transform group-hover:-translate-x-1 transition-transform duration-200" />
+                                <ArrowLeft size={20}
+                                           className="group-hover:transform group-hover:-translate-x-1 transition-transform duration-200"/>
                             </button>
                             <div className="flex items-center space-x-4">
-                                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 via-purple-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
-                                    <FileText className="text-white" size={24} />
+                                <div
+                                    className="w-12 h-12 bg-gradient-to-br from-blue-500 via-purple-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
+                                    <FileText className="text-white" size={24}/>
                                 </div>
                                 <div>
                                     <h1 className="text-2xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -660,7 +659,7 @@ const FileLibraryPage = () => {
                                 className="flex items-center space-x-2 px-6 py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all duration-200 border border-gray-200 hover:border-gray-300 group"
                                 title="Open Main App"
                             >
-                                <Home size={18} className="group-hover:scale-110 transition-transform duration-200" />
+                                <Home size={18} className="group-hover:scale-110 transition-transform duration-200"/>
                                 <span className="font-medium">Main App</span>
                             </button>
                         </div>
@@ -671,18 +670,21 @@ const FileLibraryPage = () => {
             {/* Upload Success Notification */}
             {showUploadSuccess && (
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-                    <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-4 mb-4 shadow-lg">
+                    <div
+                        className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-4 mb-4 shadow-lg">
                         <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-                                <CheckCircle className="text-emerald-600" size={20} />
+                                <CheckCircle className="text-emerald-600" size={20}/>
                             </div>
                             <div>
                                 <h4 className="font-semibold text-emerald-800">🎉 File uploaded successfully!</h4>
                                 <p className="text-sm text-emerald-700">
-                                    <span className="font-medium">{showUploadSuccess.custom_name || showUploadSuccess.filename}</span>
+                                    <span
+                                        className="font-medium">{showUploadSuccess.custom_name || showUploadSuccess.filename}</span>
                                     {' '}- {showUploadSuccess.total_rows?.toLocaleString()} rows processed
                                     {uploadQueue.length > 1 && (
-                                        <span className="ml-2 text-xs bg-emerald-200 text-emerald-800 px-2 py-1 rounded-full">
+                                        <span
+                                            className="ml-2 text-xs bg-emerald-200 text-emerald-800 px-2 py-1 rounded-full">
                                             {currentUploadIndex + 1} of {uploadQueue.length}
                                         </span>
                                     )}
@@ -696,10 +698,11 @@ const FileLibraryPage = () => {
             {/* Error Message */}
             {error && (
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-                    <div className="bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl p-4 mb-4 shadow-lg">
+                    <div
+                        className="bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl p-4 mb-4 shadow-lg">
                         <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                                <AlertTriangle className="text-red-600" size={20} />
+                                <AlertTriangle className="text-red-600" size={20}/>
                             </div>
                             <div className="flex-1">
                                 <h4 className="font-semibold text-red-800">❌ Error</h4>
@@ -709,7 +712,7 @@ const FileLibraryPage = () => {
                                 onClick={() => setError(null)}
                                 className="text-red-600 hover:text-red-800 hover:bg-red-100 p-2 rounded-lg transition-all duration-200"
                             >
-                                <X size={16} />
+                                <X size={16}/>
                             </button>
                         </div>
                     </div>
@@ -719,7 +722,8 @@ const FileLibraryPage = () => {
             {/* Controls */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6 mb-6 backdrop-blur-sm">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+                    <div
+                        className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
                         {/* Upload and Actions */}
                         <div className="flex items-center space-x-4">
                             <input
@@ -737,12 +741,14 @@ const FileLibraryPage = () => {
                             >
                                 {uploadProgress ? (
                                     <>
-                                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                                        <div
+                                            className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                                         <span className="font-medium">Processing...</span>
                                     </>
                                 ) : (
                                     <>
-                                        <Upload size={18} className="group-hover:scale-110 transition-transform duration-200" />
+                                        <Upload size={18}
+                                                className="group-hover:scale-110 transition-transform duration-200"/>
                                         <span className="font-medium">Upload Files</span>
                                         <span className="text-xs bg-white bg-opacity-20 px-2 py-1 rounded-full">
                                             Max 5
@@ -755,14 +761,17 @@ const FileLibraryPage = () => {
                                 onClick={loadFiles}
                                 className="flex items-center space-x-2 px-4 py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all duration-200 border border-gray-200 hover:border-gray-300 group"
                             >
-                                <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" />
+                                <RefreshCw size={16}
+                                           className="group-hover:rotate-180 transition-transform duration-500"/>
                                 <span className="font-medium">Refresh</span>
                             </button>
 
                             {selectedFiles.size > 0 && (
-                                <div className="flex items-center space-x-3 bg-blue-50 rounded-xl px-4 py-3 border border-blue-200">
+                                <div
+                                    className="flex items-center space-x-3 bg-blue-50 rounded-xl px-4 py-3 border border-blue-200">
                                     <div className="flex items-center space-x-2">
-                                        <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                                        <div
+                                            className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
                                             <span className="text-white text-xs font-bold">{selectedFiles.size}</span>
                                         </div>
                                         <span className="text-sm font-medium text-blue-800">selected</span>
@@ -777,7 +786,8 @@ const FileLibraryPage = () => {
                                             }}
                                             className="flex items-center space-x-2 px-3 py-2 text-green-600 hover:text-green-800 hover:bg-green-100 rounded-lg transition-all duration-200 group"
                                         >
-                                            <Download size={14} className="group-hover:scale-110 transition-transform duration-200" />
+                                            <Download size={14}
+                                                      className="group-hover:scale-110 transition-transform duration-200"/>
                                             <span className="font-medium">Download</span>
                                         </button>
                                     )}
@@ -786,7 +796,8 @@ const FileLibraryPage = () => {
                                         onClick={handleBulkDelete}
                                         className="flex items-center space-x-2 px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-lg transition-all duration-200 group"
                                     >
-                                        <Trash2 size={14} className="group-hover:scale-110 transition-transform duration-200" />
+                                        <Trash2 size={14}
+                                                className="group-hover:scale-110 transition-transform duration-200"/>
                                         <span className="font-medium">Delete</span>
                                     </button>
                                     <button
@@ -802,7 +813,8 @@ const FileLibraryPage = () => {
                         {/* Search and Filters */}
                         <div className="flex items-center space-x-4">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                                        size={16}/>
                                 <input
                                     type="text"
                                     placeholder="Search files..."
@@ -845,24 +857,24 @@ const FileLibraryPage = () => {
                                 <button
                                     onClick={() => setViewMode('grid')}
                                     className={`p-2 rounded-lg transition-all duration-200 ${
-                                        viewMode === 'grid' 
-                                            ? 'bg-white text-blue-600 shadow-sm' 
+                                        viewMode === 'grid'
+                                            ? 'bg-white text-blue-600 shadow-sm'
                                             : 'text-gray-600 hover:bg-gray-200'
                                     }`}
                                     title="Grid View"
                                 >
-                                    <Grid size={16} />
+                                    <Grid size={16}/>
                                 </button>
                                 <button
                                     onClick={() => setViewMode('list')}
                                     className={`p-2 rounded-lg transition-all duration-200 ${
-                                        viewMode === 'list' 
-                                            ? 'bg-white text-blue-600 shadow-sm' 
+                                        viewMode === 'list'
+                                            ? 'bg-white text-blue-600 shadow-sm'
                                             : 'text-gray-600 hover:bg-gray-200'
                                     }`}
                                     title="List View"
                                 >
-                                    <List size={16} />
+                                    <List size={16}/>
                                 </button>
                             </div>
                         </div>
@@ -874,7 +886,7 @@ const FileLibraryPage = () => {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
                                     <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                        <Upload className="text-blue-600" size={16} />
+                                        <Upload className="text-blue-600" size={16}/>
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-gray-900">
@@ -889,7 +901,7 @@ const FileLibraryPage = () => {
                                     <div className="w-32 bg-gray-200 rounded-full h-2">
                                         <div
                                             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                                            style={{ width: `${((currentUploadIndex + 1) / uploadQueue.length) * 100}%` }}
+                                            style={{width: `${((currentUploadIndex + 1) / uploadQueue.length) * 100}%`}}
                                         ></div>
                                     </div>
                                     <span className="text-xs text-gray-600 font-medium">
@@ -929,7 +941,7 @@ const FileLibraryPage = () => {
                 {/* File Display */}
                 {filteredAndSortedFiles.length === 0 ? (
                     <div className="text-center py-12">
-                        <FileText size={48} className="mx-auto text-gray-400 mb-4" />
+                        <FileText size={48} className="mx-auto text-gray-400 mb-4"/>
                         <h3 className="text-lg font-medium text-gray-900 mb-2">
                             {files.length === 0 ? 'No files uploaded' : 'No files match your search'}
                         </h3>
@@ -947,7 +959,7 @@ const FileLibraryPage = () => {
                                 onClick={() => fileInputRef.current?.click()}
                                 className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg"
                             >
-                                <Upload size={18} />
+                                <Upload size={18}/>
                                 <span className="font-medium">Upload Your First Files</span>
                             </button>
                         )}
@@ -958,8 +970,8 @@ const FileLibraryPage = () => {
                             <div
                                 key={file.file_id}
                                 className={`group bg-white rounded-lg border-2 transition-all duration-200 hover:shadow-lg cursor-pointer ${
-                                    selectedFiles.has(file.file_id) 
-                                        ? 'border-blue-500 bg-blue-50' 
+                                    selectedFiles.has(file.file_id)
+                                        ? 'border-blue-500 bg-blue-50'
                                         : 'border-gray-200 hover:border-blue-300'
                                 }`}
                                 onClick={() => toggleFileSelection(file.file_id)}
@@ -973,29 +985,29 @@ const FileLibraryPage = () => {
                     <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        File
-                                    </th>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Rows
-                                    </th>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Columns
-                                    </th>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Size
-                                    </th>
-                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Upload Time
-                                    </th>
-                                    <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
+                            <tr>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    File
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Rows
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Columns
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Size
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Upload Time
+                                </th>
+                                <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Actions
+                                </th>
+                            </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {filteredAndSortedFiles.map(renderFileRow)}
+                            {filteredAndSortedFiles.map(renderFileRow)}
                             </tbody>
                         </table>
                     </div>
@@ -1018,7 +1030,7 @@ const FileLibraryPage = () => {
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center space-x-3">
                                 <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                                    <AlertTriangle className="text-red-600" size={20} />
+                                    <AlertTriangle className="text-red-600" size={20}/>
                                 </div>
                                 <h3 className="text-lg font-semibold text-gray-800">Confirm Delete</h3>
                             </div>
@@ -1027,7 +1039,7 @@ const FileLibraryPage = () => {
                                 disabled={deleteInProgress}
                                 className="text-gray-400 hover:text-gray-600 disabled:opacity-50 hover:bg-gray-100 p-2 rounded-lg transition-all duration-200"
                             >
-                                <X size={20} />
+                                <X size={20}/>
                             </button>
                         </div>
 
@@ -1045,7 +1057,8 @@ const FileLibraryPage = () => {
                                         </span>
                                     </div>
                                     <div className="text-xs text-gray-600">
-                                        {fileToDelete.total_rows?.toLocaleString()} rows • {fileToDelete.total_columns} columns
+                                        {fileToDelete.total_rows?.toLocaleString()} rows
+                                        • {fileToDelete.total_columns} columns
                                         {fileToDelete.sheet_name && (
                                             <span className="ml-1 text-blue-600">• {fileToDelete.sheet_name}</span>
                                         )}
@@ -1069,12 +1082,13 @@ const FileLibraryPage = () => {
                             >
                                 {deleteInProgress ? (
                                     <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                        <div
+                                            className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                                         <span>Deleting...</span>
                                     </>
                                 ) : (
                                     <>
-                                        <Trash2 size={16} />
+                                        <Trash2 size={16}/>
                                         <span>Delete File</span>
                                     </>
                                 )}

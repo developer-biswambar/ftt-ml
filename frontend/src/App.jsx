@@ -3,13 +3,13 @@ import React from 'react';
 import {BrowserRouter as Router, Route, Routes} from 'react-router-dom';
 import {messageService} from './services/messageService';
 import {
+    useDocumentTitle,
     useFileManagement,
-    useTemplateManagement,
-    useProcessManagement,
-    useMessageManagement,
     useFileSelection,
+    useMessageManagement,
     usePanelResize,
-    useDocumentTitle
+    useProcessManagement,
+    useTemplateManagement
 } from './hooks/useAppState';
 import LeftSidebar from './components/core/LeftSideBar.jsx';
 import ChatInterface from './components/core/ChatInterface.jsx';
@@ -439,7 +439,7 @@ const MainApp = () => {
                 requiredFiles={requiredFiles}
                 onStartReconciliationInApp={handleReconciliation}
                 onStartDeltaGenerationInApp={handleDeltaGeneration}
-                onFileTransformationInApp = {handleStartTransformation}
+                onFileTransformationInApp={handleStartTransformation}
                 isTyping={isTyping}
                 typingMessage={typingMessage}
                 files={files}

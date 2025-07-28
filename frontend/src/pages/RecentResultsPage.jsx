@@ -1,33 +1,28 @@
 // src/pages/RecentResultsPage.jsx - Detailed Recent Results View
-import React, {useState, useEffect} from 'react';
+import React, {useEffect, useState} from 'react';
 import {useNavigate, useSearchParams} from 'react-router-dom';
 import {
+    Activity,
+    AlertCircle,
     ArrowLeft,
-    BarChart3,
+    Calendar,
     CheckCircle,
     Clock,
+    Database,
     Download,
     Eye,
     FileSpreadsheet,
     FileText,
-    RefreshCw,
     GitCompare,
-    Shuffle,
-    Settings,
-    Save,
-    Server,
-    Filter,
-    Search,
-    Calendar,
-    User,
     Loader,
-    AlertCircle,
-    TrendingUp,
-    Database,
-    Activity,
     PieChart,
-    Zap,
-    Layers
+    RefreshCw,
+    Search,
+    Server,
+    Settings,
+    Shuffle,
+    TrendingUp,
+    Zap
 } from 'lucide-react';
 import {apiService} from '../services/defaultApi.js';
 import {deltaApiService} from '../services/deltaApiService';

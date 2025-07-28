@@ -24,21 +24,21 @@ const RowGenerationStep = ({
     const [showConditionBuilder, setShowConditionBuilder] = useState({});
 
     const mappingTypes = [
-        { value: 'direct', label: 'Direct Mapping', icon: Target },
-        { value: 'static', label: 'Static Value', icon: Type },
-        { value: 'dynamic', label: 'Dynamic/Conditional', icon: GitBranch }
+        {value: 'direct', label: 'Direct Mapping', icon: Target},
+        {value: 'static', label: 'Static Value', icon: Type},
+        {value: 'dynamic', label: 'Dynamic/Conditional', icon: GitBranch}
     ];
 
     const operators = [
-        { value: '==', label: 'equals' },
-        { value: '!=', label: 'not equals' },
-        { value: '>', label: 'greater than' },
-        { value: '<', label: 'less than' },
-        { value: '>=', label: 'greater than or equal' },
-        { value: '<=', label: 'less than or equal' },
-        { value: 'contains', label: 'contains' },
-        { value: 'startsWith', label: 'starts with' },
-        { value: 'endsWith', label: 'ends with' }
+        {value: '==', label: 'equals'},
+        {value: '!=', label: 'not equals'},
+        {value: '>', label: 'greater than'},
+        {value: '<', label: 'less than'},
+        {value: '>=', label: 'greater than or equal'},
+        {value: '<=', label: 'less than or equal'},
+        {value: 'contains', label: 'contains'},
+        {value: 'startsWith', label: 'starts with'},
+        {value: 'endsWith', label: 'ends with'}
     ];
 
     const addRule = () => {
@@ -51,12 +51,12 @@ const RowGenerationStep = ({
         };
 
         onUpdate([...rules, newRule]);
-        setExpandedRules({ ...expandedRules, [newRule.id]: true });
+        setExpandedRules({...expandedRules, [newRule.id]: true});
     };
 
     const updateRule = (index, updates) => {
         const updatedRules = [...rules];
-        updatedRules[index] = { ...updatedRules[index], ...updates };
+        updatedRules[index] = {...updatedRules[index], ...updates};
         onUpdate(updatedRules);
     };
 
@@ -119,7 +119,7 @@ const RowGenerationStep = ({
         const currentColumn = updatedRules[ruleIndex].output_columns[columnIndex];
 
 
-        if (updates.source_column){
+        if (updates.source_column) {
             // Extract the new column name from source_column (if provided)
             updates['name'] = updates.source_column?.split('.').pop();
         }
@@ -208,7 +208,7 @@ const RowGenerationStep = ({
                         <input
                             type="text"
                             value={column.name}
-                            onChange={(e) => updateOutputColumn(ruleIndex, columnIndex, { name: e.target.value })}
+                            onChange={(e) => updateOutputColumn(ruleIndex, columnIndex, {name: e.target.value})}
                             placeholder="Column name"
                             className="px-2 py-1 border border-gray-300 rounded text-sm font-medium"
                         />
@@ -234,7 +234,7 @@ const RowGenerationStep = ({
                         className="p-1 text-red-400 hover:text-red-600"
                         title="Remove column"
                     >
-                        <X size={16} />
+                        <X size={16}/>
                     </button>
                 </div>
 
@@ -246,7 +246,7 @@ const RowGenerationStep = ({
                         </label>
                         <select
                             value={column.source_column || ''}
-                            onChange={(e) => updateOutputColumn(ruleIndex, columnIndex, { source_column: e.target.value })}
+                            onChange={(e) => updateOutputColumn(ruleIndex, columnIndex, {source_column: e.target.value})}
                             className="w-full px-3 py-2 border border-gray-300 rounded"
                         >
                             <option value="">Select source column...</option>
@@ -267,7 +267,7 @@ const RowGenerationStep = ({
                         <input
                             type="text"
                             value={column.static_value || ''}
-                            onChange={(e) => updateOutputColumn(ruleIndex, columnIndex, { static_value: e.target.value })}
+                            onChange={(e) => updateOutputColumn(ruleIndex, columnIndex, {static_value: e.target.value})}
                             placeholder="Enter static value..."
                             className="w-full px-3 py-2 border border-gray-300 rounded"
                         />
@@ -295,7 +295,7 @@ const RowGenerationStep = ({
                                         <label className="block text-xs text-gray-600">If Column</label>
                                         <select
                                             value={condition.condition_column || ''}
-                                            onChange={(e) => updateDynamicCondition(ruleIndex, columnIndex, condIndex, { condition_column: e.target.value })}
+                                            onChange={(e) => updateDynamicCondition(ruleIndex, columnIndex, condIndex, {condition_column: e.target.value})}
                                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                         >
                                             <option value="">Select...</option>
@@ -311,7 +311,7 @@ const RowGenerationStep = ({
                                         <label className="block text-xs text-gray-600">Operator</label>
                                         <select
                                             value={condition.operator}
-                                            onChange={(e) => updateDynamicCondition(ruleIndex, columnIndex, condIndex, { operator: e.target.value })}
+                                            onChange={(e) => updateDynamicCondition(ruleIndex, columnIndex, condIndex, {operator: e.target.value})}
                                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                         >
                                             {operators.map(op => (
@@ -327,7 +327,7 @@ const RowGenerationStep = ({
                                         <input
                                             type="text"
                                             value={condition.condition_value || ''}
-                                            onChange={(e) => updateDynamicCondition(ruleIndex, columnIndex, condIndex, { condition_value: e.target.value })}
+                                            onChange={(e) => updateDynamicCondition(ruleIndex, columnIndex, condIndex, {condition_value: e.target.value})}
                                             placeholder="Condition value"
                                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                         />
@@ -338,7 +338,7 @@ const RowGenerationStep = ({
                                         <input
                                             type="text"
                                             value={condition.output_value || ''}
-                                            onChange={(e) => updateDynamicCondition(ruleIndex, columnIndex, condIndex, { output_value: e.target.value })}
+                                            onChange={(e) => updateDynamicCondition(ruleIndex, columnIndex, condIndex, {output_value: e.target.value})}
                                             placeholder="Output value"
                                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                         />
@@ -350,7 +350,7 @@ const RowGenerationStep = ({
                                             className="p-1 text-red-400 hover:text-red-600"
                                             title="Remove condition"
                                         >
-                                            <X size={14} />
+                                            <X size={14}/>
                                         </button>
                                     </div>
                                 </div>
@@ -358,7 +358,8 @@ const RowGenerationStep = ({
                         ))}
 
                         {(!column.dynamic_conditions || column.dynamic_conditions.length === 0) && (
-                            <div className="text-center py-4 text-gray-500 border border-dashed border-gray-300 rounded">
+                            <div
+                                className="text-center py-4 text-gray-500 border border-dashed border-gray-300 rounded">
                                 <p className="text-sm">No conditions defined</p>
                                 <button
                                     onClick={() => addDynamicCondition(ruleIndex, columnIndex)}
@@ -377,7 +378,7 @@ const RowGenerationStep = ({
                             <input
                                 type="text"
                                 value={column.default_value || ''}
-                                onChange={(e) => updateOutputColumn(ruleIndex, columnIndex, { default_value: e.target.value })}
+                                onChange={(e) => updateOutputColumn(ruleIndex, columnIndex, {default_value: e.target.value})}
                                 placeholder="Default value"
                                 className="w-full px-3 py-2 border border-gray-300 rounded"
                             />
@@ -405,7 +406,7 @@ const RowGenerationStep = ({
                         }))}
                         className="flex items-center space-x-1 px-2 py-1 text-blue-600 hover:text-blue-800 text-sm"
                     >
-                        <Settings size={14} />
+                        <Settings size={14}/>
                         <span>{showBuilder ? 'Hide Builder' : 'Show Builder'}</span>
                     </button>
                 </div>
@@ -485,7 +486,7 @@ const RowGenerationStep = ({
                 <div>
                     <textarea
                         value={rule.condition || ''}
-                        onChange={(e) => updateRule(ruleIndex, { condition: e.target.value })}
+                        onChange={(e) => updateRule(ruleIndex, {condition: e.target.value})}
                         placeholder="e.g., file_0.Amount < 0"
                         className="w-full px-3 py-2 border border-gray-300 rounded font-mono text-sm"
                         rows={2}
@@ -503,7 +504,8 @@ const RowGenerationStep = ({
             <div>
                 <h3 className="text-lg font-semibold text-gray-800">Transformation Rules</h3>
                 <p className="text-sm text-gray-600">
-                    Create rules to transform and generate output records. Each rule can define its own output columns and conditions.
+                    Create rules to transform and generate output records. Each rule can define its own output columns
+                    and conditions.
                 </p>
             </div>
 
@@ -513,7 +515,7 @@ const RowGenerationStep = ({
                     onClick={addRule}
                     className="flex items-center space-x-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
-                    <Plus size={16} />
+                    <Plus size={16}/>
                     <span>Add Transformation Rule</span>
                 </button>
 
@@ -527,7 +529,7 @@ const RowGenerationStep = ({
             {/* Rules List */}
             {rules.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                    <Layers size={48} className="mx-auto mb-4 text-gray-400" />
+                    <Layers size={48} className="mx-auto mb-4 text-gray-400"/>
                     <p className="text-gray-600 mb-4">No transformation rules defined</p>
                     <p className="text-sm text-gray-500 mb-4">
                         Create rules to define how your data should be transformed and what output columns to generate
@@ -552,15 +554,15 @@ const RowGenerationStep = ({
                                             onClick={() => toggleExpanded(rule.id)}
                                             className="p-1 hover:bg-gray-200 rounded"
                                         >
-                                            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                            {isExpanded ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
                                         </button>
 
-                                        <Copy size={20} className="text-gray-600" />
+                                        <Copy size={20} className="text-gray-600"/>
 
                                         <input
                                             type="text"
                                             value={rule.name}
-                                            onChange={(e) => updateRule(index, { name: e.target.value })}
+                                            onChange={(e) => updateRule(index, {name: e.target.value})}
                                             className="px-2 py-1 border border-gray-300 rounded text-sm font-medium bg-white"
                                             placeholder="Rule name"
                                         />
@@ -569,7 +571,7 @@ const RowGenerationStep = ({
                                             <input
                                                 type="checkbox"
                                                 checked={rule.enabled}
-                                                onChange={(e) => updateRule(index, { enabled: e.target.checked })}
+                                                onChange={(e) => updateRule(index, {enabled: e.target.checked})}
                                                 className="rounded border-gray-300"
                                             />
                                             <span>Enabled</span>
@@ -608,7 +610,7 @@ const RowGenerationStep = ({
                                             className="p-1 text-red-400 hover:text-red-600"
                                             title="Remove rule"
                                         >
-                                            <Minus size={16} />
+                                            <Minus size={16}/>
                                         </button>
                                     </div>
                                 </div>
@@ -625,7 +627,7 @@ const RowGenerationStep = ({
                                                     onClick={() => addOutputColumn(index)}
                                                     className="flex items-center space-x-1 px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
                                                 >
-                                                    <Plus size={14} />
+                                                    <Plus size={14}/>
                                                     <span>Add Column</span>
                                                 </button>
                                             </div>
@@ -639,8 +641,9 @@ const RowGenerationStep = ({
                                                     ))}
                                                 </div>
                                             ) : (
-                                                <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                                                    <Target size={32} className="mx-auto mb-2 text-gray-400" />
+                                                <div
+                                                    className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                                                    <Target size={32} className="mx-auto mb-2 text-gray-400"/>
                                                     <p className="text-gray-600 mb-2">No output columns defined</p>
                                                     <button
                                                         onClick={() => addOutputColumn(index)}
@@ -672,7 +675,7 @@ const RowGenerationStep = ({
             {/* Help Section */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-start space-x-2">
-                    <AlertCircle size={16} className="text-blue-600 mt-0.5" />
+                    <AlertCircle size={16} className="text-blue-600 mt-0.5"/>
                     <div className="text-sm text-blue-800">
                         <p className="font-medium mb-1">How Transformation Rules Work:</p>
                         <ul className="list-disc list-inside space-y-1">

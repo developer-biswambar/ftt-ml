@@ -14,7 +14,7 @@ class AIAssistanceService {
         const token = localStorage.getItem('authToken');
         return {
             'Content-Type': 'application/json',
-            ...(token && { 'Authorization': `Bearer ${token}` })
+            ...(token && {'Authorization': `Bearer ${token}`})
         };
     }
 
@@ -22,13 +22,13 @@ class AIAssistanceService {
      * Generic AI call without predefined prompts
      */
     async makeGenericAICall({
-        systemPrompt = null,
-        userPrompt = null,
-        messages = null,
-        temperature = null,
-        maxTokens = null,
-        responseFormat = null
-    }) {
+                                systemPrompt = null,
+                                userPrompt = null,
+                                messages = null,
+                                temperature = null,
+                                maxTokens = null,
+                                responseFormat = null
+                            }) {
         try {
             const response = await fetch(`${this.baseURL}/generic-call`, {
                 method: 'POST',
@@ -58,10 +58,10 @@ class AIAssistanceService {
      * Get AI-powered transformation suggestions
      */
     async suggestTransformations({
-        sourceColumns,
-        outputSchema,
-        transformationContext = null
-    }) {
+                                     sourceColumns,
+                                     outputSchema,
+                                     transformationContext = null
+                                 }) {
         try {
             const response = await fetch(`${this.baseURL}/suggest-transformations`, {
                 method: 'POST',
@@ -131,11 +131,11 @@ class AIAssistanceService {
      * Get suggestions for row generation rules
      */
     async suggestRowGenerationRules({
-        sourceColumns,
-        outputSchema,
-        existingRules = [],
-        context = null
-    }) {
+                                        sourceColumns,
+                                        outputSchema,
+                                        existingRules = [],
+                                        context = null
+                                    }) {
         const systemPrompt = `
 You are a data transformation expert. Analyze the source columns and output schema to suggest intelligent row generation rules.
 
@@ -189,7 +189,7 @@ Return practical row generation rule suggestions as a JSON object with the exact
             systemPrompt,
             userPrompt,
             temperature: 0.3,
-            responseFormat: { type: "json_object" }
+            responseFormat: {type: "json_object"}
         });
     }
 
@@ -197,11 +197,11 @@ Return practical row generation rule suggestions as a JSON object with the exact
      * Get suggestions for column mappings
      */
     async suggestColumnMappings({
-        sourceColumns,
-        outputSchema,
-        existingMappings = [],
-        context = null
-    }) {
+                                    sourceColumns,
+                                    outputSchema,
+                                    existingMappings = [],
+                                    context = null
+                                }) {
         const systemPrompt = `
 You are a data mapping specialist. Analyze source and target columns to suggest intelligent mapping strategies.
 
@@ -257,7 +257,7 @@ Return practical column mapping suggestions as a JSON object with the exact stru
             systemPrompt,
             userPrompt,
             temperature: 0.3,
-            responseFormat: { type: "json_object" }
+            responseFormat: {type: "json_object"}
         });
     }
 
@@ -325,10 +325,10 @@ Identify any issues and provide recommendations for improvement.
      * Generate sample data for testing transformations
      */
     async generateSampleData({
-        sourceSchema,
-        rowCount = 5,
-        dataPatterns = null
-    }) {
+                                 sourceSchema,
+                                 rowCount = 5,
+                                 dataPatterns = null
+                             }) {
         const systemPrompt = `
 You are a test data generator. Create realistic sample data that matches the provided schema and patterns.
 
@@ -354,7 +354,7 @@ Create realistic, varied test data that would be useful for transformation testi
             systemPrompt,
             userPrompt,
             temperature: 0.8,
-            responseFormat: { type: "json_object" }
+            responseFormat: {type: "json_object"}
         });
     }
 
@@ -362,10 +362,10 @@ Create realistic, varied test data that would be useful for transformation testi
      * Get AI-powered data quality analysis
      */
     async analyzeDataQuality({
-        sampleData,
-        schema,
-        context = null
-    }) {
+                                 sampleData,
+                                 schema,
+                                 context = null
+                             }) {
         const systemPrompt = `
 You are a data quality expert. Analyze sample data and identify:
 1. Data quality issues (missing values, inconsistencies, outliers)
@@ -398,10 +398,10 @@ Provide comprehensive data quality analysis and recommendations.
      * Get optimization suggestions for complex transformations
      */
     async suggestOptimizations({
-        transformationConfig,
-        performanceMetrics = null,
-        context = null
-    }) {
+                                   transformationConfig,
+                                   performanceMetrics = null,
+                                   context = null
+                               }) {
         const systemPrompt = `
 You are a performance optimization expert for data transformations. Analyze transformation configurations and suggest optimizations for:
 1. Processing speed improvements
@@ -434,10 +434,10 @@ Suggest specific optimizations to improve performance and reliability.
      * Get AI assistance for error resolution
      */
     async getErrorResolution({
-        errorMessage,
-        transformationConfig,
-        context = null
-    }) {
+                                 errorMessage,
+                                 transformationConfig,
+                                 context = null
+                             }) {
         const systemPrompt = `
 You are a debugging expert for data transformations. Help users resolve transformation errors by:
 1. Analyzing error messages and context
@@ -470,10 +470,10 @@ Provide detailed troubleshooting steps and solutions.
      * Generate documentation for transformations
      */
     async generateDocumentation({
-        transformationConfig,
-        includeExamples = true,
-        format = 'markdown'
-    }) {
+                                    transformationConfig,
+                                    includeExamples = true,
+                                    format = 'markdown'
+                                }) {
         const systemPrompt = `
 You are a technical documentation specialist. Generate comprehensive documentation for data transformations including:
 1. Transformation overview and purpose

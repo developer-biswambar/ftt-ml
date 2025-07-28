@@ -2,28 +2,26 @@ import {
     AlertCircle,
     BarChart3,
     CheckCircle,
+    ChevronDown,
+    ChevronRight,
     Clock,
     Download,
+    ExternalLink,
     Eye,
     FileSpreadsheet,
     FileText,
-    RefreshCw,
     GitCompare,
-    Shuffle,
-    Settings,
+    History,
+    Loader,
+    RefreshCw,
     Save,
     Server,
+    Settings,
+    Shuffle,
     X,
-    Loader,
-    ExternalLink,
-    History,
-    Zap,
-    Layers,
-    ChevronDown,
-    ChevronRight
+    Zap
 } from 'lucide-react';
 import {useEffect, useState} from "react";
-import transformationApiService from "../../services/transformationApiService.js";
 
 const RightSidebar = ({
                           processedFiles = [],

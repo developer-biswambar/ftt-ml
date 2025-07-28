@@ -1,7 +1,18 @@
 // src/components/LeftSidebar.jsx - Enhanced with Reusable File Upload Modal
-import React, {useRef, useState, useEffect} from 'react';
-import {CheckCircle, Eye, FileText, RefreshCw, Upload, AlertCircle, X, Sheet, Trash2, AlertTriangle, ExternalLink, FolderOpen} from 'lucide-react';
-import { apiService } from '../../services/defaultApi.js';
+import React, {useRef, useState} from 'react';
+import {
+    AlertTriangle,
+    CheckCircle,
+    ExternalLink,
+    Eye,
+    FileText,
+    FolderOpen,
+    RefreshCw,
+    Trash2,
+    Upload,
+    X
+} from 'lucide-react';
+import {apiService} from '../../services/defaultApi.js';
 import FileUploadModal from '../../fileManagement/FileUploadModal.jsx';
 
 const LeftSidebar = ({
@@ -59,7 +70,7 @@ const LeftSidebar = ({
 
             if (result.success) {
                 // Remove file from selected files if it was selected
-                const updatedSelectedFiles = { ...selectedFiles };
+                const updatedSelectedFiles = {...selectedFiles};
                 Object.keys(updatedSelectedFiles).forEach(key => {
                     if (updatedSelectedFiles[key]?.file_id === fileToDelete.file_id) {
                         delete updatedSelectedFiles[key];
@@ -92,7 +103,7 @@ const LeftSidebar = ({
 
     // Handle upload modal confirmation
     const handleUploadConfirm = async (uploadConfig) => {
-        const { file, sheetName, customName } = uploadConfig;
+        const {file, sheetName, customName} = uploadConfig;
 
         // Close modal first
         setShowUploadModal(false);
@@ -243,14 +254,15 @@ const LeftSidebar = ({
                                         {displayName}
                                     </p>
                                     <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                                        isExcel 
-                                            ? 'bg-green-100 text-green-700' 
+                                        isExcel
+                                            ? 'bg-green-100 text-green-700'
                                             : 'bg-blue-100 text-blue-700'
                                     }`}>
                                         {isExcel ? 'Excel' : 'CSV'}
                                     </span>
                                     {fileInUse && (
-                                        <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">
+                                        <span
+                                            className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">
                                             In Use
                                         </span>
                                     )}
@@ -306,7 +318,8 @@ const LeftSidebar = ({
                                     Uploading file...
                                 </div>
                                 <div className="w-full bg-blue-200 rounded-full h-1.5 mt-1">
-                                    <div className="bg-blue-600 h-1.5 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                                    <div className="bg-blue-600 h-1.5 rounded-full animate-pulse"
+                                         style={{width: '60%'}}></div>
                                 </div>
                                 <div className="text-xs text-blue-700 mt-1">
                                     Processing file content...
@@ -523,10 +536,12 @@ const LeftSidebar = ({
 
                     {/* Step 4: File Assignment */}
                     {selectedTemplate && (
-                        <div className="border-t border-slate-200 bg-white/50 flex-shrink-0 max-h-48 overflow-hidden flex flex-col">
+                        <div
+                            className="border-t border-slate-200 bg-white/50 flex-shrink-0 max-h-48 overflow-hidden flex flex-col">
                             <div className="p-3 pb-2 flex-shrink-0">
                                 <div className="flex items-center space-x-2">
-                                    <div className="w-5 h-5 bg-purple-100 rounded-full flex items-center justify-center">
+                                    <div
+                                        className="w-5 h-5 bg-purple-100 rounded-full flex items-center justify-center">
                                         <span className="text-purple-600 text-xs font-bold">4</span>
                                     </div>
                                     <h3 className="text-sm font-semibold text-slate-700">Assign Files</h3>
@@ -623,7 +638,7 @@ const LeftSidebar = ({
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center space-x-3">
                                 <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                                    <AlertTriangle className="text-red-600" size={20} />
+                                    <AlertTriangle className="text-red-600" size={20}/>
                                 </div>
                                 <h3 className="text-lg font-semibold text-gray-800">Confirm Delete</h3>
                             </div>
@@ -632,7 +647,7 @@ const LeftSidebar = ({
                                 disabled={deleteInProgress}
                                 className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
                             >
-                                <X size={20} />
+                                <X size={20}/>
                             </button>
                         </div>
 
@@ -650,7 +665,8 @@ const LeftSidebar = ({
                                         </span>
                                     </div>
                                     <div className="text-xs text-gray-600">
-                                        {fileToDelete.total_rows?.toLocaleString()} rows • {fileToDelete.columns?.length} columns
+                                        {fileToDelete.total_rows?.toLocaleString()} rows
+                                        • {fileToDelete.columns?.length} columns
                                         {fileToDelete.sheet_name && (
                                             <span className="ml-1 text-blue-600">• {fileToDelete.sheet_name}</span>
                                         )}
@@ -661,9 +677,10 @@ const LeftSidebar = ({
                             {isFileInUse(fileToDelete) && (
                                 <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
                                     <div className="flex items-center space-x-2">
-                                        <AlertTriangle className="text-yellow-600" size={16} />
+                                        <AlertTriangle className="text-yellow-600" size={16}/>
                                         <p className="text-sm text-yellow-800">
-                                            <strong>Warning:</strong> This file is currently selected for use in the process.
+                                            <strong>Warning:</strong> This file is currently selected for use in the
+                                            process.
                                             Deleting it will remove it from your selection.
                                         </p>
                                     </div>
@@ -686,12 +703,13 @@ const LeftSidebar = ({
                             >
                                 {deleteInProgress ? (
                                     <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                        <div
+                                            className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                                         <span>Deleting...</span>
                                     </>
                                 ) : (
                                     <>
-                                        <Trash2 size={16} />
+                                        <Trash2 size={16}/>
                                         <span>Delete File</span>
                                     </>
                                 )}

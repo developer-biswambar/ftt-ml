@@ -1,25 +1,7 @@
-import React, {useState, useEffect} from 'react';
-import {
-    FileText,
-    Target,
-    Settings,
-    Eye,
-    Check,
-    ChevronLeft,
-    ChevronRight,
-    X,
-    Save,
-    Upload,
-    Wand2,
-    AlertCircle,
-    Download,
-    Copy,
-    Layers
-} from 'lucide-react';
+import React, {useEffect, useState} from 'react';
+import {AlertCircle, Check, ChevronLeft, ChevronRight, Copy, Eye, FileText, X} from 'lucide-react';
 import RowGenerationStep from './RowGenerationStep';
-import ColumnMappingStep from './ColumnMappingStep';
 import PreviewStep from './PreviewStep';
-import {deltaApiService} from '../../services/deltaApiService';
 import {transformationApiService} from '../../services/transformationApiService';
 
 const TransformationFlow = ({

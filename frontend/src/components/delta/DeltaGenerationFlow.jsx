@@ -6,19 +6,14 @@ import {
     ChevronRight,
     Columns,
     FileText,
+    Filter,
     GitCompare,
     Key,
-    Settings,
-    Target,
-    X,
-    Plus,
     Minus,
+    Plus,
     Save,
     Upload,
-    Filter,
-    Search,
-    ChevronDown,
-    Calendar
+    X
 } from 'lucide-react';
 import DeltaRuleSaveLoad from './DeltaRuleSaveLoad.jsx';
 import FilterDataStep from './FilterDataStep.jsx';

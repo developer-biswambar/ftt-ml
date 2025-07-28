@@ -1,42 +1,39 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
-    Plus,
-    Minus,
-    Upload,
-    Download,
-    Wand2,
-    Settings,
-    Check,
-    X,
     AlertCircle,
+    Calendar,
     Copy,
+    Download,
     FileText,
     Hash,
-    Calendar,
+    List,
+    Plus,
     ToggleLeft,
     Type,
-    List
+    Upload,
+    Wand2,
+    X
 } from 'lucide-react';
 
 const SchemaDefinitionStep = ({
-    outputDefinition,
-    onUpdate,
-    onSuggestMappings,
-    sourceColumns,
-    onSendMessage
-}) => {
+                                  outputDefinition,
+                                  onUpdate,
+                                  onSuggestMappings,
+                                  sourceColumns,
+                                  onSendMessage
+                              }) => {
     const [showImportModal, setShowImportModal] = useState(false);
     const [importText, setImportText] = useState('');
     const [showAIAssistant, setShowAIAssistant] = useState(false);
 
     const columnTypes = [
-        { value: 'string', label: 'Text', icon: Type },
-        { value: 'number', label: 'Number', icon: Hash },
-        { value: 'decimal', label: 'Decimal', icon: Hash },
-        { value: 'date', label: 'Date', icon: Calendar },
-        { value: 'datetime', label: 'DateTime', icon: Calendar },
-        { value: 'boolean', label: 'Boolean', icon: ToggleLeft },
-        { value: 'array', label: 'Array', icon: List }
+        {value: 'string', label: 'Text', icon: Type},
+        {value: 'number', label: 'Number', icon: Hash},
+        {value: 'decimal', label: 'Decimal', icon: Hash},
+        {value: 'date', label: 'Date', icon: Calendar},
+        {value: 'datetime', label: 'DateTime', icon: Calendar},
+        {value: 'boolean', label: 'Boolean', icon: ToggleLeft},
+        {value: 'array', label: 'Array', icon: List}
     ];
 
     const addColumn = () => {
@@ -142,7 +139,7 @@ const SchemaDefinitionStep = ({
             }
         };
 
-        const blob = new Blob([JSON.stringify(schemaData, null, 2)], { type: 'application/json' });
+        const blob = new Blob([JSON.stringify(schemaData, null, 2)], {type: 'application/json'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -227,7 +224,7 @@ const SchemaDefinitionStep = ({
                         onClick={addColumn}
                         className="flex items-center space-x-1 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                     >
-                        <Plus size={16} />
+                        <Plus size={16}/>
                         <span>Add Column</span>
                     </button>
 
@@ -235,7 +232,7 @@ const SchemaDefinitionStep = ({
                         onClick={suggestColumnsFromSource}
                         className="flex items-center space-x-1 px-3 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
                     >
-                        <Wand2 size={16} />
+                        <Wand2 size={16}/>
                         <span>Suggest from Source</span>
                     </button>
 
@@ -243,7 +240,7 @@ const SchemaDefinitionStep = ({
                         onClick={() => setShowImportModal(true)}
                         className="flex items-center space-x-1 px-3 py-2 border border-gray-300 rounded hover:bg-gray-50"
                     >
-                        <Upload size={16} />
+                        <Upload size={16}/>
                         <span>Import</span>
                     </button>
 
@@ -252,7 +249,7 @@ const SchemaDefinitionStep = ({
                         disabled={outputDefinition.columns.length === 0}
                         className="flex items-center space-x-1 px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
                     >
-                        <Download size={16} />
+                        <Download size={16}/>
                         <span>Export</span>
                     </button>
                 </div>
@@ -262,7 +259,7 @@ const SchemaDefinitionStep = ({
                         <span>Output Format:</span>
                         <select
                             value={outputDefinition.format}
-                            onChange={(e) => onUpdate({ ...outputDefinition, format: e.target.value })}
+                            onChange={(e) => onUpdate({...outputDefinition, format: e.target.value})}
                             className="px-2 py-1 border border-gray-300 rounded"
                         >
                             <option value="csv">CSV</option>
@@ -276,7 +273,7 @@ const SchemaDefinitionStep = ({
                         <input
                             type="checkbox"
                             checked={outputDefinition.include_headers}
-                            onChange={(e) => onUpdate({ ...outputDefinition, include_headers: e.target.checked })}
+                            onChange={(e) => onUpdate({...outputDefinition, include_headers: e.target.checked})}
                             className="rounded border-gray-300"
                         />
                         <span>Include Headers</span>
@@ -288,7 +285,7 @@ const SchemaDefinitionStep = ({
             <div className="space-y-3">
                 {outputDefinition.columns.length === 0 ? (
                     <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                        <FileText size={48} className="mx-auto mb-4 text-gray-400" />
+                        <FileText size={48} className="mx-auto mb-4 text-gray-400"/>
                         <p className="text-gray-600 mb-4">No columns defined yet</p>
                         <button
                             onClick={addColumn}
@@ -327,7 +324,7 @@ const SchemaDefinitionStep = ({
 
                                         <div className="col-span-2">
                                             <div className="flex items-center space-x-1">
-                                                <TypeIcon size={16} className="text-gray-500" />
+                                                <TypeIcon size={16} className="text-gray-500"/>
                                                 <select
                                                     value={column.type}
                                                     onChange={(e) => updateColumn(index, 'type', e.target.value)}
@@ -383,14 +380,14 @@ const SchemaDefinitionStep = ({
                                                 className="p-1 text-blue-400 hover:text-blue-600"
                                                 title="Duplicate"
                                             >
-                                                <Copy size={14} />
+                                                <Copy size={14}/>
                                             </button>
                                             <button
                                                 onClick={() => removeColumn(index)}
                                                 className="p-1 text-red-400 hover:text-red-600"
                                                 title="Remove"
                                             >
-                                                <X size={14} />
+                                                <X size={14}/>
                                             </button>
                                         </div>
                                     </div>
@@ -452,7 +449,7 @@ const SchemaDefinitionStep = ({
             {outputDefinition.columns.length > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-start space-x-2">
-                        <AlertCircle size={16} className="text-blue-600 mt-0.5" />
+                        <AlertCircle size={16} className="text-blue-600 mt-0.5"/>
                         <div className="text-sm text-blue-800">
                             <p className="font-medium mb-1">Schema Summary:</p>
                             <ul className="list-disc list-inside space-y-1">
@@ -460,7 +457,8 @@ const SchemaDefinitionStep = ({
                                 <li>{outputDefinition.columns.filter(c => c.required).length} required columns</li>
                                 <li>Output format: {outputDefinition.format.toUpperCase()}</li>
                                 {outputDefinition.columns.filter(c => c.allowed_values?.length > 0).length > 0 && (
-                                    <li>{outputDefinition.columns.filter(c => c.allowed_values?.length > 0).length} columns with validation rules</li>
+                                    <li>{outputDefinition.columns.filter(c => c.allowed_values?.length > 0).length} columns
+                                        with validation rules</li>
                                 )}
                             </ul>
                         </div>

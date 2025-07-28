@@ -1,5 +1,5 @@
 // src/services/ruleManagementService.js - Reconciliation Rule Management Service
-import { apiService } from './defaultApi.js';
+import {apiService} from './defaultApi.js';
 
 class RuleManagementService {
     constructor() {
@@ -77,7 +77,7 @@ class RuleManagementService {
 
     sanitizeRuleConfig(config) {
         // Remove file-specific references to make rules reusable
-        const sanitized = { ...config };
+        const sanitized = {...config};
 
         // Process Files configuration - remove file-specific names but keep structure
         if (sanitized.Files) {
@@ -107,7 +107,7 @@ class RuleManagementService {
 
     adaptRuleToFiles(savedRule, fileColumns) {
         // Adapt a saved rule to work with new files
-        const adaptedConfig = { ...savedRule.rule_config };
+        const adaptedConfig = {...savedRule.rule_config};
         const warnings = [];
         const errors = [];
 
@@ -280,21 +280,21 @@ class RuleManagementService {
             try {
                 const savedRule = await apiService.saveReconciliationRule(sanitizedConfig, metadata);
                 this.addToRecentRules(savedRule);
-                return { success: true, rule: savedRule };
+                return {success: true, rule: savedRule};
             } catch (backendError) {
                 console.warn('Backend save failed, falling back to local storage:', backendError);
 
                 // Fallback to local storage
                 const localSuccess = this.saveRuleLocally(rule);
                 if (localSuccess) {
-                    return { success: true, rule, isLocal: true };
+                    return {success: true, rule, isLocal: true};
                 } else {
                     throw new Error('Failed to save rule locally');
                 }
             }
         } catch (error) {
             console.error('Error saving rule:', error);
-            return { success: false, error: error.message };
+            return {success: false, error: error.message};
         }
     }
 
@@ -304,9 +304,9 @@ class RuleManagementService {
             try {
                 const rules = templateId
                     ? await apiService.getRulesByTemplate(templateId)
-                    : await apiService.listReconciliationRules({ limit: 50 });
+                    : await apiService.listReconciliationRules({limit: 50});
 
-                return { success: true, rules, source: 'backend' };
+                return {success: true, rules, source: 'backend'};
             } catch (backendError) {
                 console.warn('Backend load failed, falling back to local storage:', backendError);
 
@@ -316,11 +316,11 @@ class RuleManagementService {
                     ? localRules.filter(r => r.template_id === templateId)
                     : localRules;
 
-                return { success: true, rules: filteredRules, source: 'local' };
+                return {success: true, rules: filteredRules, source: 'local'};
             }
         } catch (error) {
             console.error('Error loading rules:', error);
-            return { success: false, error: error.message, rules: [] };
+            return {success: false, error: error.message, rules: []};
         }
     }
 
@@ -329,7 +329,7 @@ class RuleManagementService {
             // Try backend first
             try {
                 const updatedRule = await apiService.updateReconciliationRule(ruleId, updates);
-                return { success: true, rule: updatedRule };
+                return {success: true, rule: updatedRule};
             } catch (backendError) {
                 console.warn('Backend update failed, trying local storage:', backendError);
 
@@ -338,14 +338,14 @@ class RuleManagementService {
                 if (localSuccess) {
                     const localRules = this.getLocalRules();
                     const updatedRule = localRules.find(r => r.id === ruleId);
-                    return { success: true, rule: updatedRule, isLocal: true };
+                    return {success: true, rule: updatedRule, isLocal: true};
                 } else {
                     throw new Error('Failed to update rule locally');
                 }
             }
         } catch (error) {
             console.error('Error updating rule:', error);
-            return { success: false, error: error.message };
+            return {success: false, error: error.message};
         }
     }
 
@@ -354,21 +354,21 @@ class RuleManagementService {
             // Try backend first
             try {
                 await apiService.deleteReconciliationRule(ruleId);
-                return { success: true };
+                return {success: true};
             } catch (backendError) {
                 console.warn('Backend delete failed, trying local storage:', backendError);
 
                 // Fallback to local storage
                 const localSuccess = this.deleteRuleLocally(ruleId);
                 if (localSuccess) {
-                    return { success: true, isLocal: true };
+                    return {success: true, isLocal: true};
                 } else {
                     throw new Error('Failed to delete rule locally');
                 }
             }
         } catch (error) {
             console.error('Error deleting rule:', error);
-            return { success: false, error: error.message };
+            return {success: false, error: error.message};
         }
     }
 
@@ -377,7 +377,7 @@ class RuleManagementService {
             // Try backend first
             try {
                 await apiService.markRuleAsUsed(ruleId);
-                return { success: true };
+                return {success: true};
             } catch (backendError) {
                 console.warn('Backend mark-as-used failed, trying local storage:', backendError);
 
@@ -390,11 +390,11 @@ class RuleManagementService {
                     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(localRules));
                 }
 
-                return { success: true, isLocal: true };
+                return {success: true, isLocal: true};
             }
         } catch (error) {
             console.error('Error marking rule as used:', error);
-            return { success: false, error: error.message };
+            return {success: false, error: error.message};
         }
     }
 
@@ -478,7 +478,7 @@ class RuleManagementService {
             };
 
             const blob = new Blob([JSON.stringify(exportData, null, 2)],
-                { type: 'application/json' });
+                {type: 'application/json'});
 
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -489,10 +489,10 @@ class RuleManagementService {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            return { success: true };
+            return {success: true};
         } catch (error) {
             console.error('Error exporting rules:', error);
-            return { success: false, error: error.message };
+            return {success: false, error: error.message};
         }
     }
 
@@ -519,7 +519,7 @@ class RuleManagementService {
 
                     const result = await this.saveRule(
                         rule.rule_config,
-                        { id: rule.template_id, name: rule.template_name },
+                        {id: rule.template_id, name: rule.template_name},
                         {
                             name: `${rule.name} (Imported)`,
                             description: rule.description,
@@ -540,10 +540,10 @@ class RuleManagementService {
                 }
             }
 
-            return { success: true, results: importResults };
+            return {success: true, results: importResults};
         } catch (error) {
             console.error('Error importing rules:', error);
-            return { success: false, error: error.message };
+            return {success: false, error: error.message};
         }
     }
 

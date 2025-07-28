@@ -1,5 +1,5 @@
 // src/services/fileManagementService.js
-import { apiService } from './defaultApi.js';
+import {apiService} from './defaultApi.js';
 
 class FileManagementService {
     constructor() {
@@ -27,7 +27,7 @@ class FileManagementService {
                     fileData: data.data // Raw file data for immediate display
                 };
             }
-            return { success: false, error: data.message };
+            return {success: false, error: data.message};
         } catch (error) {
             return {
                 success: false,
@@ -44,14 +44,14 @@ class FileManagementService {
 
             const data = await apiService.getFiles();
             if (data.success) {
-                const result = { success: true, files: data.data.files || [] };
+                const result = {success: true, files: data.data.files || []};
                 this.cache.set('files', result);
                 return result;
             }
-            return { success: false, files: [], error: data.message };
+            return {success: false, files: [], error: data.message};
         } catch (error) {
             console.error('Failed to load files:', error);
-            return { success: false, files: [], error: error.message };
+            return {success: false, files: [], error: error.message};
         }
     }
 
@@ -60,9 +60,9 @@ class FileManagementService {
             const data = await apiService.deleteFile(fileId);
             if (data.success) {
                 this.invalidateCache('files');
-                return { success: true, message: 'File deleted successfully' };
+                return {success: true, message: 'File deleted successfully'};
             }
-            return { success: false, error: data.message };
+            return {success: false, error: data.message};
         } catch (error) {
             return {
                 success: false,
@@ -79,12 +79,12 @@ class FileManagementService {
             }
 
             const response = await apiService.getReconciliationTemplates();
-            const result = { success: true, templates: response.data || [] };
+            const result = {success: true, templates: response.data || []};
             this.cache.set('templates', result);
             return result;
         } catch (error) {
             console.error('Failed to load templates:', error);
-            return { success: false, templates: [], error: error.message };
+            return {success: false, templates: [], error: error.message};
         }
     }
 
@@ -100,7 +100,7 @@ class FileManagementService {
     // File validation
     validateFileSelection(selectedFiles, requiredFiles) {
         if (!requiredFiles || requiredFiles.length === 0) {
-            return { valid: false, error: 'No file requirements defined' };
+            return {valid: false, error: 'No file requirements defined'};
         }
 
         const missingFiles = requiredFiles.filter(rf => !selectedFiles[rf.key]);
@@ -111,7 +111,7 @@ class FileManagementService {
             };
         }
 
-        return { valid: true };
+        return {valid: true};
     }
 
     // File requirement setup

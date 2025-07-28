@@ -610,7 +610,9 @@ const FileGeneratorFlow = ({
                         </p>
                         {generationResult?.summary && (
                             <div className="mt-2 text-sm text-green-800 space-y-1">
-                                <div>📊 <strong>Records:</strong> {generationResult.summary.total_output_records.toLocaleString()} generated from {generationResult.summary.total_input_records.toLocaleString()} source records</div>
+                                <div>📊 <strong>Records:</strong> {generationResult.summary.total_output_records.toLocaleString()} generated
+                                    from {generationResult.summary.total_input_records.toLocaleString()} source records
+                                </div>
                                 {generationResult.summary.row_multiplication_factor > 1 && (
                                     <div className="flex items-center space-x-2">
                                         <Layers size={14}/>

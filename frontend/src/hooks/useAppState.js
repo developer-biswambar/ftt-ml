@@ -1,5 +1,5 @@
 // src/hooks/useAppState.js
-import {useState, useEffect, useRef, useCallback} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import {fileManagementService} from '../services/fileManagementService';
 import {processManagementService} from '../services/processManagementService';
 import {messageService} from '../services/messageService';
@@ -86,7 +86,7 @@ export const useProcessManagement = () => {
         return result;
     }, []);
 
-     useEffect(() => {
+    useEffect(() => {
         loadProcessedFiles(); // runs once when the component mounts (on page load)
     }, [loadProcessedFiles]);
 
@@ -98,8 +98,7 @@ export const useProcessManagement = () => {
             result = await processManagementService.startReconciliation(config);
         } else if (type === 'delta-generation') {
             result = await processManagementService.startDeltaGeneration(config);
-        }
-        else if (type === 'file-transformation') {
+        } else if (type === 'file-transformation') {
             result = await processManagementService.startFileTransformation(config)
         }
 
@@ -135,8 +134,7 @@ export const useProcessManagement = () => {
                     let idField = 'reconciliation'
                     if (type === 'delta-generation') {
                         idField = 'delta_id'
-                    }
-                    else if (type === 'file-transformation') {
+                    } else if (type === 'file-transformation') {
                         idField = 'generation_id'
                     }
                     return file[idField] === processId

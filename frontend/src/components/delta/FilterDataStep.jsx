@@ -1,25 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import {
-    Filter,
-    Plus,
-    Minus,
-    Search,
-    ChevronDown,
-    Calendar,
-    X,
-    Check,
-    AlertCircle
-} from 'lucide-react';
-import { deltaApiService } from '../../services/deltaApiService.js';
+import React, {useEffect, useState} from 'react';
+import {AlertCircle, Calendar, ChevronDown, Filter, Minus, Plus, Search} from 'lucide-react';
+import {deltaApiService} from '../../services/deltaApiService.js';
 
 const FilterDataStep = ({
-    filesArray,
-    fileFilters,
-    addFilter,
-    updateFilter,
-    removeFilter,
-    fileColumns
-}) => {
+                            filesArray,
+                            fileFilters,
+                            addFilter,
+                            updateFilter,
+                            removeFilter,
+                            fileColumns
+                        }) => {
     const [uniqueValueCache, setUniqueValueCache] = useState({});
     const [loadingValues, setLoadingValues] = useState({});
     const [expandedFilters, setExpandedFilters] = useState({});
@@ -27,16 +17,16 @@ const FilterDataStep = ({
     // Fetch unique values for a column
     const fetchUniqueValues = async (fileId, columnName, filterKey) => {
         const cacheKey = `${fileId}_${columnName}`;
-        
+
         if (uniqueValueCache[cacheKey]) {
             return uniqueValueCache[cacheKey];
         }
 
-        setLoadingValues(prev => ({ ...prev, [filterKey]: true }));
+        setLoadingValues(prev => ({...prev, [filterKey]: true}));
 
         try {
             const response = await deltaApiService.getColumnUniqueValues(fileId, columnName, 1000);
-            
+
             setUniqueValueCache(prev => ({
                 ...prev,
                 [cacheKey]: response
@@ -45,9 +35,9 @@ const FilterDataStep = ({
             return response;
         } catch (error) {
             console.error('Error fetching unique values:', error);
-            return { unique_values: [], is_date_column: false, total_unique: 0 };
+            return {unique_values: [], is_date_column: false, total_unique: 0};
         } finally {
-            setLoadingValues(prev => ({ ...prev, [filterKey]: false }));
+            setLoadingValues(prev => ({...prev, [filterKey]: false}));
         }
     };
 
@@ -55,14 +45,14 @@ const FilterDataStep = ({
     const toggleValueInFilter = (fileKey, filterIndex, value) => {
         const currentFilter = fileFilters[fileKey][filterIndex];
         const currentValues = currentFilter.values || [];
-        
+
         let newValues;
         if (currentValues.includes(value)) {
             newValues = currentValues.filter(v => v !== value);
         } else {
             newValues = [...currentValues, value];
         }
-        
+
         updateFilter(fileKey, filterIndex, 'values', newValues);
     };
 
@@ -96,10 +86,12 @@ const FilterDataStep = ({
         const letters = ['A', 'B'];
 
         return (
-            <div key={fileIndex} className={`p-4 border border-${colors[fileIndex]}-200 bg-${colors[fileIndex]}-50 rounded-lg`}>
+            <div key={fileIndex}
+                 className={`p-4 border border-${colors[fileIndex]}-200 bg-${colors[fileIndex]}-50 rounded-lg`}>
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
-                        <div className={`w-6 h-6 bg-${colors[fileIndex]}-500 rounded-full flex items-center justify-center text-white text-sm font-bold`}>
+                        <div
+                            className={`w-6 h-6 bg-${colors[fileIndex]}-500 rounded-full flex items-center justify-center text-white text-sm font-bold`}>
                             {letters[fileIndex]}
                         </div>
                         <h4 className={`text-md font-medium text-${colors[fileIndex]}-800`}>
@@ -110,7 +102,7 @@ const FilterDataStep = ({
                         onClick={() => addFilter(fileKey)}
                         className={`flex items-center space-x-1 px-3 py-1 bg-${colors[fileIndex]}-500 text-white rounded hover:bg-${colors[fileIndex]}-600 text-sm`}
                     >
-                        <Plus size={14} />
+                        <Plus size={14}/>
                         <span>Add Filter</span>
                     </button>
                 </div>
@@ -122,7 +114,8 @@ const FilterDataStep = ({
                         const isLoading = loadingValues[filterKey];
 
                         return (
-                            <div key={filterIndex} className={`p-3 bg-white border border-${colors[fileIndex]}-200 rounded-lg`}>
+                            <div key={filterIndex}
+                                 className={`p-3 bg-white border border-${colors[fileIndex]}-200 rounded-lg`}>
                                 {/* Filter Header */}
                                 <div className="flex items-center space-x-3 mb-3">
                                     <div className="flex-1">
@@ -138,7 +131,7 @@ const FilterDataStep = ({
                                                 // Clear cache for new column
                                                 const cacheKey = `${file.file_id}_${e.target.value}`;
                                                 setUniqueValueCache(prev => {
-                                                    const newCache = { ...prev };
+                                                    const newCache = {...prev};
                                                     delete newCache[cacheKey];
                                                     return newCache;
                                                 });
@@ -151,30 +144,30 @@ const FilterDataStep = ({
                                             ))}
                                         </select>
                                     </div>
-                                    
+
                                     <div className="flex items-center space-x-2">
                                         {filter.column && (
                                             <button
                                                 onClick={() => toggleFilterExpansion(filterKey)}
                                                 className={`flex items-center space-x-1 px-3 py-2 bg-${colors[fileIndex]}-100 text-${colors[fileIndex]}-700 rounded text-sm hover:bg-${colors[fileIndex]}-200`}
                                             >
-                                                <Filter size={14} />
+                                                <Filter size={14}/>
                                                 <span>
                                                     {filter.values?.length || 0} selected
                                                 </span>
-                                                <ChevronDown 
-                                                    size={14} 
+                                                <ChevronDown
+                                                    size={14}
                                                     className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                                                 />
                                             </button>
                                         )}
-                                        
+
                                         <button
                                             onClick={() => removeFilter(fileKey, filterIndex)}
                                             className="p-2 text-red-400 hover:text-red-600"
                                             title="Remove filter"
                                         >
-                                            <Minus size={14} />
+                                            <Minus size={14}/>
                                         </button>
                                     </div>
                                 </div>
@@ -193,11 +186,12 @@ const FilterDataStep = ({
                                         colorScheme={colors[fileIndex]}
                                     />
                                 )}
-                                
+
                                 {/* Filter Summary */}
                                 {filter.column && filter.values && filter.values.length > 0 && (
                                     <div className={`mt-2 p-2 bg-${colors[fileIndex]}-50 rounded text-xs`}>
-                                        <span className={`text-${colors[fileIndex]}-700 font-medium`}>Active Filter:</span>
+                                        <span
+                                            className={`text-${colors[fileIndex]}-700 font-medium`}>Active Filter:</span>
                                         <span className={`ml-1 text-${colors[fileIndex]}-600`}>
                                             {filter.column} equals {filter.values.length} value{filter.values.length !== 1 ? 's' : ''}
                                         </span>
@@ -214,7 +208,7 @@ const FilterDataStep = ({
 
                     {filters.length === 0 && (
                         <div className="text-center text-gray-500 py-4">
-                            <Filter size={32} className="mx-auto mb-2 opacity-50" />
+                            <Filter size={32} className="mx-auto mb-2 opacity-50"/>
                             <p className="text-sm">No filters applied to this file.</p>
                             <p className="text-xs">Add filters to reduce the data before delta generation.</p>
                         </div>
@@ -229,7 +223,8 @@ const FilterDataStep = ({
             <div>
                 <h3 className="text-lg font-semibold text-gray-800">Filter Data (Optional)</h3>
                 <p className="text-sm text-gray-600">
-                    Apply filters to both files before delta generation. This can help reduce processing time and focus on specific data subsets.
+                    Apply filters to both files before delta generation. This can help reduce processing time and focus
+                    on specific data subsets.
                     Filters support exact matching with automatic date format handling.
                 </p>
             </div>
@@ -255,16 +250,16 @@ const FilterDataStep = ({
 
 // Filter Value Selector Component
 const FilterValueSelector = ({
-    fileId,
-    columnName,
-    selectedValues,
-    onValueToggle,
-    onSelectAll,
-    onClearAll,
-    fetchUniqueValues,
-    isLoading,
-    colorScheme
-}) => {
+                                 fileId,
+                                 columnName,
+                                 selectedValues,
+                                 onValueToggle,
+                                 onSelectAll,
+                                 onClearAll,
+                                 fetchUniqueValues,
+                                 isLoading,
+                                 colorScheme
+                             }) => {
     const [uniqueValuesData, setUniqueValuesData] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [showAll, setShowAll] = useState(false);
@@ -296,7 +291,7 @@ const FilterValueSelector = ({
     if (!uniqueValuesData) {
         return (
             <div className="text-center py-4">
-                <AlertCircle size={24} className="mx-auto mb-2 text-gray-400" />
+                <AlertCircle size={24} className="mx-auto mb-2 text-gray-400"/>
                 <p className="text-xs text-gray-500">Failed to load values</p>
                 <button
                     onClick={loadUniqueValues}
@@ -308,7 +303,7 @@ const FilterValueSelector = ({
         );
     }
 
-    const { unique_values, is_date_column, total_unique, has_more } = uniqueValuesData;
+    const {unique_values, is_date_column, total_unique, has_more} = uniqueValuesData;
 
     // Filter values based on search term
     const filteredValues = unique_values.filter(value =>
@@ -324,14 +319,14 @@ const FilterValueSelector = ({
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
                     {is_date_column && (
-                        <Calendar size={14} className={`text-${colorScheme}-600`} />
+                        <Calendar size={14} className={`text-${colorScheme}-600`}/>
                     )}
                     <span className="text-xs font-medium text-gray-700">
                         {total_unique.toLocaleString()} unique values
                         {has_more && ` (showing first 1000)`}
                     </span>
                 </div>
-                
+
                 <div className="flex space-x-2">
                     <button
                         onClick={() => onSelectAll(filteredValues)}
@@ -350,7 +345,7 @@ const FilterValueSelector = ({
 
             {/* Search */}
             <div className="relative mb-3">
-                <Search size={14} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Search size={14} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400"/>
                 <input
                     type="text"
                     placeholder="Search values..."
@@ -363,7 +358,8 @@ const FilterValueSelector = ({
             {/* Values list */}
             <div className="max-h-48 overflow-y-auto space-y-1">
                 {displayValues.map((value, index) => (
-                    <label key={index} className="flex items-center space-x-2 text-xs cursor-pointer hover:bg-gray-50 p-1 rounded">
+                    <label key={index}
+                           className="flex items-center space-x-2 text-xs cursor-pointer hover:bg-gray-50 p-1 rounded">
                         <input
                             type="checkbox"
                             checked={selectedValues.includes(value)}

@@ -222,7 +222,7 @@ Use the download buttons in the "Results" panel → to get detailed reports, or 
         const id = result.processId || 'N/A';
         const totalIn = result.process.total_input_rows ?? 0;
         const totalOut = result.process.total_output_rows ?? 0;
-        const processingTime =  result.process.processing_time_seconds ?? 0;
+        const processingTime = result.process.processing_time_seconds ?? 0;
 
         const val = result.process.validation_summary || {};
         const passed = val.passed === true;

@@ -1,34 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
-    Link,
-    Wand2,
-    Code,
-    Hash,
-    Type,
-    Calendar,
-    ToggleLeft,
-    Settings,
     AlertCircle,
+    Brain,
+    Calendar,
     ChevronDown,
     ChevronRight,
-    Search,
-    Database,
-    FileText,
-    Zap,
+    Code,
+    Hash,
     Lightbulb,
-    Sparkles,
-    Brain
+    Link,
+    Search,
+    ToggleLeft,
+    Type,
+    Wand2
 } from 'lucide-react';
-import { aiAssistanceService } from '../../services/aiAssistanceService';
+import {aiAssistanceService} from '../../services/aiAssistanceService';
 
 const ColumnMappingStep = ({
-    mappings,
-    onUpdate,
-    sourceColumns,
-    outputSchema,
-    rowGenerationRules,
-    onSendMessage
-}) => {
+                               mappings,
+                               onUpdate,
+                               sourceColumns,
+                               outputSchema,
+                               rowGenerationRules,
+                               onSendMessage
+                           }) => {
     const [expandedMappings, setExpandedMappings] = useState({});
     const [showAIAssistant, setShowAIAssistant] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -50,7 +45,7 @@ const ColumnMappingStep = ({
                     enabled: true,
                     transformation: {
                         type: 'static',
-                        config: { value: '' }
+                        config: {value: ''}
                     }
                 });
             }
@@ -217,18 +212,18 @@ const ColumnMappingStep = ({
     };
 
     const mappingTypes = [
-        { value: 'direct', label: 'Direct Mapping', icon: Link },
-        { value: 'static', label: 'Static Value', icon: Type },
-        { value: 'expression', label: 'Expression', icon: Code },
-        { value: 'conditional', label: 'Conditional', icon: ToggleLeft },
-        { value: 'sequence', label: 'Sequential', icon: Hash },
-        { value: 'lookup', label: 'Lookup', icon: Search },
-        { value: 'custom_function', label: 'Custom Function', icon: Code }
+        {value: 'direct', label: 'Direct Mapping', icon: Link},
+        {value: 'static', label: 'Static Value', icon: Type},
+        {value: 'expression', label: 'Expression', icon: Code},
+        {value: 'conditional', label: 'Conditional', icon: ToggleLeft},
+        {value: 'sequence', label: 'Sequential', icon: Hash},
+        {value: 'lookup', label: 'Lookup', icon: Search},
+        {value: 'custom_function', label: 'Custom Function', icon: Code}
     ];
 
     const updateMapping = (index, updates) => {
         const updatedMappings = [...mappings];
-        updatedMappings[index] = { ...updatedMappings[index], ...updates };
+        updatedMappings[index] = {...updatedMappings[index], ...updates};
         onUpdate(updatedMappings);
     };
 
@@ -356,7 +351,7 @@ const ColumnMappingStep = ({
                             </label>
                             <select
                                 value={mapping.source || ''}
-                                onChange={(e) => updateMapping(index, { source: e.target.value })}
+                                onChange={(e) => updateMapping(index, {source: e.target.value})}
                                 className="w-full px-3 py-2 border border-gray-300 rounded"
                             >
                                 <option value="">Select source column...</option>
@@ -383,7 +378,7 @@ const ColumnMappingStep = ({
                                 onChange={(e) => updateMapping(index, {
                                     transformation: {
                                         type: 'static',
-                                        config: { value: e.target.value }
+                                        config: {value: e.target.value}
                                     }
                                 })}
                                 placeholder="Enter static value..."
@@ -523,10 +518,11 @@ const ColumnMappingStep = ({
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
-                        <Brain size={20} className="text-blue-600" />
+                        <Brain size={20} className="text-blue-600"/>
                         <span className="font-medium text-blue-800">Intelligent Mapping Suggestions</span>
                         {isAnalyzing && (
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
+                            <div
+                                className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
                         )}
                     </div>
                     <div className="flex items-center space-x-2">
@@ -549,7 +545,8 @@ const ColumnMappingStep = ({
                 </div>
 
                 {isAnalyzing ? (
-                    <p className="text-sm text-blue-700">🧠 Analyzing column patterns and suggesting optimal mappings...</p>
+                    <p className="text-sm text-blue-700">🧠 Analyzing column patterns and suggesting optimal
+                        mappings...</p>
                 ) : intelligentSuggestions.length > 0 && showSuggestions ? (
                     <div className="space-y-2">
                         {intelligentSuggestions.map(suggestion => (
@@ -557,8 +554,9 @@ const ColumnMappingStep = ({
                                 <div className="flex items-start justify-between">
                                     <div className="flex-1">
                                         <div className="flex items-center space-x-2 mb-1">
-                                            <Lightbulb size={14} className="text-blue-600" />
-                                            <span className="text-sm font-medium text-gray-800">{suggestion.title}</span>
+                                            <Lightbulb size={14} className="text-blue-600"/>
+                                            <span
+                                                className="text-sm font-medium text-gray-800">{suggestion.title}</span>
                                             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
                                                 {Math.round(suggestion.confidence * 100)}%
                                             </span>
@@ -590,7 +588,8 @@ const ColumnMappingStep = ({
                 ) : !isAnalyzing ? (
                     <div className="text-center py-4">
                         <p className="text-sm text-blue-700 mb-2">Get AI-powered suggestions for column mappings.</p>
-                        <p className="text-xs text-gray-600">Click "Get AI Suggestions" to analyze your data and recommend intelligent mapping strategies.</p>
+                        <p className="text-xs text-gray-600">Click "Get AI Suggestions" to analyze your data and
+                            recommend intelligent mapping strategies.</p>
                     </div>
                 ) : null}
             </div>
@@ -602,12 +601,12 @@ const ColumnMappingStep = ({
                         onClick={suggestMappings}
                         className="flex items-center space-x-1 px-3 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
                     >
-                        <Wand2 size={16} />
+                        <Wand2 size={16}/>
                         <span>Auto-Map Columns</span>
                     </button>
 
                     <div className="relative">
-                        <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"/>
                         <input
                             type="text"
                             value={searchTerm}
@@ -619,7 +618,8 @@ const ColumnMappingStep = ({
                 </div>
 
                 <div className="text-sm text-gray-600">
-                    {mappings.filter(m => m.mapping_type !== 'static' || m.transformation?.config?.value).length} of {mappings.length} columns mapped
+                    {mappings.filter(m => m.mapping_type !== 'static' || m.transformation?.config?.value).length} of {mappings.length} columns
+                    mapped
                 </div>
             </div>
 
@@ -644,10 +644,10 @@ const ColumnMappingStep = ({
                                         onClick={() => toggleExpanded(mapping.id)}
                                         className="p-1 hover:bg-gray-200 rounded"
                                     >
-                                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                        {isExpanded ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
                                     </button>
 
-                                    <ColumnIcon size={20} className="text-gray-600" />
+                                    <ColumnIcon size={20} className="text-gray-600"/>
 
                                     <div>
                                         <div className="flex items-center space-x-2">
@@ -666,7 +666,7 @@ const ColumnMappingStep = ({
 
                                 <div className="flex items-center space-x-3">
                                     <div className="flex items-center space-x-2">
-                                        <TypeIcon size={16} className="text-gray-500" />
+                                        <TypeIcon size={16} className="text-gray-500"/>
                                         <select
                                             value={mapping.mapping_type}
                                             onChange={(e) => updateMapping(index, {
@@ -674,7 +674,7 @@ const ColumnMappingStep = ({
                                                 source: null,
                                                 transformation: e.target.value === 'static' ? {
                                                     type: 'static',
-                                                    config: { value: '' }
+                                                    config: {value: ''}
                                                 } : {
                                                     type: e.target.value,
                                                     config: {}
@@ -694,7 +694,7 @@ const ColumnMappingStep = ({
                                         <input
                                             type="checkbox"
                                             checked={mapping.enabled}
-                                            onChange={(e) => updateMapping(index, { enabled: e.target.checked })}
+                                            onChange={(e) => updateMapping(index, {enabled: e.target.checked})}
                                             className="rounded border-gray-300"
                                         />
                                         <span>Enabled</span>
@@ -714,14 +714,14 @@ const ColumnMappingStep = ({
                                                 {mapping.mapping_type === 'direct' && mapping.source
                                                     ? `${column.name} ← ${mapping.source}`
                                                     : mapping.mapping_type === 'static'
-                                                    ? `${column.name} = "${mapping.transformation?.config?.value}"`
-                                                    : mapping.mapping_type === 'expression'
-                                                    ? `${column.name} = ${mapping.transformation?.config?.formula}`
-                                                    : mapping.mapping_type === 'sequence'
-                                                    ? `${column.name} = ${mapping.transformation?.config?.prefix}[${mapping.transformation?.config?.start}...]${mapping.transformation?.config?.suffix}`
-                                                    : mapping.mapping_type === 'lookup'
-                                                    ? `${column.name} = lookup(${mapping.transformation?.config?.key_column})`
-                                                    : `${column.name} (${mapping.mapping_type})`
+                                                        ? `${column.name} = "${mapping.transformation?.config?.value}"`
+                                                        : mapping.mapping_type === 'expression'
+                                                            ? `${column.name} = ${mapping.transformation?.config?.formula}`
+                                                            : mapping.mapping_type === 'sequence'
+                                                                ? `${column.name} = ${mapping.transformation?.config?.prefix}[${mapping.transformation?.config?.start}...]${mapping.transformation?.config?.suffix}`
+                                                                : mapping.mapping_type === 'lookup'
+                                                                    ? `${column.name} = lookup(${mapping.transformation?.config?.key_column})`
+                                                                    : `${column.name} (${mapping.mapping_type})`
                                                 }
                                             </p>
                                         </div>
@@ -736,7 +736,7 @@ const ColumnMappingStep = ({
             {/* Help Section */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-start space-x-2">
-                    <AlertCircle size={16} className="text-blue-600 mt-0.5" />
+                    <AlertCircle size={16} className="text-blue-600 mt-0.5"/>
                     <div className="text-sm text-blue-800">
                         <p className="font-medium mb-1">Mapping Types:</p>
                         <ul className="list-disc list-inside space-y-1">

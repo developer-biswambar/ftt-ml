@@ -1,33 +1,18 @@
 // src/components/RuleSaveLoad.jsx - Component for saving and loading reconciliation rules
-import React, { useState, useEffect } from 'react';
-import {
-    Save,
-    Upload,
-    X,
-    Search,
-    Calendar,
-    Tag,
-    Eye,
-    Edit3,
-    Trash2,
-    AlertCircle,
-    Check,
-    Filter,
-    Star,
-    Clock
-} from 'lucide-react';
-import { apiService } from '../../services/defaultApi.js';
+import React, {useEffect, useState} from 'react';
+import {AlertCircle, Calendar, Clock, Eye, Save, Search, Star, Tag, Trash2, Upload, X} from 'lucide-react';
+import {apiService} from '../../services/defaultApi.js';
 
 const RuleSaveLoad = ({
-    selectedTemplate,
-    currentConfig,
-    fileColumns,
-    loadedRuleId,
-    hasUnsavedChanges,
-    onRuleLoaded,
-    onRuleSaved,
-    onClose
-}) => {
+                          selectedTemplate,
+                          currentConfig,
+                          fileColumns,
+                          loadedRuleId,
+                          hasUnsavedChanges,
+                          onRuleLoaded,
+                          onRuleSaved,
+                          onClose
+                      }) => {
     const [activeTab, setActiveTab] = useState('load');
     const [rules, setRules] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -74,7 +59,7 @@ const RuleSaveLoad = ({
         try {
             const templateRules = selectedTemplate?.id
                 ? await apiService.getRulesByTemplate(selectedTemplate.id)
-                : await apiService.listReconciliationRules({ limit: 50 });
+                : await apiService.listReconciliationRules({limit: 50});
 
             setRules(templateRules);
         } catch (error) {
@@ -96,7 +81,7 @@ const RuleSaveLoad = ({
 
         setLoading(true);
         try {
-            const { ruleConfig, ruleMetadata } = apiService.createRuleFromConfig(
+            const {ruleConfig, ruleMetadata} = apiService.createRuleFromConfig(
                 currentConfig,
                 selectedTemplate,
                 saveForm
@@ -131,7 +116,7 @@ const RuleSaveLoad = ({
             await apiService.markRuleAsUsed(rule.id);
 
             // Adapt rule to current files
-            const { adaptedConfig, warnings, errors } = apiService.adaptRuleToFiles(rule, fileColumns);
+            const {adaptedConfig, warnings, errors} = apiService.adaptRuleToFiles(rule, fileColumns);
 
             if (errors.length > 0) {
                 alert(`Cannot load rule: ${errors.join('\n')}`);
@@ -204,7 +189,7 @@ const RuleSaveLoad = ({
                             onClick={onClose}
                             className="p-1 text-gray-400 hover:text-gray-600"
                         >
-                            <X size={20} />
+                            <X size={20}/>
                         </button>
                     </div>
 
@@ -218,7 +203,7 @@ const RuleSaveLoad = ({
                                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                             }`}
                         >
-                            <Upload size={16} className="inline mr-1" />
+                            <Upload size={16} className="inline mr-1"/>
                             Load Rule
                         </button>
                         <button
@@ -229,20 +214,21 @@ const RuleSaveLoad = ({
                                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                             }`}
                         >
-                            <Save size={16} className="inline mr-1" />
+                            <Save size={16} className="inline mr-1"/>
                             {loadedRuleId && hasUnsavedChanges ? 'Update Rule' : 'Save Rule'}
                         </button>
                     </div>
                 </div>
 
                 {/* Content */}
-                <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
+                <div className="p-6 overflow-y-auto" style={{maxHeight: 'calc(90vh - 140px)'}}>
                     {activeTab === 'load' && (
                         <div className="space-y-4">
                             {/* Search and Filters */}
                             <div className="flex space-x-4 mb-4">
                                 <div className="flex-1 relative">
-                                    <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                                    <Search size={16}
+                                            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"/>
                                     <input
                                         type="text"
                                         placeholder="Search rules..."
@@ -267,7 +253,8 @@ const RuleSaveLoad = ({
                             {/* Rules List */}
                             {loading ? (
                                 <div className="text-center py-8">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                                    <div
+                                        className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                                     <p className="text-gray-500 mt-2">Loading rules...</p>
                                 </div>
                             ) : filteredRules.length === 0 ? (
@@ -288,22 +275,24 @@ const RuleSaveLoad = ({
                             ) : (
                                 <div className="space-y-3">
                                     {filteredRules.map(rule => (
-                                        <div key={rule.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                        <div key={rule.id}
+                                             className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                                             <div className="flex items-start justify-between">
                                                 <div className="flex-1">
                                                     <div className="flex items-center space-x-2 mb-2">
                                                         <h3 className="font-medium text-gray-800">{rule.name}</h3>
                                                         <span className={`px-2 py-1 text-xs rounded-full ${
                                                             rule.category === 'reconciliation' ? 'bg-blue-100 text-blue-800' :
-                                                            rule.category === 'financial' ? 'bg-green-100 text-green-800' :
-                                                            rule.category === 'trading' ? 'bg-purple-100 text-purple-800' :
-                                                            'bg-gray-100 text-gray-800'
+                                                                rule.category === 'financial' ? 'bg-green-100 text-green-800' :
+                                                                    rule.category === 'trading' ? 'bg-purple-100 text-purple-800' :
+                                                                        'bg-gray-100 text-gray-800'
                                                         }`}>
                                                             {rule.category}
                                                         </span>
                                                         {rule.usage_count > 0 && (
-                                                            <span className="flex items-center space-x-1 text-xs text-gray-500">
-                                                                <Star size={12} />
+                                                            <span
+                                                                className="flex items-center space-x-1 text-xs text-gray-500">
+                                                                <Star size={12}/>
                                                                 <span>{rule.usage_count}</span>
                                                             </span>
                                                         )}
@@ -315,12 +304,12 @@ const RuleSaveLoad = ({
 
                                                     <div className="flex items-center space-x-4 text-xs text-gray-500">
                                                         <span className="flex items-center space-x-1">
-                                                            <Calendar size={12} />
+                                                            <Calendar size={12}/>
                                                             <span>{new Date(rule.created_at).toLocaleDateString()}</span>
                                                         </span>
                                                         {rule.last_used_at && (
                                                             <span className="flex items-center space-x-1">
-                                                                <Clock size={12} />
+                                                                <Clock size={12}/>
                                                                 <span>Used {new Date(rule.last_used_at).toLocaleDateString()}</span>
                                                             </span>
                                                         )}
@@ -328,14 +317,16 @@ const RuleSaveLoad = ({
 
                                                     {rule.tags && rule.tags.length > 0 && (
                                                         <div className="flex items-center space-x-1 mt-2">
-                                                            <Tag size={12} className="text-gray-400" />
+                                                            <Tag size={12} className="text-gray-400"/>
                                                             {rule.tags.slice(0, 3).map(tag => (
-                                                                <span key={tag} className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                                                                <span key={tag}
+                                                                      className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
                                                                     {tag}
                                                                 </span>
                                                             ))}
                                                             {rule.tags.length > 3 && (
-                                                                <span className="text-xs text-gray-500">+{rule.tags.length - 3} more</span>
+                                                                <span
+                                                                    className="text-xs text-gray-500">+{rule.tags.length - 3} more</span>
                                                             )}
                                                         </div>
                                                     )}
@@ -347,7 +338,7 @@ const RuleSaveLoad = ({
                                                         className="p-2 text-gray-400 hover:text-gray-600"
                                                         title="View details"
                                                     >
-                                                        <Eye size={16} />
+                                                        <Eye size={16}/>
                                                     </button>
                                                     <button
                                                         onClick={() => handleLoadRule(rule)}
@@ -362,7 +353,7 @@ const RuleSaveLoad = ({
                                                         title="Delete rule"
                                                         disabled={loading}
                                                     >
-                                                        <Trash2 size={16} />
+                                                        <Trash2 size={16}/>
                                                     </button>
                                                 </div>
                                             </div>
@@ -383,7 +374,7 @@ const RuleSaveLoad = ({
                                 {saveErrors.length > 0 && (
                                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                                         <div className="flex items-center space-x-2 mb-2">
-                                            <AlertCircle size={16} className="text-red-600" />
+                                            <AlertCircle size={16} className="text-red-600"/>
                                             <span className="text-sm font-medium text-red-800">Please fix the following errors:</span>
                                         </div>
                                         <ul className="text-sm text-red-700 list-disc list-inside">
@@ -402,7 +393,7 @@ const RuleSaveLoad = ({
                                         <input
                                             type="text"
                                             value={saveForm.name}
-                                            onChange={(e) => setSaveForm(prev => ({ ...prev, name: e.target.value }))}
+                                            onChange={(e) => setSaveForm(prev => ({...prev, name: e.target.value}))}
                                             className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             placeholder="e.g., Trade Reconciliation with Amount Extraction"
                                         />
@@ -414,7 +405,7 @@ const RuleSaveLoad = ({
                                         </label>
                                         <select
                                             value={saveForm.category}
-                                            onChange={(e) => setSaveForm(prev => ({ ...prev, category: e.target.value }))}
+                                            onChange={(e) => setSaveForm(prev => ({...prev, category: e.target.value}))}
                                             className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         >
                                             <option value="reconciliation">Reconciliation</option>
@@ -432,7 +423,7 @@ const RuleSaveLoad = ({
                                     </label>
                                     <textarea
                                         value={saveForm.description}
-                                        onChange={(e) => setSaveForm(prev => ({ ...prev, description: e.target.value }))}
+                                        onChange={(e) => setSaveForm(prev => ({...prev, description: e.target.value}))}
                                         rows={3}
                                         className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="Describe what this rule does and when to use it..."
@@ -445,13 +436,14 @@ const RuleSaveLoad = ({
                                     </label>
                                     <div className="flex flex-wrap gap-2 mb-2">
                                         {saveForm.tags.map(tag => (
-                                            <span key={tag} className="flex items-center space-x-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                                            <span key={tag}
+                                                  className="flex items-center space-x-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
                                                 <span>{tag}</span>
                                                 <button
                                                     onClick={() => removeTag(tag)}
                                                     className="text-blue-600 hover:text-blue-800"
                                                 >
-                                                    <X size={12} />
+                                                    <X size={12}/>
                                                 </button>
                                             </span>
                                         ))}
@@ -486,11 +478,16 @@ const RuleSaveLoad = ({
                                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                                     <h4 className="font-medium text-gray-800 mb-2">Configuration Summary</h4>
                                     <div className="text-sm text-gray-600 space-y-1">
-                                        <div>• Extraction rules: {currentConfig.Files?.reduce((total, file) => total + (file.Extract?.length || 0), 0) || 0}</div>
-                                        <div>• Filter rules: {currentConfig.Files?.reduce((total, file) => total + (file.Filter?.length || 0), 0) || 0}</div>
-                                        <div>• Reconciliation rules: {currentConfig.ReconciliationRules?.length || 0}</div>
-                                        <div>• File A columns: {currentConfig.selected_columns_file_a?.length || 0}</div>
-                                        <div>• File B columns: {currentConfig.selected_columns_file_b?.length || 0}</div>
+                                        <div>• Extraction
+                                            rules: {currentConfig.Files?.reduce((total, file) => total + (file.Extract?.length || 0), 0) || 0}</div>
+                                        <div>• Filter
+                                            rules: {currentConfig.Files?.reduce((total, file) => total + (file.Filter?.length || 0), 0) || 0}</div>
+                                        <div>• Reconciliation
+                                            rules: {currentConfig.ReconciliationRules?.length || 0}</div>
+                                        <div>• File A
+                                            columns: {currentConfig.selected_columns_file_a?.length || 0}</div>
+                                        <div>• File B
+                                            columns: {currentConfig.selected_columns_file_b?.length || 0}</div>
                                     </div>
                                 </div>
 
@@ -506,8 +503,9 @@ const RuleSaveLoad = ({
                                         disabled={loading || !saveForm.name.trim()}
                                         className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
                                     >
-                                        {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
-                                        <Save size={16} />
+                                        {loading && <div
+                                            className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                                        <Save size={16}/>
                                         <span>{loadedRuleId && hasUnsavedChanges ? 'Update Rule' : 'Save Rule'}</span>
                                     </button>
                                 </div>
@@ -519,7 +517,8 @@ const RuleSaveLoad = ({
                 {/* Rule Details Modal */}
                 {showRuleDetails && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60">
-                        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
+                        <div
+                            className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
                             <div className="p-4 border-b border-gray-200 bg-gray-50">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-lg font-semibold text-gray-800">Rule Details</h3>
@@ -527,12 +526,12 @@ const RuleSaveLoad = ({
                                         onClick={() => setShowRuleDetails(null)}
                                         className="p-1 text-gray-400 hover:text-gray-600"
                                     >
-                                        <X size={20} />
+                                        <X size={20}/>
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 80px)' }}>
+                            <div className="p-6 overflow-y-auto" style={{maxHeight: 'calc(80vh - 80px)'}}>
                                 <div className="space-y-4">
                                     <div>
                                         <h4 className="font-medium text-gray-800 mb-2">{showRuleDetails.name}</h4>
@@ -550,11 +549,13 @@ const RuleSaveLoad = ({
                                         </div>
                                         <div>
                                             <span className="font-medium text-gray-700">Created:</span>
-                                            <span className="ml-2 text-gray-600">{new Date(showRuleDetails.created_at).toLocaleDateString()}</span>
+                                            <span
+                                                className="ml-2 text-gray-600">{new Date(showRuleDetails.created_at).toLocaleDateString()}</span>
                                         </div>
                                         <div>
                                             <span className="font-medium text-gray-700">Updated:</span>
-                                            <span className="ml-2 text-gray-600">{new Date(showRuleDetails.updated_at).toLocaleDateString()}</span>
+                                            <span
+                                                className="ml-2 text-gray-600">{new Date(showRuleDetails.updated_at).toLocaleDateString()}</span>
                                         </div>
                                     </div>
 
@@ -563,7 +564,8 @@ const RuleSaveLoad = ({
                                             <span className="font-medium text-gray-700 block mb-2">Tags:</span>
                                             <div className="flex flex-wrap gap-1">
                                                 {showRuleDetails.tags.map(tag => (
-                                                    <span key={tag} className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                                                    <span key={tag}
+                                                          className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
                                                         {tag}
                                                     </span>
                                                 ))}
@@ -574,9 +576,12 @@ const RuleSaveLoad = ({
                                     <div>
                                         <h5 className="font-medium text-gray-700 mb-2">Configuration Summary:</h5>
                                         <div className="bg-gray-50 p-3 rounded text-sm">
-                                            <div>• Extraction Rules: {showRuleDetails.rule_config.Files?.reduce((total, file) => total + (file.Extract?.length || 0), 0) || 0}</div>
-                                            <div>• Filter Rules: {showRuleDetails.rule_config.Files?.reduce((total, file) => total + (file.Filter?.length || 0), 0) || 0}</div>
-                                            <div>• Reconciliation Rules: {showRuleDetails.rule_config.ReconciliationRules?.length || 0}</div>
+                                            <div>• Extraction
+                                                Rules: {showRuleDetails.rule_config.Files?.reduce((total, file) => total + (file.Extract?.length || 0), 0) || 0}</div>
+                                            <div>• Filter
+                                                Rules: {showRuleDetails.rule_config.Files?.reduce((total, file) => total + (file.Filter?.length || 0), 0) || 0}</div>
+                                            <div>• Reconciliation
+                                                Rules: {showRuleDetails.rule_config.ReconciliationRules?.length || 0}</div>
                                         </div>
                                     </div>
 

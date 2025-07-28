@@ -1,7 +1,7 @@
 // src/components/UploadAnimations.jsx
 import React from 'react';
 
-export const UploadProgressIndicator = ({ isUploading, fileName, progress = 0 }) => {
+export const UploadProgressIndicator = ({isUploading, fileName, progress = 0}) => {
     if (!isUploading) return null;
 
     return (
@@ -15,7 +15,7 @@ export const UploadProgressIndicator = ({ isUploading, fileName, progress = 0 })
                     <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                         <div
                             className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
-                            style={{ width: `${progress}%` }}
+                            style={{width: `${progress}%`}}
                         ></div>
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
@@ -27,7 +27,7 @@ export const UploadProgressIndicator = ({ isUploading, fileName, progress = 0 })
     );
 };
 
-export const FileUploadSuccess = ({ fileName, onClose, fileDetails }) => {
+export const FileUploadSuccess = ({fileName, onClose, fileDetails}) => {
     React.useEffect(() => {
         const timer = setTimeout(onClose, 4000);
         return () => clearTimeout(timer);
@@ -39,7 +39,8 @@ export const FileUploadSuccess = ({ fileName, onClose, fileDetails }) => {
                 <div className="flex-shrink-0">
                     <div className="h-8 w-8 bg-green-500 rounded-full flex items-center justify-center animate-bounce">
                         <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                  d="M5 13l4 4L19 7"></path>
                         </svg>
                     </div>
                 </div>
@@ -62,7 +63,8 @@ export const FileUploadSuccess = ({ fileName, onClose, fileDetails }) => {
                     className="text-green-400 hover:text-green-600 transition-colors"
                 >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                              d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
             </div>
@@ -70,7 +72,7 @@ export const FileUploadSuccess = ({ fileName, onClose, fileDetails }) => {
     );
 };
 
-export const NewFileIndicator = ({ isNew, children }) => {
+export const NewFileIndicator = ({isNew, children}) => {
     return (
         <div className={`relative ${isNew ? 'animate-pulse' : ''}`}>
             {isNew && (
@@ -84,7 +86,8 @@ export const NewFileIndicator = ({ isNew, children }) => {
                     <div className="absolute inset-0 bg-green-100 rounded-lg animate-pulse opacity-50"></div>
                 </>
             )}
-            <div className={`relative ${isNew ? 'bg-green-50 border-green-200 shadow-md' : ''} transition-all duration-500`}>
+            <div
+                className={`relative ${isNew ? 'bg-green-50 border-green-200 shadow-md' : ''} transition-all duration-500`}>
                 {children}
                 {isNew && (
                     <div className="absolute top-2 right-2 text-green-600 text-xs font-bold animate-bounce">
@@ -102,7 +105,7 @@ export const useUploadNotifications = () => {
 
     const addNotification = React.useCallback((notification) => {
         const id = Date.now() + Math.random();
-        const newNotification = { ...notification, id };
+        const newNotification = {...notification, id};
         setNotifications(prev => [...prev, newNotification]);
 
         // Auto remove after 4 seconds

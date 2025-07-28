@@ -1,20 +1,17 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
-    Eye,
-    Download,
-    RefreshCw,
     AlertCircle,
-    CheckCircle,
-    Play,
-    FileText,
-    Table,
-    Code,
-    Info,
-    ExternalLink,
     ArrowLeft,
-    Save,
+    CheckCircle,
+    ExternalLink,
+    Eye,
+    FileText,
+    Info,
     Layers,
-    Target
+    Play,
+    RefreshCw,
+    Target,
+    X
 } from 'lucide-react';
 
 const PreviewStep = ({
@@ -24,7 +21,8 @@ const PreviewStep = ({
                          onRefresh,
                          onViewResults,
                          onRetry,
-                         onUpdateConfig
+                         onUpdateConfig,
+                         onClose // Add onClose prop for closing the popup
                      }) => {
     const [viewMode, setViewMode] = useState('summary'); // summary, results
 
@@ -40,7 +38,7 @@ const PreviewStep = ({
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-blue-50 p-4 rounded-lg">
                         <div className="flex items-center space-x-2 mb-2">
-                            <FileText size={20} className="text-blue-600" />
+                            <FileText size={20} className="text-blue-600"/>
                             <span className="text-sm font-medium text-blue-800">Source Files</span>
                         </div>
                         <p className="text-2xl font-semibold text-blue-900">{sourceFileCount}</p>
@@ -48,7 +46,7 @@ const PreviewStep = ({
 
                     <div className="bg-green-50 p-4 rounded-lg">
                         <div className="flex items-center space-x-2 mb-2">
-                            <Layers size={20} className="text-green-600" />
+                            <Layers size={20} className="text-green-600"/>
                             <span className="text-sm font-medium text-green-800">Active Rules</span>
                         </div>
                         <p className="text-2xl font-semibold text-green-900">{ruleCount}</p>
@@ -56,7 +54,7 @@ const PreviewStep = ({
 
                     <div className="bg-purple-50 p-4 rounded-lg">
                         <div className="flex items-center space-x-2 mb-2">
-                            <Target size={20} className="text-purple-600" />
+                            <Target size={20} className="text-purple-600"/>
                             <span className="text-sm font-medium text-purple-800">Output Columns</span>
                         </div>
                         <p className="text-2xl font-semibold text-purple-900">{totalOutputColumns}</p>
@@ -64,7 +62,7 @@ const PreviewStep = ({
 
                     <div className="bg-orange-50 p-4 rounded-lg">
                         <div className="flex items-center space-x-2 mb-2">
-                            <CheckCircle size={20} className="text-orange-600" />
+                            <CheckCircle size={20} className="text-orange-600"/>
                             <span className="text-sm font-medium text-orange-800">Merge Output</span>
                         </div>
                         <p className="text-lg font-semibold text-orange-900">
@@ -108,7 +106,8 @@ const PreviewStep = ({
                                 }}
                                 className="rounded border-gray-300"
                             />
-                            <span className="text-sm text-gray-700">Merge outputs from all rules into single dataset</span>
+                            <span
+                                className="text-sm text-gray-700">Merge outputs from all rules into single dataset</span>
                         </label>
                         <p className="text-xs text-gray-500 ml-6 mt-1">
                             If unchecked, each rule will generate separate output files
@@ -149,10 +148,11 @@ const PreviewStep = ({
                 {config.row_generation_rules.some(rule => !rule.output_columns || rule.output_columns.length === 0) && (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                         <div className="flex items-start space-x-2">
-                            <AlertCircle size={16} className="text-yellow-600 mt-0.5" />
+                            <AlertCircle size={16} className="text-yellow-600 mt-0.5"/>
                             <div className="text-sm text-yellow-800">
                                 <p className="font-medium">Warning: Rules Without Output Columns</p>
-                                <p className="mt-1">Some rules don't have output columns defined. They won't generate any data.</p>
+                                <p className="mt-1">Some rules don't have output columns defined. They won't generate
+                                    any data.</p>
                             </div>
                         </div>
                     </div>
@@ -165,7 +165,7 @@ const PreviewStep = ({
         if (!generatedResults) {
             return (
                 <div className="text-center py-8 text-gray-500">
-                    <FileText size={48} className="mx-auto mb-4 text-gray-300" />
+                    <FileText size={48} className="mx-auto mb-4 text-gray-300"/>
                     <p>No results generated yet</p>
                 </div>
             );
@@ -176,7 +176,7 @@ const PreviewStep = ({
                 <div className="space-y-4">
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                         <div className="flex items-center space-x-2 mb-2">
-                            <CheckCircle size={20} className="text-green-600" />
+                            <CheckCircle size={20} className="text-green-600"/>
                             <span className="font-medium text-green-800">Transformation Completed Successfully</span>
                         </div>
 
@@ -219,7 +219,8 @@ const PreviewStep = ({
                                     <div>
                                         <p className="font-medium text-gray-800">Merged Output</p>
                                         <p className="text-sm text-gray-600">
-                                            Combined results from all {config.row_generation_rules.filter(r => r.enabled).length} rules
+                                            Combined results from
+                                            all {config.row_generation_rules.filter(r => r.enabled).length} rules
                                         </p>
                                     </div>
                                     <div className="flex space-x-2">
@@ -227,16 +228,17 @@ const PreviewStep = ({
                                             onClick={() => onViewResults(generatedResults.transformation_id)}
                                             className="flex items-center space-x-1 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
                                         >
-                                            <Eye size={16} />
+                                            <Eye size={16}/>
                                             <span>View</span>
-                                            <ExternalLink size={12} />
+                                            <ExternalLink size={12}/>
                                         </button>
                                     </div>
                                 </div>
                             ) : (
                                 // Separate results per rule
                                 config.row_generation_rules.filter(r => r.enabled).map((rule, index) => (
-                                    <div key={rule.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div key={rule.id}
+                                         className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                         <div>
                                             <p className="font-medium text-gray-800">{rule.name}</p>
                                             <p className="text-sm text-gray-600">
@@ -248,9 +250,9 @@ const PreviewStep = ({
                                                 onClick={() => onViewResults(`${generatedResults.transformation_id}_rule_${index}`)}
                                                 className="flex items-center space-x-1 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
                                             >
-                                                <Eye size={16} />
+                                                <Eye size={16}/>
                                                 <span>View</span>
-                                                <ExternalLink size={12} />
+                                                <ExternalLink size={12}/>
                                             </button>
                                         </div>
                                     </div>
@@ -263,7 +265,7 @@ const PreviewStep = ({
                     {generatedResults.warnings && generatedResults.warnings.length > 0 && (
                         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                             <div className="flex items-start space-x-2">
-                                <AlertCircle size={16} className="text-yellow-600 mt-0.5" />
+                                <AlertCircle size={16} className="text-yellow-600 mt-0.5"/>
                                 <div className="text-sm text-yellow-800">
                                     <p className="font-medium">Warnings:</p>
                                     <ul className="list-disc list-inside mt-1">
@@ -279,7 +281,7 @@ const PreviewStep = ({
                     {generatedResults.errors && generatedResults.errors.length > 0 && (
                         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                             <div className="flex items-start space-x-2">
-                                <AlertCircle size={16} className="text-red-600 mt-0.5" />
+                                <AlertCircle size={16} className="text-red-600 mt-0.5"/>
                                 <div className="text-sm text-red-800">
                                     <p className="font-medium">Errors occurred during processing:</p>
                                     <ul className="list-disc list-inside mt-1">
@@ -297,7 +299,7 @@ const PreviewStep = ({
             return (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <div className="flex items-start space-x-2">
-                        <AlertCircle size={16} className="text-red-600 mt-0.5" />
+                        <AlertCircle size={16} className="text-red-600 mt-0.5"/>
                         <div className="text-sm text-red-800">
                             <p className="font-medium">Transformation Failed</p>
                             {generatedResults.errors && generatedResults.errors.length > 0 && (
@@ -336,62 +338,55 @@ const PreviewStep = ({
 
     return (
         <div className="space-y-6">
-            <div>
-                <h3 className="text-lg font-semibold text-gray-800">Generate & View Results</h3>
-                <p className="text-sm text-gray-600">
-                    Review your transformation configuration and generate the output files.
-                </p>
-            </div>
-
-            {/* View Mode Tabs */}
-            <div className="border-b border-gray-200">
-                <nav className="-mb-px flex space-x-8">
+            {/* Header with close button */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h3 className="text-lg font-semibold text-gray-800">Generate & View Results</h3>
+                    <p className="text-sm text-gray-600">
+                        Review your transformation configuration and generate the output files.
+                    </p>
+                </div>
+                {onClose && (
                     <button
-                        onClick={() => setViewMode('summary')}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                            viewMode === 'summary'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
+                        onClick={onClose}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="Close"
                     >
-                        <div className="flex items-center space-x-2">
-                            <Info size={16} />
-                            <span>Configuration Summary</span>
-                        </div>
+                        <X size={20}/>
                     </button>
-
-                    <button
-                        onClick={() => setViewMode('results')}
-                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                            viewMode === 'results'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                    >
-                        <div className="flex items-center space-x-2">
-                            <FileText size={16} />
-                            <span>Generation Results</span>
-                        </div>
-                    </button>
-                </nav>
-            </div>
-
-            {/* Content Area */}
-            <div className="min-h-[400px]">
-                {isLoading ? (
-                    <div className="flex items-center justify-center h-64">
-                        <div className="text-center">
-                            <RefreshCw size={32} className="animate-spin mx-auto mb-4 text-blue-500" />
-                            <p className="text-gray-600">Generating transformation results...</p>
-                            <p className="text-sm text-gray-500 mt-2">This may take a few moments</p>
-                        </div>
-                    </div>
-                ) : (
-                    <>
-                        {viewMode === 'summary' && renderConfigSummary()}
-                        {viewMode === 'results' && renderGenerationResults()}
-                    </>
                 )}
+            </div>
+
+            {/* Configuration Summary */}
+            <div>
+                <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center space-x-2">
+                    <Info size={18} className="text-blue-600"/>
+                    <span>Configuration Summary</span>
+                </h4>
+                {renderConfigSummary()}
+            </div>
+
+            {/* Generation Summary Section */}
+            <div className="border-t border-gray-200 pt-6">
+                <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center space-x-2">
+                    <FileText size={18} className="text-green-600"/>
+                    <span>Generation Summary</span>
+                </h4>
+
+                {/* Content Area */}
+                <div className="min-h-[300px]">
+                    {isLoading ? (
+                        <div className="flex items-center justify-center h-64">
+                            <div className="text-center">
+                                <RefreshCw size={32} className="animate-spin mx-auto mb-4 text-blue-500"/>
+                                <p className="text-gray-600">Generating transformation results...</p>
+                                <p className="text-sm text-gray-500 mt-2">This may take a few moments</p>
+                            </div>
+                        </div>
+                    ) : (
+                        renderGenerationResults()
+                    )}
+                </div>
             </div>
 
             {/* Actions */}
@@ -401,7 +396,7 @@ const PreviewStep = ({
                         onClick={onRetry}
                         className="flex items-center space-x-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
                     >
-                        <ArrowLeft size={16} />
+                        <ArrowLeft size={16}/>
                         <span>Modify Rules</span>
                     </button>
 
@@ -411,7 +406,7 @@ const PreviewStep = ({
                             disabled={isLoading}
                             className="flex items-center space-x-1 px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
                         >
-                            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+                            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''}/>
                             <span>Regenerate</span>
                         </button>
                     )}
@@ -422,7 +417,7 @@ const PreviewStep = ({
                         onClick={onRefresh}
                         className="flex items-center space-x-2 px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                     >
-                        <Play size={16} />
+                        <Play size={16}/>
                         <span>Generate Results</span>
                     </button>
                 )}
@@ -430,7 +425,7 @@ const PreviewStep = ({
                 {generatedResults && generatedResults.success && (
                     <div className="flex items-center space-x-2">
                         <span className="text-sm text-green-600 flex items-center space-x-1">
-                            <CheckCircle size={16} />
+                            <CheckCircle size={16}/>
                             <span>Ready for use</span>
                         </span>
                     </div>
@@ -440,7 +435,7 @@ const PreviewStep = ({
             {/* Help */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-start space-x-2">
-                    <Info size={16} className="text-blue-600 mt-0.5" />
+                    <Info size={16} className="text-blue-600 mt-0.5"/>
                     <div className="text-sm text-blue-800">
                         <p className="font-medium mb-1">How to Use Generated Results:</p>
                         <ul className="list-disc list-inside space-y-1">
