@@ -200,7 +200,6 @@ try:
     from app.routes.viewer_routes import router as viewer_router
     from app.routes.file_routes import router as file_router
     from app.routes.regex_routes import router as regex_router
-    from app.routes.file_generator import router as file_generator_router
     from app.routes.delta_routes import router as delta_router
     from app.routes.save_results_routes import router as save_results_router
     from app.routes.recent_results_routes import router as recent_results_router
@@ -222,7 +221,6 @@ try:
     app.include_router(recent_results_router)
     app.include_router(rule_management_router)
 
-    app.include_router(file_generator_router)
     app.include_router(delta_rules_router)
 
     app.include_router(transformation_router)

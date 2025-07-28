@@ -337,6 +337,7 @@ async def process_transformation(request: TransformationRequest):
                 uploaded_files[file_id] = {
                     "data": df,
                     "info": {
+                        "file_id":file_id,
                         "filename": filename,
                         "file_size_mb": round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2),
                         "upload_time": datetime.now().isoformat(),
