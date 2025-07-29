@@ -143,7 +143,7 @@ class ProcessManagementService {
 
     // Results retrieval
     //TODO
-    async getProcessedFiles() {
+    async getAllProcessedResult() {
         try {
             // For now, return empty array as the API endpoint doesn't exist yet
             const recentResult = await deltaApiService.loadRecentResultsForSidebar(20);
