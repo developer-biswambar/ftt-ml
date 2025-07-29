@@ -4,7 +4,7 @@ import {
     CheckCircle,
     ChevronDown,
     ChevronRight,
-    Clock,
+    Clock, Delete,
     Download,
     ExternalLink,
     Eye,
@@ -35,6 +35,7 @@ const RightSidebar = ({
                       }) => {
 
     const [showSaveModal, setShowSaveModal] = useState(false);
+    const [showDeleteRecentResultModal, setShowDeleteRecentResultModal] = useState(false);
     const [saveModalData, setSaveModalData] = useState(null);
     const [customFilename, setCustomFilename] = useState('');
     const [description, setDescription] = useState('');
@@ -895,6 +896,16 @@ const RightSidebar = ({
                                 >
                                     <RefreshCw size={12}/>
                                     <span>Refresh</span>
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                                <button
+                                    className="px-3 py-2 text-xs bg-red-300 text-blue-700 rounded hover:bg-red-600 transition-all duration-200 flex items-center justify-center space-x-1"
+                                    title="Delete all results"
+                                >
+                                    <Delete size={12}/>
+                                    {/*TODO add clear all feature*/}
+                                    <span>Clear All Result</span>
                                 </button>
                             </div>
                         </div>
