@@ -73,22 +73,22 @@ export const useTemplateManagement = () => {
 };
 
 export const useProcessManagement = () => {
-    const [processedFiles, setProcessedFiles] = useState([]);
+    const [recentResults, setRecentResults] = useState([]);
     const [isProcessing, setIsProcessing] = useState(false);
     const [activeProcess, setActiveProcess] = useState(null);
     const [autoRefreshInterval, setAutoRefreshInterval] = useState(null);
 
-    const loadProcessedFiles = useCallback(async () => {
-        const result = await processManagementService.getProcessedFiles();
+    const loadAllProcessedResult = useCallback(async () => {
+        const result = await processManagementService.getAllProcessedResult();
         if (result.success) {
-            setProcessedFiles(result.processedFiles);
+            setRecentResults(result.processedFiles);
         }
         return result;
     }, []);
 
     useEffect(() => {
-        loadProcessedFiles(); // runs once when the component mounts (on page load)
-    }, [loadProcessedFiles]);
+        loadAllProcessedResult(); // runs once when the component mounts (on page load)
+    }, [loadAllProcessedResult]);
 
     const startProcess = useCallback(async (type, config) => {
         setIsProcessing(true);
@@ -110,7 +110,7 @@ export const useProcessManagement = () => {
             });
 
             // Add to processed files list
-            setProcessedFiles(prev => [result.process, ...prev]);
+            setRecentResults(prev => [result.process, ...prev]);
 
             // Monitor the process
             monitorProcess(result.processId, type);
@@ -129,7 +129,7 @@ export const useProcessManagement = () => {
             setActiveProcess(null);
 
             // Update the processed file status
-            setProcessedFiles(prev =>
+            setRecentResults(prev =>
                 prev.map(file => {
                     let idField = 'reconciliation'
                     if (type === 'delta-generation') {
@@ -156,12 +156,12 @@ export const useProcessManagement = () => {
     }, []);
 
     const addProcessingResult = (processingEntry) => {
-        setProcessedFiles(prev => [processingEntry, ...prev]);
+        setRecentResults(prev => [processingEntry, ...prev]);
     };
 
 // Function to update a processing result (e.g., from processing to completed)
     const updateProcessingResult = (tempId, updatedEntry) => {
-        setProcessedFiles(prev =>
+        setRecentResults(prev =>
             prev.map(file => {
                 // Check different ID fields based on process type
                 if (file.generation_id === tempId ||
@@ -178,7 +178,7 @@ export const useProcessManagement = () => {
 
 // Function to remove a processing result (if needed)
     const removeProcessingResult = (tempId) => {
-        setProcessedFiles(prev =>
+        setRecentResults(prev =>
             prev.filter(file =>
                 file.generation_id !== tempId &&
                 file.delta_id !== tempId &&
@@ -199,10 +199,10 @@ export const useProcessManagement = () => {
     }, [autoRefreshInterval]);
 
     return {
-        processedFiles,
+        recentResults,
         isProcessing,
         activeProcess,
-        loadProcessedFiles,
+        loadAllProcessedResult,
         startProcess,
         monitorProcess,
         getDetailedResults,
