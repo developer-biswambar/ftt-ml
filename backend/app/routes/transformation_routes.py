@@ -4,22 +4,16 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.models.transformation_models import (
     TransformationRequest,
     TransformationResult,
-    TransformationConfig,
     TransformationTemplate,
-    LLMAssistanceRequest,
-    LLMAssistanceResponse,
-    SourceFile,
-    TransformationRule,
-    OutputColumn,
-    DynamicCondition
+    SourceFile
 )
-from app.services.transformation_service import TransformationEngine, transformation_storage
+from app.services.transformation_service import transformation_storage
 from app.utils.uuid_generator import generate_uuid
 
 # Setup logging
@@ -337,7 +331,7 @@ async def process_transformation(request: TransformationRequest):
                 uploaded_files[file_id] = {
                     "data": df,
                     "info": {
-                        "file_id":file_id,
+                        "file_id": file_id,
                         "filename": filename,
                         "file_size_mb": round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2),
                         "upload_time": datetime.now().isoformat(),
