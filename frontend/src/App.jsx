@@ -23,7 +23,7 @@ const MainApp = () => {
     const {files, uploadProgress, loadFiles, uploadFile} = useFileManagement();
     const {templates} = useTemplateManagement();
     const {
-        processedFiles,
+        recentResults,
         isProcessing,
         activeProcess,
         startProcess,
@@ -97,8 +97,8 @@ const MainApp = () => {
 
     // Merge file generation processing with regular processed files for the sidebar
     const allProcessedFiles = React.useMemo(() => {
-        return processedFiles;
-    }, [processedFiles]);
+        return recentResults;
+    }, [recentResults]);
 
     // Process handlers
     const handleReconciliation = async (reconciliationConfig) => {
@@ -214,9 +214,9 @@ const MainApp = () => {
     const displayDetailedResults = async (resultId) => {
         try {
             // Determine process type
-            const deltaRecord = processedFiles.find(f => f.delta_id === resultId);
-            const reconRecord = processedFiles.find(f => f.reconciliation_id === resultId);
-            const generationRecord = processedFiles.find(f => f.generation_id === resultId);
+            const deltaRecord = recentResults.find(f => f.delta_id === resultId);
+            const reconRecord = recentResults.find(f => f.reconciliation_id === resultId);
+            const generationRecord = recentResults.find(f => f.generation_id === resultId);
 
             let processType = 'unknown';
             if (deltaRecord) processType = 'delta-generation';
@@ -328,10 +328,10 @@ const MainApp = () => {
     // Download results handler
     const handleDownloadResults = async (resultId, resultType) => {
         try {
-            if (processedFiles.length === 0) return
+            if (recentResults.length === 0) return
             // Determine process type
-            const deltaRecord = processedFiles.find(f => f.delta_id === resultId);
-            const generationRecord = processedFiles.find(f => f.generation_id === resultId);
+            const deltaRecord = recentResults.find(f => f.delta_id === resultId);
+            const generationRecord = recentResults.find(f => f.generation_id === resultId);
 
             let processType = 'reconciliation';
             if (deltaRecord) processType = 'delta-generation';
