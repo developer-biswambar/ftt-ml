@@ -487,57 +487,10 @@ const LeftSidebar = ({
                         </div>
                     </div>
 
-                    {/* Step 3: File Library */}
-                    <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-                        <div className="p-3 pb-2 flex-shrink-0">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-2">
-                                    <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                                        <span className="text-green-600 text-xs font-bold">3</span>
-                                    </div>
-                                    <h3 className="text-sm font-semibold text-slate-700">File Library</h3>
-                                </div>
-                                {onOpenFileLibrary && files.length > 0 && (
-                                    <button
-                                        onClick={onOpenFileLibrary}
-                                        className="flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition-colors duration-200"
-                                        title="Open full File Library in new tab"
-                                    >
-                                        <FolderOpen size={12}/>
-                                        <span>Open Full Library</span>
-                                        <ExternalLink size={10}/>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto px-3 pb-3 min-h-0">
-                            {files.length === 0 ? (
-                                <div className="text-center py-6 text-slate-500">
-                                    <FileText size={28} className="mx-auto mb-2 opacity-50"/>
-                                    <p className="text-sm">No files uploaded yet</p>
-                                    <p className="text-xs">Upload CSV or Excel files to get started</p>
-                                    {onOpenFileLibrary && (
-                                        <button
-                                            onClick={onOpenFileLibrary}
-                                            className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
-                                        >
-                                            Open File Library
-                                        </button>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {files.map(renderFileItem)}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
                     {/* Step 4: File Assignment */}
                     {selectedTemplate && (
                         <div
-                            className="border-t border-slate-200 bg-white/50 flex-shrink-0 max-h-48 overflow-hidden flex flex-col">
+                            className="border-t border-slate-200 bg-white/50 flex-shrink-0 max-h-52 overflow-hidden flex flex-col">
                             <div className="p-3 pb-2 flex-shrink-0">
                                 <div className="flex items-center space-x-2">
                                     <div
@@ -598,6 +551,53 @@ const LeftSidebar = ({
                             </div>
                         </div>
                     )}
+
+                    {/* Step 3: File Library */}
+                    <div className={`flex-1 min-h-0 overflow-hidden flex flex-col ${selectedTemplate ? 'max-h-64' : ''}`}>
+                        <div className="p-3 pb-2 flex-shrink-0">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                                        <span className="text-green-600 text-xs font-bold">3</span>
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-slate-700">File Library</h3>
+                                </div>
+                                {onOpenFileLibrary && files.length > 0 && (
+                                    <button
+                                        onClick={onOpenFileLibrary}
+                                        className="flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition-colors duration-200"
+                                        title="Open full File Library in new tab"
+                                    >
+                                        <FolderOpen size={12}/>
+                                        <span>Open Full Library</span>
+                                        <ExternalLink size={10}/>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto px-3 pb-3 min-h-0">
+                            {files.length === 0 ? (
+                                <div className="text-center py-6 text-slate-500">
+                                    <FileText size={28} className="mx-auto mb-2 opacity-50"/>
+                                    <p className="text-sm">No files uploaded yet</p>
+                                    <p className="text-xs">Upload CSV or Excel files to get started</p>
+                                    {onOpenFileLibrary && (
+                                        <button
+                                            onClick={onOpenFileLibrary}
+                                            className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                                        >
+                                            Open File Library
+                                        </button>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {files.map(renderFileItem)}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 {/* Process Status */}
@@ -631,7 +631,8 @@ const LeftSidebar = ({
                 </div>
             </div>
 
-            {/* Delete Confirmation Modal */}
+            {/* Delete Confirmation Modal */}1
+
             {showDeleteModal && fileToDelete && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
