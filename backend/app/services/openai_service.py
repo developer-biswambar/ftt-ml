@@ -7,7 +7,7 @@ import time
 from typing import List, Dict, Any
 
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, OpenAI
 
 from app.models.schemas import ExtractedField, ExtractionRow
 
@@ -512,6 +512,36 @@ Please extract the requested financial data from each text entry and return as J
         except Exception as e:
             logger.error(f"OpenAI connection test failed: {str(e)}")
             return False
+
+
+def get_openai_client():
+    """Get synchronous OpenAI client for transformation routes and other sync operations"""
+    try:
+        load_dotenv()
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key or api_key == "sk-placeholder":
+            logger.warning("OpenAI API key not configured properly")
+            return None
+        
+        return OpenAI(api_key=api_key)
+    except Exception as e:
+        logger.error(f"Failed to create OpenAI client: {str(e)}")
+        return None
+
+
+def get_async_openai_client():
+    """Get asynchronous OpenAI client for async operations"""
+    try:
+        load_dotenv()
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key or api_key == "sk-placeholder":
+            logger.warning("OpenAI API key not configured properly")
+            return None
+        
+        return AsyncOpenAI(api_key=api_key)
+    except Exception as e:
+        logger.error(f"Failed to create async OpenAI client: {str(e)}")
+        return None
 
 
 # Singleton instance

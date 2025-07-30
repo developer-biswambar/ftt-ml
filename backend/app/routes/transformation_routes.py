@@ -18,6 +18,15 @@ from app.utils.uuid_generator import generate_uuid
 
 # Setup logging
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# Add console handler if not already present
+if not logger.handlers:
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
 # Create router
 router = APIRouter(prefix="/transformation", tags=["transformation"])
@@ -90,15 +99,26 @@ def apply_column_mapping(mapping_config: Dict[str, Any], row_data: Dict[str, Any
         # Evaluate dynamic conditions
         conditions = mapping_config.get('dynamic_conditions', [])
         default_value = mapping_config.get('default_value', '')
+        
+        print(f"[DYNAMIC DEBUG] Processing dynamic mapping with {len(conditions)} conditions")
+        print(f"[DYNAMIC DEBUG] Available row_data keys: {list(row_data.keys())}")
+        print(f"[DYNAMIC DEBUG] Dynamic conditions: {conditions}")
+        logger.debug(f"Processing dynamic mapping with {len(conditions)} conditions")
+        logger.debug(f"Available row_data keys: {list(row_data.keys())}")
+        logger.debug(f"Dynamic conditions: {conditions}")
 
         for condition in conditions:
             condition_column = condition.get('condition_column', '')
             operator = condition.get('operator', '==')
             condition_value = condition.get('condition_value', '')
             output_value = condition.get('output_value', '')
+            
+            print(f"[DYNAMIC DEBUG] Checking condition: {condition_column} {operator} {condition_value} -> {output_value}")
+            logger.debug(f"Checking condition: {condition_column} {operator} {condition_value} -> {output_value}")
 
             if condition_column in row_data:
                 row_value = row_data[condition_column]
+                logger.debug(f"Dynamic condition evaluation - Column: {condition_column}, Value: {row_value}, Operator: {operator}, Expected: {condition_value}")
 
                 # Evaluate condition based on operator
                 condition_met = False
@@ -148,12 +168,19 @@ def apply_column_mapping(mapping_config: Dict[str, Any], row_data: Dict[str, Any
                             condition_met = row_value_str.endswith(condition_value_str)
 
                     if condition_met:
+                        print(f"[DYNAMIC DEBUG] CONDITION MET! Returning output_value: {output_value}")
+                        logger.debug(f"Condition met! Returning output_value: {output_value}")
                         return output_value
 
                 except Exception as e:
                     logger.warning(f"Error evaluating dynamic condition: {str(e)}")
                     continue
+            else:
+                print(f"[DYNAMIC DEBUG] Column '{condition_column}' NOT FOUND in row_data. Available keys: {list(row_data.keys())}")
+                logger.debug(f"Dynamic condition column '{condition_column}' not found in row_data. Available keys: {list(row_data.keys())}")
 
+        print(f"[DYNAMIC DEBUG] Returning default value: {default_value}")
+        logger.debug(f"Dynamic condition returning default value: {default_value}")
         return default_value
 
     return ''
@@ -168,14 +195,14 @@ def process_transformation_rules(source_data: Dict[str, pd.DataFrame], config: D
     rule_results = {}
     processing_errors = []
 
-    # Get all source rows
+    # Get all source rows (simplified for single file - no alias prefix needed)
     source_rows = []
     for alias, df in source_data.items():
         for _, row in df.iterrows():
-            # Flatten row data with alias prefix
+            # Use direct column names since we only have one source file
             row_dict = {}
             for col, value in row.items():
-                row_dict[f"{alias}.{col}"] = value
+                row_dict[col] = value  # Direct column name, no prefix
             source_rows.append(row_dict)
 
     for rule in rules:
@@ -201,7 +228,10 @@ def process_transformation_rules(source_data: Dict[str, pd.DataFrame], config: D
                     column_name = column_config.get('name', '')
                     if column_name:
                         try:
-                            output_row[column_name] = apply_column_mapping(column_config, source_row, {})
+                            logger.debug(f"Processing column '{column_name}' with config: {column_config}")
+                            result_value = apply_column_mapping(column_config, source_row, {})
+                            output_row[column_name] = result_value
+                            logger.debug(f"Column '{column_name}' result: {result_value}")
                         except Exception as e:
                             logger.error(f"Error processing column '{column_name}' in rule '{rule_name}': {str(e)}")
                             output_row[column_name] = ''
@@ -594,6 +624,160 @@ async def delete_transformation_results(transformation_id: str):
         raise HTTPException(status_code=404, detail="Transformation ID not found")
 
 
+@router.post("/generate-config/")
+async def generate_transformation_config(request: dict):
+    """Generate transformation configuration using AI based on user requirements"""
+    
+    try:
+        requirements = request.get('requirements', '')
+        source_files = request.get('source_files', [])
+        
+        if not requirements:
+            raise HTTPException(status_code=400, detail="Requirements are required")
+        
+        if not source_files:
+            raise HTTPException(status_code=400, detail="Source files information is required")
+        
+        # Import OpenAI service
+        from app.services.openai_service import get_openai_client
+        
+        client = get_openai_client()
+        if not client:
+            raise HTTPException(status_code=500, detail="OpenAI API not configured")
+        
+        # Prepare context about source files
+        files_context = []
+        for sf in source_files:
+            files_context.append(f"File: {sf['filename']} (alias: {sf['alias']})")
+            files_context.append(f"  Columns: {', '.join(sf['columns'])}")
+            files_context.append(f"  Rows: {sf['totalRows']}")
+        
+        files_info = "\n".join(files_context)
+        
+        # Create prompt for OpenAI
+        prompt = f"""
+You are an expert data transformation configuration generator. Based on the user requirements and source file information, generate a JSON configuration for data transformation.
+
+Source Files Available:
+{files_info}
+
+User Requirements:
+{requirements}
+
+Generate a transformation configuration with this exact JSON structure:
+{{
+    "name": "descriptive_name_for_transformation",
+    "description": "brief_description_of_what_this_transformation_does",
+    "source_files": [
+        {{
+            "file_id": "actual_file_id",
+            "alias": "source_file",
+            "purpose": "Primary data source"
+        }}
+    ],
+    "row_generation_rules": [
+        {{
+            "id": "rule_1",
+            "name": "Rule Name",
+            "enabled": true,
+            "output_columns": [
+                {{
+                    "id": "col_1",
+                    "name": "output_column_name",
+                    "mapping_type": "direct|static|dynamic",
+                    "source_column": "source_column_name",
+                    "static_value": "static_value_if_applicable",
+                    "dynamic_conditions": [
+                        {{
+                            "condition_column": "column_name",
+                            "operator": "==|!=|>|<|>=|<=|contains|startsWith|endsWith",
+                            "condition_value": "value_to_compare",
+                            "output_value": "value_to_output_if_condition_met"
+                        }}
+                    ],
+                    "default_value": "default_value_for_dynamic"
+                }}
+            ],
+            "priority": 0
+        }}
+    ],
+    "merge_datasets": false,
+    "validation_rules": []
+}}
+
+Mapping Types:
+- "direct": Copy value directly from source column
+- "static": Use a fixed static value
+- "dynamic": Use conditional logic with dynamic_conditions array
+
+For dynamic mapping, use dynamic_conditions array with condition objects.
+For static mapping, use static_value field.
+For direct mapping, use source_column field.
+
+Make sure to:
+1. Use actual column names from the source files
+2. Create realistic transformation rules based on requirements
+3. Use appropriate operators for conditions
+4. Generate meaningful output column names
+5. Return ONLY the JSON configuration, no additional text
+"""
+        
+        # Call OpenAI API
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a data transformation expert. Return only valid JSON configuration."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=2000
+        )
+        
+        generated_config_text = response.choices[0].message.content.strip()
+        
+        # Parse the JSON response
+        import json
+        try:
+            generated_config = json.loads(generated_config_text)
+        except json.JSONDecodeError:
+            # Try to extract JSON from response if it contains extra text
+            import re
+            json_match = re.search(r'\{.*\}', generated_config_text, re.DOTALL)
+            if json_match:
+                generated_config = json.loads(json_match.group())
+            else:
+                raise HTTPException(status_code=500, detail="Failed to parse AI-generated configuration")
+        
+        # Update file IDs with actual values from request (simplified for single file)
+        if 'source_files' in generated_config and len(source_files) > 0:
+            actual_file_id = source_files[0].get('file_id')
+            
+            # Update the source_files with actual file_id
+            if len(generated_config['source_files']) > 0:
+                generated_config['source_files'][0]['file_id'] = actual_file_id
+                generated_config['source_files'][0]['alias'] = actual_file_id  # Use file_id as alias
+            
+            # No need to update column references since we use direct column names now
+        
+        # Validate the generated configuration has required fields
+        required_fields = ['name', 'description', 'source_files', 'row_generation_rules']
+        missing_fields = [field for field in required_fields if field not in generated_config]
+        if missing_fields:
+            raise HTTPException(status_code=500, detail=f"AI generated config missing fields: {missing_fields}")
+        
+        return {
+            "success": True,
+            "message": "Configuration generated successfully",
+            "data": generated_config
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating AI configuration: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Configuration generation error: {str(e)}")
+
+
 @router.get("/health")
 async def transformation_health_check():
     """Health check for transformation service"""
@@ -608,6 +792,7 @@ async def transformation_health_check():
             "dynamic_column_mapping",
             "dataset_merging",
             "template_system",
-            "multiple_output_formats"
+            "multiple_output_formats",
+            "ai_configuration_generation"
         ]
     }

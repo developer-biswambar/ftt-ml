@@ -168,6 +168,27 @@ export const transformationApiService = {
             if (!response.ok) {
                 throw new Error('Failed to delete')
             }
+        },
+
+    // Generate AI configuration
+    generateAIConfiguration: async (requirements, sourceFiles) => {
+        const response = await fetch(`${API_BASE_URL}/transformation/generate-config/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                requirements,
+                source_files: sourceFiles
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to generate AI configuration');
         }
+
+        return response.json();
+    }
 }
 export default transformationApiService

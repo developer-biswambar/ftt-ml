@@ -109,8 +109,8 @@ const ColumnMappingStep = ({
                                         config: {
                                             formula: '{Net_Amount} + {Tax_Amount}',
                                             variables: {
-                                                'Net_Amount': 'file_0.Net_Amount',
-                                                'Tax_Amount': 'file_0.Tax_Amount'
+                                                'Net_Amount': 'Net_Amount',
+                                                'Tax_Amount': 'Tax_Amount'
                                             }
                                         }
                                     }

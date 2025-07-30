@@ -19,6 +19,7 @@ import {
 import RowGenerationStep from './RowGenerationStep';
 import ColumnMappingStep from './ColumnMappingStep';
 import PreviewStep from './PreviewStep';
+import AIRequirementsStep from './AIRequirementsStep';
 import {deltaApiService} from '../../services/deltaApiService';
 import {transformationApiService} from '../../services/transformationApiService';
 
@@ -32,7 +33,7 @@ const TransformationFlow = ({
 
     const filesArray = Object.values(files);
     // State management
-    const [currentStep, setCurrentStep] = useState('file_selection');
+    const [currentStep, setCurrentStep] = useState('ai_requirements');
     const [config, setConfig] = useState({
         name: '',
         description: '',
@@ -45,9 +46,11 @@ const TransformationFlow = ({
     const [generatedResults, setGeneratedResults] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [validationErrors, setValidationErrors] = useState([]);
+    const [savedRequirements, setSavedRequirements] = useState('');
 
-    // Updated step definitions (removed schema_definition and column_mapping)
+    // Updated step definitions with AI requirements step
     const steps = [
+        {id: 'ai_requirements', title: 'AI Setup', icon: Wand2},
         {id: 'file_selection', title: 'Select Files', icon: FileText},
         {id: 'row_generation', title: 'Configure Rules', icon: Copy},
         {id: 'preview', title: 'Generate & View', icon: Eye}
@@ -60,7 +63,7 @@ const TransformationFlow = ({
                 .filter(([key, file]) => file)
                 .map(([key, file], index) => ({
                     file_id: file.file_id,
-                    alias: `file_${index}`,
+                    alias: file.file_id, // Use actual file_id as alias to avoid confusion
                     purpose: index === 0 ? 'Primary data source' : 'Additional data source'
                 }));
 
@@ -103,11 +106,37 @@ const TransformationFlow = ({
         }
     };
 
+    // Handler for AI-generated configuration
+    const handleAIConfigurationGenerated = (generatedConfig, requirements = '') => {
+        // Save the requirements for later use
+        setSavedRequirements(requirements);
+        
+        if (Object.keys(generatedConfig).length === 0) {
+            // User chose to skip AI and configure manually
+            setCurrentStep('file_selection');
+            onSendMessage('system', '✅ Proceeding with manual configuration. Please set up your files and rules.');
+        } else {
+            // AI generated configuration
+            setConfig(prev => ({
+                ...prev,
+                ...generatedConfig
+            }));
+            
+            // Skip file selection and go directly to rule configuration
+            setCurrentStep('row_generation');
+            onSendMessage('system', '✅ AI configuration applied successfully! You can now review and modify the rules.');
+        }
+    };
+
     // Validation
     const validateCurrentStep = () => {
         const errors = [];
 
         switch (currentStep) {
+            case 'ai_requirements':
+                // No validation needed for AI requirements step
+                break;
+
             case 'file_selection':
                 if (config.source_files.length === 0) {
                     errors.push('Please select at least one source file');
@@ -140,6 +169,28 @@ const TransformationFlow = ({
     // Generate results for all rules
     const generateResults = async () => {
         setIsProcessing(true);
+        
+        // Debug: Log the transformation config being sent
+        console.log('[UI DEBUG] Transformation config being sent:', {
+            source_files: config.source_files,
+            row_generation_rules: config.row_generation_rules,
+            rules_count: config.row_generation_rules?.length || 0
+        });
+        
+        // Debug: Log dynamic conditions specifically
+        config.row_generation_rules?.forEach((rule, ruleIndex) => {
+            rule.output_columns?.forEach((column, colIndex) => {
+                if (column.mapping_type === 'dynamic') {
+                    console.log(`[UI DEBUG] Rule ${ruleIndex}, Column ${colIndex} - Dynamic mapping:`, {
+                        column_name: column.name,
+                        mapping_type: column.mapping_type,
+                        dynamic_conditions: column.dynamic_conditions,
+                        default_value: column.default_value
+                    });
+                }
+            });
+        });
+        
         try {
             const response = await transformationApiService.processTransformation({
                 process_name: config.name || 'Data Transformation',
@@ -204,6 +255,17 @@ const TransformationFlow = ({
     // Step content renderer
     const renderStepContent = () => {
         switch (currentStep) {
+            case 'ai_requirements':
+                return (
+                    <AIRequirementsStep
+                        sourceFiles={config.source_files}
+                        onConfigurationGenerated={handleAIConfigurationGenerated}
+                        onSendMessage={onSendMessage}
+                        filesArray={filesArray}
+                        initialRequirements={savedRequirements}
+                    />
+                );
+
             case 'file_selection':
                 return (
                     <div className="space-y-4">

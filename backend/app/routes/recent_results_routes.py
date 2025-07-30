@@ -142,12 +142,12 @@ async def get_recent_results(limit: int = 5):
                         file_b=file_ids[1] if len(file_ids) > 1 else '',
                         summary={
                             "input_records": transformation_details['results']['processing_info']['input_row_count'],
-                            'output_records': len(transformation_details['results']['data']),
-                            'columns_generated': len(transformation_details['results']['data'].columns),
+                            'output_records': transformation_details['results']['processing_info']['output_row_count'],
+                            'columns_generated': 'Unknown',
                             'configuration': transformation_details['results']['config'],
                             'processing_info': transformation_details['results']['processing_info']
                         },
-                        processing_time_seconds=None  # Not stored in current delta structure
+                        processing_time_seconds=transformation_details['results']['processing_info']['processing_time']
                     ))
 
                 except Exception as gen_error:

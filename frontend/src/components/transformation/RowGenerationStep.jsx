@@ -120,8 +120,8 @@ const RowGenerationStep = ({
 
 
         if (updates.source_column) {
-            // Extract the new column name from source_column (if provided)
-            updates['name'] = updates.source_column?.split('.').pop();
+            // Since we're using direct column names now, no need to split
+            updates['name'] = updates.source_column;
         }
         // Create the updated column object by merging current and new values
         const updatedColumn = {
@@ -188,8 +188,8 @@ const RowGenerationStep = ({
         Object.entries(sourceColumns).forEach(([alias, cols]) => {
             cols.forEach(col => {
                 columns.push({
-                    value: `${alias}.${col}`,
-                    label: `${alias}.${col}`,
+                    value: col,  // Use direct column name
+                    label: col,  // Use direct column name
                     alias,
                     column: col
                 });
@@ -200,6 +200,16 @@ const RowGenerationStep = ({
 
     const renderOutputColumnConfig = (rule, ruleIndex, column, columnIndex) => {
         const allColumns = getAllSourceColumns();
+        
+        // Debug logging for dynamic columns
+        if (column.mapping_type === 'dynamic') {
+            console.log(`[UI DEBUG] Dynamic column "${column.name}":`, {
+                mapping_type: column.mapping_type,
+                dynamic_conditions: column.dynamic_conditions,
+                default_value: column.default_value,
+                available_columns: allColumns.map(col => col.value)
+            });
+        }
 
         return (
             <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
@@ -487,12 +497,12 @@ const RowGenerationStep = ({
                     <textarea
                         value={rule.condition || ''}
                         onChange={(e) => updateRule(ruleIndex, {condition: e.target.value})}
-                        placeholder="e.g., file_0.Amount < 0"
+                        placeholder="e.g., Amount < 0"
                         className="w-full px-3 py-2 border border-gray-300 rounded font-mono text-sm"
                         rows={2}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                        Use column references like 'file_0.ColumnName' or use the builder above
+                        Use column references like 'ColumnName' or use the builder above
                     </p>
                 </div>
             </div>
