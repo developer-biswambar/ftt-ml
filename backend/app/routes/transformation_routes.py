@@ -44,6 +44,78 @@ async def get_file_dataframe(file_ref: SourceFile) -> pd.DataFrame:
     return file_data["data"]
 
 
+def evaluate_expression(expression: str, row_data: Dict[str, Any]) -> Any:
+    """Evaluate expressions with variable substitution like {column_name} or calculations"""
+    if not expression or not isinstance(expression, str):
+        return expression
+    
+    try:
+        # Check if it's an expression with variables (contains curly braces)
+        if '{' in expression and '}' in expression:
+            logger.debug(f"Evaluating expression: {expression}")
+            import re
+            
+            # Find all variables in curly braces
+            variables = re.findall(r'\{([^}]+)\}', expression)
+            result_expression = expression
+            
+            # Replace each variable with its value
+            for var in variables:
+                if var in row_data:
+                    value = row_data[var]
+                    # Handle different types of values
+                    if isinstance(value, (int, float)):
+                        result_expression = result_expression.replace(f'{{{var}}}', str(value))
+                    elif isinstance(value, str):
+                        # For string values, wrap in quotes for safe evaluation
+                        result_expression = result_expression.replace(f'{{{var}}}', f'"{value}"')
+                    else:
+                        result_expression = result_expression.replace(f'{{{var}}}', f'"{str(value)}"')
+                else:
+                    logger.warning(f"Variable '{var}' not found in row data. Available: {list(row_data.keys())}")
+                    return expression  # Return original if variable not found
+            
+            # Try to evaluate as mathematical expression first
+            try:
+                # Create safe evaluation context
+                safe_context = {
+                    '__builtins__': {},
+                    'abs': abs,
+                    'round': round,
+                    'min': min, 
+                    'max': max,
+                    'int': int,
+                    'float': float,
+                    'str': str
+                }
+                
+                # If it looks like a math expression, evaluate it
+                if any(op in result_expression for op in ['+', '-', '*', '/', '(', ')', '%']):
+                    result = eval(result_expression, safe_context)
+                    logger.debug(f"Mathematical result: {result}")
+                    return result
+                else:
+                    # For string concatenation, just remove quotes and return as string
+                    # Handle patterns like "John" "Doe" -> "John Doe"
+                    result = result_expression.replace('" "', ' ').replace('"', '')
+                    logger.debug(f"String concatenation result: {result}")
+                    return result.strip()
+                    
+            except Exception as e:
+                logger.warning(f"Could not evaluate expression '{result_expression}': {e}")
+                # Fallback: simple string concatenation
+                result = result_expression.replace('" "', ' ').replace('"', '')
+                return result.strip()
+        
+        else:
+            # No variables, return as-is
+            return expression
+            
+    except Exception as e:
+        logger.error(f"Error evaluating expression '{expression}': {e}")
+        return expression
+
+
 def evaluate_condition(condition: str, row_data: Dict[str, Any], context: Dict[str, Any]) -> bool:
     """Safely evaluate a condition string against row data"""
     if not condition.strip():
@@ -93,16 +165,15 @@ def apply_column_mapping(mapping_config: Dict[str, Any], row_data: Dict[str, Any
         return row_data.get(source_column, '')
 
     elif mapping_type == 'static':
-        return mapping_config.get('static_value', '')
+        static_value = mapping_config.get('static_value', '')
+        # Evaluate expressions in static values
+        return evaluate_expression(static_value, row_data)
 
     elif mapping_type == 'dynamic':
         # Evaluate dynamic conditions
         conditions = mapping_config.get('dynamic_conditions', [])
         default_value = mapping_config.get('default_value', '')
         
-        print(f"[DYNAMIC DEBUG] Processing dynamic mapping with {len(conditions)} conditions")
-        print(f"[DYNAMIC DEBUG] Available row_data keys: {list(row_data.keys())}")
-        print(f"[DYNAMIC DEBUG] Dynamic conditions: {conditions}")
         logger.debug(f"Processing dynamic mapping with {len(conditions)} conditions")
         logger.debug(f"Available row_data keys: {list(row_data.keys())}")
         logger.debug(f"Dynamic conditions: {conditions}")
@@ -113,7 +184,6 @@ def apply_column_mapping(mapping_config: Dict[str, Any], row_data: Dict[str, Any
             condition_value = condition.get('condition_value', '')
             output_value = condition.get('output_value', '')
             
-            print(f"[DYNAMIC DEBUG] Checking condition: {condition_column} {operator} {condition_value} -> {output_value}")
             logger.debug(f"Checking condition: {condition_column} {operator} {condition_value} -> {output_value}")
 
             if condition_column in row_data:
@@ -168,20 +238,23 @@ def apply_column_mapping(mapping_config: Dict[str, Any], row_data: Dict[str, Any
                             condition_met = row_value_str.endswith(condition_value_str)
 
                     if condition_met:
-                        print(f"[DYNAMIC DEBUG] CONDITION MET! Returning output_value: {output_value}")
                         logger.debug(f"Condition met! Returning output_value: {output_value}")
-                        return output_value
+                        # Evaluate expressions in output values
+                        result = evaluate_expression(output_value, row_data)
+                        logger.debug(f"Evaluated output_value: {result}")
+                        return result
 
                 except Exception as e:
                     logger.warning(f"Error evaluating dynamic condition: {str(e)}")
                     continue
             else:
-                print(f"[DYNAMIC DEBUG] Column '{condition_column}' NOT FOUND in row_data. Available keys: {list(row_data.keys())}")
                 logger.debug(f"Dynamic condition column '{condition_column}' not found in row_data. Available keys: {list(row_data.keys())}")
 
-        print(f"[DYNAMIC DEBUG] Returning default value: {default_value}")
         logger.debug(f"Dynamic condition returning default value: {default_value}")
-        return default_value
+        # Evaluate expressions in default values
+        result = evaluate_expression(default_value, row_data)
+        logger.debug(f"Evaluated default value: {result}")
+        return result
 
     return ''
 
@@ -714,12 +787,25 @@ For dynamic mapping, use dynamic_conditions array with condition objects.
 For static mapping, use static_value field.
 For direct mapping, use source_column field.
 
-Make sure to:
-1. Use actual column names from the source files
-2. Create realistic transformation rules based on requirements
-3. Use appropriate operators for conditions
-4. Generate meaningful output column names
-5. Return ONLY the JSON configuration, no additional text
+IMPORTANT RULES:
+1. ONLY use column names that exist in the source files: {', '.join([col for file_info in source_files for col in file_info.get('columns', [])])}
+2. DO NOT reference columns that don't exist (like calculated fields in conditions)
+3. For dynamic conditions, ONLY use existing source columns in condition_column
+4. If you need calculated values, create them as separate output columns first
+5. Use appropriate operators for conditions
+6. Generate meaningful output column names
+7. Return ONLY the JSON configuration, no additional text
+
+EXAMPLES:
+1. Direct column mapping: "source_column": "customer_id"
+2. Static value with expression: "static_value": "{{first_name}} {{last_name}}"
+3. Dynamic condition with expression: 
+   - "condition_column": "unit_price" (must exist in source)
+   - "output_value": "{{quantity}} * {{unit_price}}"
+4. Mathematical expressions: "{{quantity}} * {{unit_price}} * (1 - {{discount_percent}}/100)"
+5. String concatenation: "{{first_name}} {{last_name}}"
+
+Use {{column_name}} syntax to reference column values in expressions.
 """
         
         # Call OpenAI API

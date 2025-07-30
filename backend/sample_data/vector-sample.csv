@@ -1,0 +1,21 @@
+customer_id,name,email,product_category,purchase_amount,description,rating,review,city,age
+1,John Smith,john.smith@email.com,Electronics,1250.99,High-end laptop for gaming and professional work,5,Excellent performance and build quality. Perfect for my development work,New York,28
+2,Sarah Johnson,sarah.j@email.com,Fashion,89.99,Casual summer dress with floral pattern,4,Nice quality fabric but runs a bit small. Overall satisfied,Los Angeles,34
+3,Mike Chen,mike.chen@email.com,Electronics,299.99,Wireless headphones with noise cancellation,5,Amazing sound quality and comfort. Best purchase this year,San Francisco,25
+4,Emily Davis,emily.davis@email.com,Home & Garden,179.99,Ergonomic office chair for home workspace,4,Good support but assembly was challenging. Worth the price,Chicago,31
+5,Robert Wilson,r.wilson@email.com,Books,24.99,Programming guide for beginners,5,Clear explanations and practical examples. Highly recommend,Boston,22
+6,Lisa Brown,lisa.brown@email.com,Fashion,159.99,Winter coat with waterproof material,3,Keeps warm but zipper feels cheap. Expected better quality,Seattle,29
+7,David Martinez,d.martinez@email.com,Sports,449.99,Professional mountain bike for trails,5,Incredible bike performance on rough terrain. Exceeded expectations,Denver,33
+8,Jennifer Taylor,jen.taylor@email.com,Electronics,79.99,Smart fitness tracker with heart rate monitor,4,Accurate tracking but battery life could be better,Miami,26
+9,Tom Anderson,tom.anderson@email.com,Home & Garden,299.99,Coffee machine with multiple brewing options,5,Perfect coffee every morning. Easy to use and clean,Portland,35
+10,Amanda White,amanda.w@email.com,Beauty,49.99,Organic skincare set with natural ingredients,4,Skin feels softer but fragrance is too strong,Phoenix,27
+11,Kevin Lee,kevin.lee@email.com,Electronics,1899.99,4K gaming monitor with high refresh rate,5,Crystal clear display and smooth gaming experience,Austin,24
+12,Rachel Green,rachel.green@email.com,Fashion,119.99,Professional blazer for business meetings,4,Great fit and style but wrinkles easily,Atlanta,32
+13,Steve Clark,steve.clark@email.com,Sports,199.99,Running shoes with advanced cushioning,5,Most comfortable shoes I've ever owned. Perfect for marathons,Houston,28
+14,Michelle Lewis,m.lewis@email.com,Books,15.99,Mystery novel with thrilling plot twists,3,Interesting story but predictable ending. Average read,Philadelphia,30
+15,Chris Walker,chris.walker@email.com,Home & Garden,89.99,Smart LED bulbs with voice control,4,Easy setup and great color options. One bulb stopped working,Orlando,26
+16,Jessica Hall,jessica.hall@email.com,Beauty,79.99,Professional makeup brush set,5,High quality brushes that blend perfectly. Worth every penny,Las Vegas,23
+17,Mark Young,mark.young@email.com,Electronics,599.99,Tablet for digital art and note-taking,4,Great for creativity but stylus lag is noticeable,San Diego,29
+18,Nicole King,nicole.king@email.com,Fashion,199.99,Designer handbag with genuine leather,5,Beautiful craftsmanship and spacious interior. Love it,Nashville,31
+19,Brian Wright,brian.wright@email.com,Sports,349.99,Tennis racket used by professional players,4,Good control and power but heavier than expected,Dallas,27
+20,Melissa Scott,melissa.scott@email.com,Home & Garden,129.99,Indoor plant collection for air purification,5,Plants arrived healthy and are thriving. Great for office,Columbus,25

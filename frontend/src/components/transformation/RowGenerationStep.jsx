@@ -278,9 +278,12 @@ const RowGenerationStep = ({
                             type="text"
                             value={column.static_value || ''}
                             onChange={(e) => updateOutputColumn(ruleIndex, columnIndex, {static_value: e.target.value})}
-                            placeholder="Enter static value..."
+                            placeholder="Enter static value or expression like {first_name} {last_name}..."
                             className="w-full px-3 py-2 border border-gray-300 rounded"
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                            💡 Use {`{column_name}`} for expressions: {`{quantity} * {unit_price}`} or {`{first_name} {last_name}`}
+                        </p>
                     </div>
                 )}
 
@@ -296,6 +299,21 @@ const RowGenerationStep = ({
                             >
                                 Add Condition
                             </button>
+                        </div>
+                        
+                        {/* Debug info */}
+                        <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                            <strong>Debug:</strong> {(column.dynamic_conditions || []).length} conditions configured
+                            {column.dynamic_conditions?.map((cond, idx) => {
+                                const isValidColumn = allColumns.some(col => col.value === cond.condition_column);
+                                return (
+                                    <div key={idx} className={`ml-2 font-mono ${!isValidColumn ? 'text-red-600 font-bold' : ''}`}>
+                                        • {cond.condition_column} {cond.operator} "{cond.condition_value}" → "{cond.output_value}"
+                                        {!isValidColumn && <span className="text-red-600"> ⚠️ INVALID COLUMN</span>}
+                                    </div>
+                                );
+                            })}
+                            <div className="mt-1">Default: "{column.default_value}"</div>
                         </div>
 
                         {(column.dynamic_conditions || []).map((condition, condIndex) => (
@@ -349,9 +367,12 @@ const RowGenerationStep = ({
                                             type="text"
                                             value={condition.output_value || ''}
                                             onChange={(e) => updateDynamicCondition(ruleIndex, columnIndex, condIndex, {output_value: e.target.value})}
-                                            placeholder="Output value"
+                                            placeholder="Output value or expression like {quantity} * {unit_price}"
                                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                         />
+                                        <p className="text-xs text-gray-400 mt-1">
+                                            Use {`{column_name}`} for calculations
+                                        </p>
                                     </div>
 
                                     <div className="flex justify-end">
@@ -389,9 +410,12 @@ const RowGenerationStep = ({
                                 type="text"
                                 value={column.default_value || ''}
                                 onChange={(e) => updateOutputColumn(ruleIndex, columnIndex, {default_value: e.target.value})}
-                                placeholder="Default value"
+                                placeholder="Default value or expression like {quantity} * {unit_price}"
                                 className="w-full px-3 py-2 border border-gray-300 rounded"
                             />
+                            <p className="text-xs text-gray-500 mt-1">
+                                💡 Supports expressions with {`{column_name}`} syntax
+                            </p>
                         </div>
                     </div>
                 )}

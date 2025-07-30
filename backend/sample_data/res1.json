@@ -1,0 +1,23 @@
+success: true,
+                    process_type:
+                    processId: data.transformation_id,
+                    summary: data.summary,
+                    process: data
+
+{
+  "delta_id": "delta_20250721_15h24m21s_714",
+  "process_type": "delta-generation",
+  "status": "processing",
+  "summary": {
+    "total_records_file_a": 12,
+    "total_records_file_b": 12,
+    "unchanged_records": 12,
+    "amended_records": 0,
+    "deleted_records": 0,
+    "newly_added_records": 0,
+    "processing_time_seconds": 0.049
+  },
+  "created_at": "2025-07-21T15:24:21.782Z",
+  "file_a": "Older File",
+  "file_b": "Newer File"
+}
