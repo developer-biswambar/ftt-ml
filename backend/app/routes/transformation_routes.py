@@ -711,12 +711,12 @@ async def generate_transformation_config(request: dict):
         if not source_files:
             raise HTTPException(status_code=400, detail="Source files information is required")
         
-        # Import OpenAI service
-        from app.services.openai_service import get_openai_client
+        # Import LLM service
+        from app.services.llm_service import get_llm_service, LLMMessage
         
-        client = get_openai_client()
-        if not client:
-            raise HTTPException(status_code=500, detail="OpenAI API not configured")
+        llm_service = get_llm_service()
+        if not llm_service.is_available():
+            raise HTTPException(status_code=500, detail=f"LLM service ({llm_service.get_provider_name()}) not configured")
         
         # Prepare context about source files
         files_context = []
@@ -808,18 +808,22 @@ EXAMPLES:
 Use {{column_name}} syntax to reference column values in expressions.
 """
         
-        # Call OpenAI API
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a data transformation expert. Return only valid JSON configuration."},
-                {"role": "user", "content": prompt}
-            ],
+        # Call LLM service
+        messages = [
+            LLMMessage(role="system", content="You are a data transformation expert. Return only valid JSON configuration."),
+            LLMMessage(role="user", content=prompt)
+        ]
+        
+        response = llm_service.generate_text(
+            messages=messages,
             temperature=0.3,
             max_tokens=2000
         )
         
-        generated_config_text = response.choices[0].message.content.strip()
+        if not response.success:
+            raise HTTPException(status_code=500, detail=f"LLM generation failed: {response.error}")
+        
+        generated_config_text = response.content
         
         # Parse the JSON response
         import json
@@ -867,18 +871,38 @@ Use {{column_name}} syntax to reference column values in expressions.
 @router.get("/health")
 async def transformation_health_check():
     """Health check for transformation service"""
+    
+    # Check LLM service status
+    try:
+        from app.services.llm_service import get_llm_service
+        llm_service = get_llm_service()
+        llm_status = {
+            "provider": llm_service.get_provider_name(),
+            "model": llm_service.get_model_name(),
+            "available": llm_service.is_available()
+        }
+    except Exception as e:
+        llm_status = {
+            "provider": "unknown",
+            "model": "unknown",
+            "available": False,
+            "error": str(e)
+        }
 
     return {
         "status": "healthy",
         "service": "transformation",
+        "llm_service": llm_status,
         "features": [
             "rule_based_transformation",
-            "multiple_output_datasets",
+            "multiple_output_datasets", 
             "conditional_logic",
             "dynamic_column_mapping",
             "dataset_merging",
             "template_system",
             "multiple_output_formats",
-            "ai_configuration_generation"
+            "ai_configuration_generation",
+            "expression_evaluation",
+            "pluggable_llm_providers"
         ]
     }
