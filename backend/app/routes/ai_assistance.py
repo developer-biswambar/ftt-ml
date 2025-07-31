@@ -54,7 +54,7 @@ async def generic_ai_call(
     try:
         start_time = time.time()
 
-        response_content = await openai_service.call_openai_generic(
+        response_content = await openai_service.call_llm_generic(
             system_prompt=request.system_prompt,
             user_prompt=request.user_prompt,
             messages=request.messages,
@@ -69,7 +69,7 @@ async def generic_ai_call(
             success=True,
             content=response_content,
             processing_time=processing_time,
-            model_used=openai_service.model
+            model_used=openai_service.llm_service.get_provider_name()
         )
 
     except Exception as e:
@@ -142,7 +142,7 @@ Please analyze this data structure and provide insights:
 Focus on practical recommendations for data processing and transformation.
 """
 
-        response_content = await openai_service.call_openai_generic(
+        response_content = await openai_service.call_llm_generic(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             temperature=0.3
@@ -151,7 +151,7 @@ Focus on practical recommendations for data processing and transformation.
         return AIResponse(
             success=True,
             content=response_content,
-            model_used=openai_service.model
+            model_used=openai_service.llm_service.get_provider_name()
         )
 
     except Exception as e:
@@ -172,7 +172,7 @@ async def test_ai_connection():
         return {
             "success": is_connected,
             "message": "AI service is available" if is_connected else "AI service unavailable",
-            "model": openai_service.model
+            "model": openai_service.llm_service.get_provider_name()
         }
 
     except Exception as e:

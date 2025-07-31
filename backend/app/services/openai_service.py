@@ -2,25 +2,18 @@
 import asyncio
 import json
 import logging
-import os
 import time
 from typing import List, Dict, Any
 
-from dotenv import load_dotenv
-from openai import AsyncOpenAI, OpenAI
-
 from app.models.schemas import ExtractedField, ExtractionRow
+from app.services.llm_service import get_llm_service, LLMMessage
 
 logger = logging.getLogger(__name__)
 
 
 class OpenAIService:
     def __init__(self):
-        load_dotenv()
-        self.client = AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-        self.model = os.getenv('OPENAI_MODEL')
-        self.max_tokens = int(os.getenv('OPENAI_MAX_TOKENS'))
-        self.temperature = os.getenv('OPENAI_TEMPERATURE')
+        self.llm_service = get_llm_service()
 
     async def extract_financial_data(
             self,
@@ -37,7 +30,7 @@ class OpenAIService:
 
             start_time = time.time()
 
-            response = await self._call_openai_api(system_prompt, user_prompt)
+            response = await self._call_llm_api(system_prompt, user_prompt)
 
             processing_time = time.time() - start_time
 
@@ -53,7 +46,7 @@ class OpenAIService:
             # Return failed extraction rows
             return self._create_failed_rows(text_batch, str(e))
 
-    async def call_openai_generic(
+    async def call_llm_generic(
             self,
             system_prompt: str = None,
             user_prompt: str = None,
@@ -63,53 +56,39 @@ class OpenAIService:
             response_format: Dict[str, str] = None
     ) -> str:
         """
-        Generic OpenAI API call without predefined prompts
+        Generic LLM API call without predefined prompts
         Can be used for any custom AI assistance tasks
         """
         try:
-            # Use provided values or defaults
-            temp = temperature if temperature is not None else self.temperature
-            tokens = max_tokens if max_tokens is not None else self.max_tokens
-
             # Build messages array
             if messages:
-                message_list = messages
+                # Convert dict messages to LLMMessage objects
+                llm_messages = [LLMMessage(role=msg["role"], content=msg["content"]) for msg in messages]
             else:
-                message_list = []
+                llm_messages = []
                 if system_prompt:
-                    message_list.append({"role": "system", "content": system_prompt})
+                    llm_messages.append(LLMMessage(role="system", content=system_prompt))
                 if user_prompt:
-                    message_list.append({"role": "user", "content": user_prompt})
+                    llm_messages.append(LLMMessage(role="user", content=user_prompt))
 
-            if not message_list:
+            if not llm_messages:
                 raise ValueError("Must provide either messages array or system/user prompts")
 
-            # Prepare API call parameters
-            api_params = {
-                "model": self.model,
-                "messages": message_list,
-                "temperature": temp,
-                "max_tokens": tokens
-            }
+            # Make the LLM call
+            response = self.llm_service.generate_text(
+                messages=llm_messages,
+                temperature=temperature or 0.3,
+                max_tokens=max_tokens or 2000
+            )
 
-            # Add response format if specified
-            if response_format:
-                api_params["response_format"] = response_format
+            if not response.success:
+                raise ValueError(f"LLM generation failed: {response.error}")
 
-            response = await self.client.chat.completions.create(**api_params)
-
-            return response.choices[0].message.content
+            return response.content
 
         except Exception as e:
-            if "rate_limit" in str(e).lower():
-                logger.warning("OpenAI rate limit hit, waiting...")
-                await asyncio.sleep(10)
-                return await self.call_openai_generic(
-                    system_prompt, user_prompt, messages, temperature, max_tokens, response_format
-                )
-            else:
-                logger.error(f"OpenAI API error: {str(e)}")
-                raise
+            logger.error(f"LLM API error: {str(e)}")
+            raise
 
     async def suggest_transformation_rules(
             self,
@@ -128,7 +107,7 @@ class OpenAIService:
 
             start_time = time.time()
 
-            response = await self.call_openai_generic(
+            response = await self.call_llm_generic(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 temperature=0.3,  # Lower temperature for more consistent suggestions
@@ -146,7 +125,7 @@ class OpenAIService:
                 "success": True,
                 "suggestions": suggestions,
                 "processing_time": processing_time,
-                "model_used": self.model
+                "model_used": self.llm_service.get_provider_name()
             }
 
         except Exception as e:
@@ -392,30 +371,28 @@ INPUT DATA:
 Please extract the requested financial data from each text entry and return as JSON array following the specified format.
 """
 
-    async def _call_openai_api(self, system_prompt: str, user_prompt: str) -> str:
-        """Make async call to OpenAI API"""
+    async def _call_llm_api(self, system_prompt: str, user_prompt: str) -> str:
+        """Make async call to LLM API"""
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                response_format={"type": "json_object"}
+            messages = [
+                LLMMessage(role="system", content=system_prompt),
+                LLMMessage(role="user", content=user_prompt)
+            ]
+            
+            response = self.llm_service.generate_text(
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2000
             )
 
-            return response.choices[0].message.content
+            if not response.success:
+                raise ValueError(f"LLM generation failed: {response.error}")
+
+            return response.content
 
         except Exception as e:
-            if "rate_limit" in str(e).lower():
-                logger.warning("OpenAI rate limit hit, waiting...")
-                await asyncio.sleep(10)
-                return await self._call_openai_api(system_prompt, user_prompt)
-            else:
-                logger.error(f"OpenAI API error: {str(e)}")
-                raise
+            logger.error(f"LLM API error: {str(e)}")
+            raise
 
     def _parse_openai_response(
             self,
@@ -497,51 +474,42 @@ Please extract the requested financial data from each text entry and return as J
         return failed_rows
 
     async def test_connection(self) -> bool:
-        """Test OpenAI API connection"""
+        """Test LLM API connection"""
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a test assistant."},
-                    {"role": "user", "content": "Respond with 'OK' if you can hear me."}
-                ],
+            messages = [
+                LLMMessage(role="system", content="You are a test assistant."),
+                LLMMessage(role="user", content="Respond with 'OK' if you can hear me.")
+            ]
+            
+            response = self.llm_service.generate_text(
+                messages=messages,
                 max_tokens=10,
                 temperature=0
             )
-            return "OK" in response.choices[0].message.content
+            
+            return response.success and "OK" in response.content
         except Exception as e:
-            logger.error(f"OpenAI connection test failed: {str(e)}")
+            logger.error(f"LLM connection test failed: {str(e)}")
             return False
 
 
 def get_openai_client():
-    """Get synchronous OpenAI client for transformation routes and other sync operations"""
+    """Get LLM service for transformation routes and other operations"""
     try:
-        load_dotenv()
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key or api_key == "sk-placeholder":
-            logger.warning("OpenAI API key not configured properly")
+        llm_service = get_llm_service()
+        if not llm_service.is_available():
+            logger.warning(f"LLM service ({llm_service.get_provider_name()}) not available")
             return None
         
-        return OpenAI(api_key=api_key)
+        return llm_service
     except Exception as e:
-        logger.error(f"Failed to create OpenAI client: {str(e)}")
+        logger.error(f"Failed to get LLM service: {str(e)}")
         return None
 
 
 def get_async_openai_client():
-    """Get asynchronous OpenAI client for async operations"""
-    try:
-        load_dotenv()
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key or api_key == "sk-placeholder":
-            logger.warning("OpenAI API key not configured properly")
-            return None
-        
-        return AsyncOpenAI(api_key=api_key)
-    except Exception as e:
-        logger.error(f"Failed to create async OpenAI client: {str(e)}")
-        return None
+    """Get LLM service for async operations (compatibility function)"""
+    return get_openai_client()
 
 
 # Singleton instance

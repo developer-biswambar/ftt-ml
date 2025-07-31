@@ -6,8 +6,9 @@ import re
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
-from openai import OpenAI
 from pydantic import BaseModel, Field
+
+from app.services.llm_service import get_llm_service, LLMMessage
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -107,13 +108,12 @@ COMMON_PATTERNS = {
 }
 
 
-def get_openai_client():
-    """Get OpenAI client instance"""
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key or api_key == "sk-placeholder":
-        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
-
-    return OpenAI(api_key=api_key)
+def get_llm_client():
+    """Get LLM service instance"""
+    llm_service = get_llm_service()
+    if not llm_service.is_available():
+        raise HTTPException(status_code=500, detail=f"LLM service ({llm_service.get_provider_name()}) not available")
+    return llm_service
 
 
 def suggest_fallback_pattern(description: str) -> Optional[Dict]:
@@ -145,11 +145,11 @@ def suggest_fallback_pattern(description: str) -> Optional[Dict]:
     return None
 
 
-async def generate_regex_with_openai(description: str, sample_text: str = "", column_name: str = "") -> Dict:
-    """Generate regex using OpenAI API"""
-    client = get_openai_client()
+async def generate_regex_with_llm(description: str, sample_text: str = "", column_name: str = "") -> Dict:
+    """Generate regex using LLM service"""
+    llm_service = get_llm_client()
 
-    prompt = f"""You are a regex expert. Generate a JavaScript-compatible regular expression based on this description:
+    user_prompt = f"""You are a regex expert. Generate a JavaScript-compatible regular expression based on this description:
 
 Description: "{description}"
 {f'Sample text: "{sample_text}"' if sample_text else ''}
@@ -172,23 +172,21 @@ Example response for "Extract dollar amounts":
 {{"regex": "\\\\\\$([\\\\d,]+(?:\\\\\\.\\\\d{{2}})?)", "explanation": "Matches dollar signs followed by numbers with optional commas and decimal places. Captures the numeric part.", "testCases": ["$1,234.56", "$99.99", "$1000"]}}"""
 
     try:
-        response = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a regex expert that generates JavaScript-compatible regular expressions. Always respond with valid JSON containing regex, explanation, and testCases fields."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            max_tokens=500,
+        messages = [
+            LLMMessage(role="system", content="You are a regex expert that generates JavaScript-compatible regular expressions. Always respond with valid JSON containing regex, explanation, and testCases fields."),
+            LLMMessage(role="user", content=user_prompt)
+        ]
+        
+        response = llm_service.generate_text(
+            messages=messages,
             temperature=0.3,
+            max_tokens=500
         )
 
-        content = response.choices[0].message.content.strip()
+        if not response.success:
+            raise ValueError(f"LLM generation failed: {response.error}")
+            
+        content = response.content.strip()
 
         # Parse JSON response
         try:
@@ -196,7 +194,7 @@ Example response for "Extract dollar amounts":
 
             # Validate required fields
             if not all(key in result for key in ['regex', 'explanation', 'testCases']):
-                raise ValueError("Missing required fields in AI response")
+                raise ValueError("Missing required fields in LLM response")
 
             # Validate regex
             try:
@@ -213,15 +211,15 @@ Example response for "Extract dollar amounts":
                 regex_pattern = regex_match.group(1)
                 return {
                     "regex": regex_pattern,
-                    "explanation": "AI-generated regex pattern",
+                    "explanation": "LLM-generated regex pattern",
                     "testCases": []
                 }
             else:
-                raise ValueError("Unable to parse AI response")
+                raise ValueError("Unable to parse LLM response")
 
     except Exception as e:
-        logger.error(f"OpenAI API error: {str(e)}")
-        raise ValueError(f"OpenAI API error: {str(e)}")
+        logger.error(f"LLM service error: {str(e)}")
+        raise ValueError(f"LLM service error: {str(e)}")
 
 
 @router.post("/generate", response_model=RegexGenerationResponse)
@@ -232,7 +230,7 @@ async def generate_regex(request: RegexGenerationRequest):
 
         # Try AI generation first
         try:
-            ai_result = await generate_regex_with_openai(
+            ai_result = await generate_regex_with_llm(
                 request.description,
                 request.sample_text or "",
                 request.column_name or ""
