@@ -101,7 +101,9 @@ OPENAI_MAX_TOKENS=2000  # Optional
 # To use JPMC LLM (internal service, no API key needed):
 LLM_PROVIDER=jpmcllm
 JPMC_LLM_URL=http://localhost:8080  # Internal JPMC LLM service endpoint
-# JPMC LLM uses simplified JSON format: {"Message": "combined_message_string"}
+# JPMC LLM uses simplified JSON format:
+# Request: {"Message": "combined_message_string"}
+# Response: {"Message": "ai_response", ...other_details}
 JPMC_LLM_MODEL=jpmc-llm-v1  # Optional, defaults to jpmc-llm-v1
 JPMC_LLM_TEMPERATURE=0.3  # Optional
 JPMC_LLM_MAX_TOKENS=2000  # Optional

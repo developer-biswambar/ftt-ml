@@ -199,7 +199,14 @@ class JPMCLLMService(LLMServiceInterface):
                 "User-Agent": "FTT-ML-Backend/1.0"
             }
             
+            # Log request details for debugging
+            logger.info(f"JPMC LLM request to {self.api_url}/generate")
+            logger.debug(f"JPMC LLM request payload: {payload}")
+            
             # Make request to JPMC LLM service (simplified endpoint)
+            import time
+            start_time = time.time()
+            
             response = requests.post(
                 f"{self.api_url}/generate",
                 json=payload,
@@ -207,10 +214,21 @@ class JPMCLLMService(LLMServiceInterface):
                 timeout=self.timeout
             )
             
+            response_time = time.time() - start_time
+            logger.info(f"JPMC LLM response: status={response.status_code}, time={response_time:.2f}s")
+            
             if response.status_code == 200:
                 result = response.json()
-                # JPMC LLM service returns simple response format
-                content = result.get("response", result.get("content", result.get("text", ""))).strip()
+                
+                # Log the full response details for debugging
+                logger.info(f"JPMC LLM full response: {result}")
+                
+                # Extract AI response from "Message" field
+                content = result.get("Message", "").strip()
+                
+                if not content:
+                    logger.warning("No 'Message' field found in JPMC LLM response")
+                    content = result.get("response", result.get("content", result.get("text", ""))).strip()
                 
                 return LLMResponse(
                     content=content,
