@@ -7,12 +7,36 @@ Simplified LLM service architecture supporting two providers:
 
 import logging
 import os
+import re
 import requests
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+
+def extract_json_string(text: str) -> str:
+    """
+    Cleans LLM output and returns a valid JSON string.
+    Does not parse it with json.loads(), just prepares it for safe loading.
+    Raises ValueError if no JSON-like content found.
+    """
+    original = text.strip()
+
+    # Step 1: Remove Markdown/code block/triple quote wrappers
+    cleaned = re.sub(r"```json\s*|\s*```", "", original, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^json'''|'''$", "", cleaned.strip(), flags=re.IGNORECASE)
+    cleaned = re.sub(r"^json", "", cleaned.strip(), flags=re.IGNORECASE)
+    cleaned = cleaned.strip("'''").strip('"""').strip()
+
+    # Step 2: Try to extract JSON-looking block (between first { and last })
+    json_match = re.search(r'{[\s\S]*}', cleaned)
+    if json_match:
+        json_str = json_match.group().strip()
+        return json_str
+
+    raise ValueError("No valid JSON-like content found.")
 
 
 @dataclass
@@ -114,10 +138,19 @@ class OpenAILLMService(LLMServiceInterface):
                 **kwargs
             )
             
-            content = response.choices[0].message.content.strip()
+            raw_content = response.choices[0].message.content.strip()
+            
+            # Try to sanitize JSON output
+            try:
+                sanitized_content = extract_json_string(raw_content)
+                logger.debug(f"JSON sanitized for OpenAI response")
+            except ValueError:
+                # If no JSON found, use raw content
+                sanitized_content = raw_content
+                logger.debug(f"No JSON content found in OpenAI response, using raw content")
             
             return LLMResponse(
-                content=content,
+                content=sanitized_content,
                 provider="openai",
                 model=self.model,
                 success=True
@@ -224,14 +257,23 @@ class JPMCLLMService(LLMServiceInterface):
                 logger.info(f"JPMC LLM full response: {result}")
                 
                 # Extract AI response from "Message" field
-                content = result.get("Message", "").strip()
+                raw_content = result.get("Message", "").strip()
                 
-                if not content:
+                if not raw_content:
                     logger.warning("No 'Message' field found in JPMC LLM response")
-                    content = result.get("response", result.get("content", result.get("text", ""))).strip()
+                    raw_content = result.get("response", result.get("content", result.get("text", ""))).strip()
+                
+                # Try to sanitize JSON output
+                try:
+                    sanitized_content = extract_json_string(raw_content)
+                    logger.debug(f"JSON sanitized for JPMC LLM response")
+                except ValueError:
+                    # If no JSON found, use raw content
+                    sanitized_content = raw_content
+                    logger.debug(f"No JSON content found in JPMC LLM response, using raw content")
                 
                 return LLMResponse(
-                    content=content,
+                    content=sanitized_content,
                     provider="jpmcllm",
                     model=self.model,
                     success=True
