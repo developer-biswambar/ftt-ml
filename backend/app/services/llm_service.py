@@ -1,11 +1,13 @@
-# LLM Service - Pluggable architecture for different LLM providers
+# Simplified LLM Service - Supports OpenAI and JPMC LLM
 """
-Pluggable LLM service architecture that supports multiple providers.
-Currently supports OpenAI, but can be extended to support other providers.
+Simplified LLM service architecture supporting two providers:
+1. OpenAI - External API service
+2. JPMC LLM - Custom internal LLM service
 """
 
 import logging
 import os
+import requests
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
@@ -142,22 +144,18 @@ class OpenAILLMService(LLMServiceInterface):
         return self.model
 
 
-class AnthropicLLMService(LLMServiceInterface):
-    """Anthropic Claude implementation of the LLM service (example for future use)"""
+class JPMCLLMService(LLMServiceInterface):
+    """JPMC Custom LLM implementation - Internal service without API key"""
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "claude-3-sonnet-20240229"):
-        self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY')
+    def __init__(self, api_url: Optional[str] = None, model: str = "jpmc-llm-v1"):
+        self.api_url = api_url or os.getenv('JPMC_LLM_URL', 'http://localhost:8080')
         self.model = model
-        self._client = None
+        self.timeout = int(os.getenv('JPMC_LLM_TIMEOUT', '30'))
         
-        if self.api_key:
-            try:
-                # Import would be: from anthropic import Anthropic
-                # self._client = Anthropic(api_key=self.api_key)
-                logger.info(f"Anthropic LLM service would be initialized with model: {self.model}")
-            except ImportError:
-                logger.error("Anthropic package not installed")
-                self._client = None
+        if self.api_url:
+            logger.info(f"JPMC LLM service initialized with model: {self.model} at {self.api_url}")
+        else:
+            logger.warning("JPMC LLM service not configured. Check JPMC_LLM_URL")
     
     def generate_text(
         self, 
@@ -166,66 +164,105 @@ class AnthropicLLMService(LLMServiceInterface):
         max_tokens: int = 2000,
         **kwargs
     ) -> LLMResponse:
-        """Generate text using Anthropic API"""
-        # This is a placeholder implementation
-        return LLMResponse(
-            content="",
-            provider="anthropic",
-            model=self.model,
-            success=False,
-            error="Anthropic service not implemented yet"
-        )
-    
-    def is_available(self) -> bool:
-        return False  # Not implemented yet
-    
-    def get_provider_name(self) -> str:
-        return "anthropic"
-    
-    def get_model_name(self) -> str:
-        return self.model
-
-
-class GeminiLLMService(LLMServiceInterface):
-    """Google Gemini implementation of the LLM service (example for future use)"""
-    
-    def __init__(self, api_key: Optional[str] = None, model: str = "gemini-pro"):
-        self.api_key = api_key or os.getenv('GOOGLE_API_KEY')
-        self.model = model
-        self._client = None
+        """Generate text using JPMC LLM API"""
+        if not self.is_available():
+            return LLMResponse(
+                content="",
+                provider="jpmcllm",
+                model=self.model,
+                success=False,
+                error="JPMC LLM service not available"
+            )
         
-        if self.api_key:
-            try:
-                # Import would be: import google.generativeai as genai
-                # genai.configure(api_key=self.api_key)
-                # self._client = genai.GenerativeModel(self.model)
-                logger.info(f"Gemini LLM service would be initialized with model: {self.model}")
-            except ImportError:
-                logger.error("Google GenerativeAI package not installed")
-                self._client = None
-    
-    def generate_text(
-        self, 
-        messages: List[LLMMessage], 
-        temperature: float = 0.3,
-        max_tokens: int = 2000,
-        **kwargs
-    ) -> LLMResponse:
-        """Generate text using Google Gemini API"""
-        # This is a placeholder implementation
-        return LLMResponse(
-            content="",
-            provider="gemini",
-            model=self.model,
-            success=False,
-            error="Gemini service not implemented yet"
-        )
+        try:
+            # Convert messages to JPMC LLM format
+            formatted_messages = [
+                {"role": msg.role, "content": msg.content} 
+                for msg in messages
+            ]
+            
+            # Prepare request payload for JPMC LLM
+            payload = {
+                "model": self.model,
+                "messages": formatted_messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                **kwargs
+            }
+            
+            headers = {
+                "Content-Type": "application/json",
+                "User-Agent": "FTT-ML-Backend/1.0"
+            }
+            
+            # Make request to JPMC LLM service
+            response = requests.post(
+                f"{self.api_url}/v1/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                content = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                
+                return LLMResponse(
+                    content=content,
+                    provider="jpmcllm",
+                    model=self.model,
+                    success=True
+                )
+            else:
+                error_msg = f"JPMC LLM API error: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                return LLMResponse(
+                    content="",
+                    provider="jpmcllm",
+                    model=self.model,
+                    success=False,
+                    error=error_msg
+                )
+                
+        except requests.exceptions.Timeout:
+            error_msg = f"JPMC LLM API timeout after {self.timeout} seconds"
+            logger.error(error_msg)
+            return LLMResponse(
+                content="",
+                provider="jpmcllm",
+                model=self.model,
+                success=False,
+                error=error_msg
+            )
+        except Exception as e:
+            error_msg = f"JPMC LLM API error: {e}"
+            logger.error(error_msg)
+            return LLMResponse(
+                content="",
+                provider="jpmcllm",
+                model=self.model,
+                success=False,
+                error=error_msg
+            )
     
     def is_available(self) -> bool:
-        return False  # Not implemented yet
+        """Check if JPMC LLM service is available"""
+        if not self.api_url:
+            return False
+        
+        # Optional: Add health check endpoint call
+        try:
+            health_response = requests.get(
+                f"{self.api_url}/health",
+                timeout=5
+            )
+            return health_response.status_code == 200
+        except Exception:
+            # If health check fails, assume service is available if configured
+            return True
     
     def get_provider_name(self) -> str:
-        return "gemini"
+        return "jpmcllm"
     
     def get_model_name(self) -> str:
         return self.model
@@ -236,14 +273,12 @@ class LLMServiceFactory:
     
     _providers = {
         "openai": OpenAILLMService,
-        "anthropic": AnthropicLLMService,
-        "gemini": GeminiLLMService,
-        # Add more providers here as they're implemented
+        "jpmcllm": JPMCLLMService,
     }
     
     @classmethod
     def create_service(
-        self, 
+        cls, 
         provider: str = "openai", 
         **kwargs
     ) -> LLMServiceInterface:
@@ -251,16 +286,21 @@ class LLMServiceFactory:
         
         provider = provider.lower()
         
-        if provider not in self._providers:
-            available_providers = ", ".join(self._providers.keys())
+        if provider not in cls._providers:
+            available_providers = ", ".join(cls._providers.keys())
             raise ValueError(f"Unknown LLM provider: {provider}. Available: {available_providers}")
         
-        service_class = self._providers[provider]
+        service_class = cls._providers[provider]
         
         # Filter kwargs to only pass constructor arguments
-        # Remove generation parameters that should go to generate_text()
-        constructor_kwargs = {k: v for k, v in kwargs.items() 
-                            if k in ['api_key', 'model']}
+        if provider == "openai":
+            constructor_kwargs = {k: v for k, v in kwargs.items() 
+                                if k in ['api_key', 'model']}
+        elif provider == "jpmcllm":
+            constructor_kwargs = {k: v for k, v in kwargs.items() 
+                                if k in ['api_url', 'model']}
+        else:
+            constructor_kwargs = kwargs
         
         service = service_class(**constructor_kwargs)
         
@@ -278,8 +318,8 @@ class LLMServiceFactory:
     def get_default_service(cls) -> LLMServiceInterface:
         """Get the default LLM service (tries providers in order of preference)"""
         
-        # Try providers in order of preference
-        preferred_order = ["openai", "anthropic"]
+        # Try providers in order of preference: JPMC first, then OpenAI
+        preferred_order = ["jpmcllm", "openai"]
         
         for provider in preferred_order:
             try:
@@ -291,9 +331,9 @@ class LLMServiceFactory:
                 logger.warning(f"Failed to initialize {provider}: {e}")
                 continue
         
-        # If no providers are available, return a dummy service that will fail gracefully
+        # If no providers are available, return OpenAI service (will be unavailable but handle gracefully)
         logger.error("No LLM providers are available")
-        return cls.create_service("openai")  # Will return unavailable service
+        return cls.create_service("openai")
 
 
 # Global service instance - can be configured at startup
@@ -311,15 +351,23 @@ def get_llm_service() -> LLMServiceInterface:
             config = LLMConfig.get_provider_config()
             
             logger.info(f"Initializing LLM service: {config['provider']} with model {config['model']}")
-            _llm_service = LLMServiceFactory.create_service(
-                provider=config.get('provider'),
-                api_key=config.get('api_key'),
-                model=config.get('model')
-            )
+            
+            if config['provider'] == 'jpmcllm':
+                _llm_service = LLMServiceFactory.create_service(
+                    provider=config.get('provider'),
+                    api_url=config.get('api_url'),
+                    model=config.get('model')
+                )
+            else:
+                _llm_service = LLMServiceFactory.create_service(
+                    provider=config.get('provider'),
+                    api_key=config.get('api_key'),
+                    model=config.get('model')
+                )
         except Exception as e:
             logger.error(f"Failed to load LLM config: {e}")
-            # Fallback to basic OpenAI configuration
-            _llm_service = LLMServiceFactory.create_service(provider="openai")
+            # Fallback to default service selection
+            _llm_service = LLMServiceFactory.get_default_service()
     
     return _llm_service
 

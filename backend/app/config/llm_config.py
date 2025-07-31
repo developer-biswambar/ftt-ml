@@ -1,7 +1,7 @@
-# LLM Configuration
+# Simplified LLM Configuration
 """
 Configuration settings for LLM providers.
-This file makes it easy to switch between different LLM providers and models.
+Supports OpenAI and JPMC LLM services only.
 """
 
 import os
@@ -15,9 +15,7 @@ class LLMConfig:
     DEFAULT_PROVIDER = "openai"
     DEFAULT_MODELS = {
         "openai": "gpt-4",
-        "anthropic": "claude-3-sonnet-20240229", 
-        "gemini": "gemini-pro",
-        # Add more providers and their default models here
+        "jpmcllm": "jpmc-llm-v1",
     }
     
     @classmethod
@@ -59,17 +57,12 @@ class LLMConfig:
                 "temperature": float(os.getenv('OPENAI_TEMPERATURE', '0.3')),
                 "max_tokens": int(os.getenv('OPENAI_MAX_TOKENS', '2000')),
             })
-        elif provider == "anthropic":
+        elif provider == "jpmcllm":
             config.update({
-                "api_key": os.getenv('ANTHROPIC_API_KEY'),
-                "temperature": float(os.getenv('ANTHROPIC_TEMPERATURE', '0.3')),
-                "max_tokens": int(os.getenv('ANTHROPIC_MAX_TOKENS', '2000')),
-            })
-        elif provider == "gemini":
-            config.update({
-                "api_key": os.getenv('GOOGLE_API_KEY'),
-                "temperature": float(os.getenv('GEMINI_TEMPERATURE', '0.3')),
-                "max_tokens": int(os.getenv('GEMINI_MAX_TOKENS', '2000')),
+                "api_url": os.getenv('JPMC_LLM_URL', 'http://localhost:8080'),
+                "temperature": float(os.getenv('JPMC_LLM_TEMPERATURE', '0.3')),
+                "max_tokens": int(os.getenv('JPMC_LLM_MAX_TOKENS', '2000')),
+                "timeout": int(os.getenv('JPMC_LLM_TIMEOUT', '30')),
             })
         
         return config
@@ -81,10 +74,8 @@ class LLMConfig:
         
         if provider == "openai":
             return bool(config.get("api_key"))
-        elif provider == "anthropic":
-            return bool(config.get("api_key"))
-        elif provider == "gemini":
-            return bool(config.get("api_key"))
+        elif provider == "jpmcllm":
+            return bool(config.get("api_url"))
         
         return False
     
@@ -98,18 +89,23 @@ class LLMConfig:
         return available
 
 
-# Example environment variable configurations:
+# Environment variable configurations:
 """
 # To use OpenAI (default):
 LLM_PROVIDER=openai
 OPENAI_API_KEY=your_openai_key
 OPENAI_MODEL=gpt-4  # Optional, defaults to gpt-4
+OPENAI_TEMPERATURE=0.3  # Optional
+OPENAI_MAX_TOKENS=2000  # Optional
 
-# To use Anthropic:
-LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=your_anthropic_key
-ANTHROPIC_MODEL=claude-3-sonnet-20240229  # Optional
+# To use JPMC LLM (internal service, no API key needed):
+LLM_PROVIDER=jpmcllm
+JPMC_LLM_URL=http://localhost:8080  # Internal JPMC LLM service endpoint
+JPMC_LLM_MODEL=jpmc-llm-v1  # Optional, defaults to jpmc-llm-v1
+JPMC_LLM_TEMPERATURE=0.3  # Optional
+JPMC_LLM_MAX_TOKENS=2000  # Optional
+JPMC_LLM_TIMEOUT=30  # Optional, request timeout in seconds
 
 # General settings (applies to current provider):
-LLM_MODEL=gpt-3.5-turbo  # Override model for any provider
+LLM_MODEL=custom-model  # Override model for any provider
 """
