@@ -140,6 +140,10 @@ DEBUG=false
 - **Coverage**: Configured for 80% minimum coverage
 - **Test Categories**: unit, integration, file_upload, excel, csv, error, validation, viewer
 - **Parallel Execution**: Available with pytest-xdist
+- **Organized Testing**: Comprehensive testing documentation in `backend/docs/testing/`
+  - Feature-specific test folders (reconciliation, transformation, delta, ai-features, file-processing)
+  - Complete test scenarios with sample data and expected results
+  - Performance benchmarks and validation criteria
 
 ## Performance Optimizations
 

@@ -1,0 +1,16 @@
+customer_id,first_name,last_name,email,phone,purchase_date,product_category,product_name,quantity,unit_price,discount_percent,payment_method,order_status,shipping_address,region
+CUST001,John,Smith,john.smith@email.com,555-0101,2024-01-15,Electronics,Smartphone,1,899.99,10,Credit Card,Completed,"123 Main St, New York, NY",North
+CUST002,Sarah,Johnson,sarah.j@email.com,555-0102,2024-01-16,Clothing,Winter Jacket,2,149.50,5,PayPal,Completed,"456 Oak Ave, Boston, MA",North
+CUST003,Mike,Williams,mike.w@email.com,555-0103,2024-01-17,Electronics,Laptop,1,1299.99,15,Credit Card,Processing,"789 Pine St, Chicago, IL",Central
+CUST004,Emma,Brown,emma.brown@email.com,555-0104,2024-01-18,Home & Garden,Garden Set,1,299.99,0,Debit Card,Shipped,"321 Elm St, Dallas, TX",South
+CUST005,David,Jones,david.jones@email.com,555-0105,2024-01-19,Books,Programming Guide,3,49.99,20,Credit Card,Completed,"654 Maple Dr, Seattle, WA",West
+CUST006,Lisa,Garcia,lisa.garcia@email.com,555-0106,2024-01-20,Electronics,Tablet,1,599.99,8,PayPal,Cancelled,"987 Cedar Ln, Miami, FL",South
+CUST007,Robert,Miller,robert.m@email.com,555-0107,2024-01-21,Clothing,Running Shoes,1,129.99,12,Credit Card,Completed,"147 Birch Rd, Denver, CO",West
+CUST008,Jennifer,Davis,jen.davis@email.com,555-0108,2024-01-22,Home & Garden,Kitchen Appliance,1,399.99,5,Debit Card,Processing,"258 Spruce St, Atlanta, GA",South
+CUST009,William,Rodriguez,will.r@email.com,555-0109,2024-01-23,Books,Fiction Novel,5,24.99,0,Credit Card,Shipped,"369 Willow Ave, Portland, OR",West
+CUST010,Ashley,Wilson,ashley.w@email.com,555-0110,2024-01-24,Electronics,Headphones,2,199.99,15,PayPal,Completed,"741 Ash St, Phoenix, AZ",West
+CUST011,Christopher,Martinez,chris.m@email.com,555-0111,2024-01-25,Clothing,Business Suit,1,449.99,10,Credit Card,Processing,"852 Poplar Dr, Minneapolis, MN",Central
+CUST012,Amanda,Anderson,amanda.a@email.com,555-0112,2024-01-26,Home & Garden,Furniture Set,1,899.99,20,Debit Card,Completed,"963 Hickory Ln, Nashville, TN",South
+CUST013,Daniel,Taylor,dan.taylor@email.com,555-0113,2024-01-27,Electronics,Smart Watch,1,349.99,5,Credit Card,Shipped,"159 Chestnut St, San Francisco, CA",West
+CUST014,Michelle,Thomas,michelle.t@email.com,555-0114,2024-01-28,Books,Technical Manual,2,89.99,10,PayPal,Completed,"357 Sycamore Ave, Detroit, MI",Central
+CUST015,James,Jackson,james.j@email.com,555-0115,2024-01-29,Clothing,Casual Wear,3,79.99,25,Credit Card,Processing,"468 Magnolia Rd, Las Vegas, NV",West

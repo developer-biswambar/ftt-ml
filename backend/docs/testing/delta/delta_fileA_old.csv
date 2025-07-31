@@ -1,0 +1,8 @@
+employee_id,name,salary,department,hire_date,bonus,status
+1001,John Smith,50000,IT,2020-01-15,5000.00,Active
+1002,Jane Doe,60000.0,HR,2019-03-22,7500,Active
+1003,Bob Johnson,55000,Finance,2021-06-10,5500.0,Active
+1004,Alice Brown,65000.00,Marketing,2018-11-05,8000,Active
+1005,Charlie Wilson,45000,IT,2022-02-28,4500.00,Active
+1006,Diana Lee,70000.0,Finance,2017-09-12,9000,Active
+1007,Mike Davis,52000,Sales,2020-07-18,5200.00,Active

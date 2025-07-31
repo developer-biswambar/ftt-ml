@@ -15,7 +15,8 @@ This directory contains comprehensive documentation for the Financial Data Trans
 - **[examples/reconciliation_workflow.md](./examples/reconciliation_workflow.md)** - Financial reconciliation workflow examples
 - **[examples/python_client.py](./examples/python_client.py)** - Python client library with examples
 
-### Testing Tools
+### Testing Resources
+- **[testing/](./testing/)** - Comprehensive testing documentation and sample data organized by feature
 - **[postman/FTT-ML_API_Collection.json](./postman/FTT-ML_API_Collection.json)** - Postman collection for API testing
 
 ## 🚀 Quick Start
@@ -112,6 +113,22 @@ OPENAI_API_KEY=your-openai-api-key-here
 
 ## 🧪 Testing & Validation
 
+### Comprehensive Testing Suite
+The **[testing/](./testing/)** directory provides organized testing resources:
+
+- **[Reconciliation Testing](./testing/reconciliation/)** - Financial data matching scenarios
+- **[Transformation Testing](./testing/transformation/)** - Data transformation workflows  
+- **[Delta Generation Testing](./testing/delta/)** - File comparison and change detection
+- **[AI Features Testing](./testing/ai-features/)** - AI-powered automation testing
+- **[File Processing Testing](./testing/file-processing/)** - Upload and processing validation
+
+Each testing folder includes:
+- ✅ Comprehensive test scenarios and expected results
+- ✅ Sample data files for different use cases
+- ✅ Performance benchmarks and validation criteria
+- ✅ Step-by-step testing workflows
+- ✅ Troubleshooting guides and best practices
+
 ### Interactive Testing
 1. **Swagger UI**: http://localhost:8000/docs
    - Interactive API explorer
@@ -123,19 +140,24 @@ OPENAI_API_KEY=your-openai-api-key-here
    - Schema references
    - Example payloads
 
-### Postman Collection
-Import `postman/FTT-ML_API_Collection.json` for:
-- Pre-configured requests for all endpoints
-- Environment variables for easy testing
-- Automated test assertions
-- Response data extraction
+### Testing Tools
+1. **Postman Collection**: Import `postman/FTT-ML_API_Collection.json` for:
+   - Pre-configured requests for all endpoints
+   - Environment variables for easy testing
+   - Automated test assertions
+   - Response data extraction
 
-### Python Client
-Use `examples/python_client.py` for:
-- Complete workflow examples
-- Error handling patterns
-- Batch processing examples
-- Integration patterns
+2. **Python Client**: Use `examples/python_client.py` for:
+   - Complete workflow examples
+   - Error handling patterns
+   - Batch processing examples
+   - Integration patterns
+
+3. **Feature-Specific Testing**: Navigate to `testing/[feature]/` for:
+   - Dedicated test data and scenarios
+   - Performance benchmarking
+   - Error condition validation
+   - End-to-end workflow testing
 
 ## 📈 Performance Guidelines
 
