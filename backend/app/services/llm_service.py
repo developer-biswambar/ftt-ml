@@ -175,19 +175,23 @@ class JPMCLLMService(LLMServiceInterface):
             )
         
         try:
-            # Convert messages to JPMC LLM format
-            formatted_messages = [
-                {"role": msg.role, "content": msg.content} 
-                for msg in messages
-            ]
+            # Convert messages to a single string for JPMC LLM format
+            # Combine all messages into one string with role prefixes
+            combined_message = ""
+            for msg in messages:
+                if msg.role == "system":
+                    combined_message += f"System: {msg.content}\n\n"
+                elif msg.role == "user":
+                    combined_message += f"User: {msg.content}\n\n"
+                elif msg.role == "assistant":
+                    combined_message += f"Assistant: {msg.content}\n\n"
             
-            # Prepare request payload for JPMC LLM
+            # Remove trailing newlines
+            combined_message = combined_message.strip()
+            
+            # Prepare request payload for JPMC LLM (simplified format)
             payload = {
-                "model": self.model,
-                "messages": formatted_messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                **kwargs
+                "Message": combined_message
             }
             
             headers = {
@@ -195,9 +199,9 @@ class JPMCLLMService(LLMServiceInterface):
                 "User-Agent": "FTT-ML-Backend/1.0"
             }
             
-            # Make request to JPMC LLM service
+            # Make request to JPMC LLM service (simplified endpoint)
             response = requests.post(
-                f"{self.api_url}/v1/chat/completions",
+                f"{self.api_url}/generate",
                 json=payload,
                 headers=headers,
                 timeout=self.timeout
@@ -205,7 +209,8 @@ class JPMCLLMService(LLMServiceInterface):
             
             if response.status_code == 200:
                 result = response.json()
-                content = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                # JPMC LLM service returns simple response format
+                content = result.get("response", result.get("content", result.get("text", ""))).strip()
                 
                 return LLMResponse(
                     content=content,
