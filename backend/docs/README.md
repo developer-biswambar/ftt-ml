@@ -119,7 +119,7 @@ The **[testing/](./testing/)** directory provides organized testing resources:
 - **[Reconciliation Testing](./testing/reconciliation/)** - Financial data matching scenarios
 - **[Transformation Testing](./testing/transformation/)** - Data transformation workflows  
 - **[Delta Generation Testing](./testing/delta/)** - File comparison and change detection
-- **[AI Features Testing](testing/reconciliation/ai-features/)** - AI-powered automation testing
+- **[AI Features Testing](./testing/ai-features/)** - AI-powered automation testing
 - **[File Processing Testing](./testing/file-processing/)** - Upload and processing validation
 
 Each testing folder includes:

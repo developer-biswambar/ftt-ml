@@ -4,7 +4,7 @@
 This guide provides comprehensive testing scenarios for the AI-powered transformation configuration feature in the financial data processing platform.
 
 ## Test Data File
-**Location**: `backend/sample_data/customer_sales_test.csv`
+**Location**: `backend/docs/testing/transformation/customer_sales_test.csv`
 
 ### File Structure
 The test file contains customer sales data with the following columns:

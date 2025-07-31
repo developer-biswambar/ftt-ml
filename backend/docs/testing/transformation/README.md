@@ -10,10 +10,11 @@ This folder contains comprehensive testing resources for the Financial Data Tran
 - **transformation_workflows.md** - Step-by-step transformation workflows
 
 ### Test Data Files
+- **customer_sales_test.csv** - Customer sales data for AI-powered transformation testing
 - **sample_trades.csv** - Sample trading data for transformation testing
 - **trade.csv** - Basic trade data for simple transformations
-- **complex_financial_data.csv** - Complex dataset for advanced transformations
-- **multi_currency_data.csv** - Multi-currency transformation scenarios
+- **complex_financial_data.csv** - Complex dataset for advanced transformations (to be created)
+- **multi_currency_data.csv** - Multi-currency transformation scenarios (to be created)
 
 ## 🚀 Quick Start Testing
 
@@ -124,6 +125,12 @@ curl -X POST "http://localhost:8000/transformation/execute" \
 ```
 
 ## 📊 Sample Data Descriptions
+
+### customer_sales_test.csv
+- **Records**: 15 customer sales transactions
+- **Columns**: customer_id, first_name, last_name, email, phone, purchase_date, product_category, product_name, quantity, unit_price, discount_percent, payment_method, order_status, shipping_address, region
+- **Use Case**: AI-powered transformation testing with customer data
+- **Complexity**: Medium - ideal for testing AI rule generation
 
 ### sample_trades.csv
 - **Records**: 1,000 trading transactions

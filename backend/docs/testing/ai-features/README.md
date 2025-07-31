@@ -144,16 +144,22 @@ curl -X POST "http://localhost:8000/ai-assistance/generic-call" \
 ### 3. Transformation Rule Generation
 ```json
 {
-  "scenario": "Trade data transformation",
+  "scenario": "Customer sales data transformation",
   "input": {
-    "natural_language": "Convert trade data to regulatory reporting format with separate line items for principal and tax amounts",
-    "source_columns": ["trade_id", "symbol", "quantity", "price", "tax_rate"],
-    "target_schema": ["report_id", "instrument", "line_type", "amount"]
+    "natural_language": "Create a customer summary report with full name, total amount, customer tier based on order value, and regional grouping",
+    "source_file": "customer_sales_test.csv",
+    "source_columns": ["customer_id", "first_name", "last_name", "quantity", "unit_price", "region", "email"],
+    "target_schema": ["customer_id", "full_name", "email", "total_amount", "customer_tier", "region"]
   },
   "expected_rules": [
-    {"type": "row_expansion", "strategy": "tax_line_items"},
-    {"type": "column_mapping", "mappings": {"trade_id": "report_id", "symbol": "instrument"}},
-    {"type": "calculated_field", "field": "amount", "formula": "quantity * price * (1 + tax_rate)"}
+    {"type": "column_mapping", "mappings": {"customer_id": "customer_id", "email": "email", "region": "region"}},
+    {"type": "calculated_field", "field": "full_name", "formula": "{first_name} + ' ' + {last_name}"},
+    {"type": "calculated_field", "field": "total_amount", "formula": "{quantity} * {unit_price}"},
+    {"type": "conditional_field", "field": "customer_tier", "conditions": [
+      {"if": "{unit_price} > 500", "then": "VIP"},
+      {"if": "{unit_price} >= 100", "then": "STANDARD"},
+      {"else": "BASIC"}
+    ]}
   ]
 }
 ```
