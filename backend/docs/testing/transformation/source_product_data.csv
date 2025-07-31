@@ -1,0 +1,25 @@
+Product_Code,Product_Name,Category,Subcategory,Brand,Cost_Price,Retail_Price,Supplier,Stock_Quantity,Reorder_Level,Weight_Kg,Dimensions,Color,Material,Warranty_Months
+PROD101,Laptop Pro,Electronics,Computers,TechBrand,999.99,1299.99,SUPP001,50,10,2.1,35x25x2,Silver,Aluminum,24
+PROD102,Office Chair,Furniture,Seating,ComfortCorp,124.75,249.50,SUPP002,25,5,15.5,65x65x120,Black,Leather,12
+PROD103,Coffee Maker,Appliances,Kitchen,BrewMaster,59.99,89.99,SUPP003,30,8,3.2,25x30x35,White,Plastic,18
+PROD104,Wireless Mouse,Electronics,Accessories,TechBrand,9.99,29.99,SUPP001,100,20,0.1,12x6x3,Black,Plastic,6
+PROD105,Desk Lamp,Furniture,Lighting,LightCorp,37.50,75.00,SUPP004,40,10,1.8,20x20x45,White,Metal,12
+PROD106,Water Bottle,Accessories,Personal,HydrateInc,3.99,19.99,SUPP005,200,50,0.3,8x8x25,Blue,Stainless Steel,6
+PROD107,Notebook Set,Stationery,Writing,PaperPro,7.75,15.50,SUPP006,150,30,0.5,21x15x2,Mixed,Paper,0
+PROD108,Phone Case,Accessories,Mobile,ProtectTech,12.99,24.99,SUPP007,80,15,0.1,15x8x1,Clear,Silicone,3
+PROD109,Bluetooth Speaker,Electronics,Audio,SoundMax,74.99,149.99,SUPP008,35,8,0.8,20x8x8,Black,Plastic,12
+PROD110,Standing Desk,Furniture,Desks,WorkSpace,249.99,499.99,SUPP009,15,3,45.0,120x60x75,Oak,Wood,36
+PROD111,Tablet,Electronics,Computers,TechBrand,199.99,399.99,SUPP001,25,5,0.7,25x18x1,Silver,Aluminum,12
+PROD112,Desk Organizer,Stationery,Organization,OfficeMax,17.99,35.99,SUPP010,60,12,0.8,30x20x10,Brown,Wood,6
+PROD113,Smart Watch,Electronics,Wearables,FitTech,149.99,299.99,SUPP011,20,4,0.1,4x4x1,Black,Metal,24
+PROD114,File Cabinet,Furniture,Storage,OfficeMax,94.99,189.99,SUPP010,10,2,25.0,40x60x130,Grey,Metal,60
+PROD115,Pen Set,Stationery,Writing,PaperPro,4.33,12.99,SUPP006,100,20,0.2,15x5x2,Blue,Plastic,0
+PROD116,Monitor,Electronics,Computers,ViewTech,224.99,449.99,SUPP012,20,4,5.2,60x45x20,Black,Plastic,36
+PROD117,Ergonomic Keyboard,Electronics,Accessories,TechBrand,64.99,129.99,SUPP001,45,10,1.1,45x20x3,Black,Plastic,12
+PROD118,Printer,Electronics,Office,PrintMax,99.99,199.99,SUPP013,15,3,8.5,45x35x20,White,Plastic,24
+PROD119,Shredder,Office Equipment,Security,SecureOffice,44.99,89.99,SUPP014,20,5,12.0,35x25x40,Black,Metal,18
+PROD120,Whiteboard,Office Equipment,Presentation,BoardMax,39.99,79.99,SUPP015,25,5,3.5,90x60x2,White,Melamine,12
+PROD121,Calculator,Electronics,Office,CalcTech,14.99,29.99,SUPP016,60,15,0.2,15x10x2,Black,Plastic,6
+PROD122,Stapler,Stationery,Office,OfficeMax,9.49,18.99,SUPP010,80,20,0.5,20x8x5,Red,Metal,3
+PROD123,Paper Shredder,Office Equipment,Security,SecureOffice,74.99,149.99,SUPP014,12,3,15.0,40x30x50,Grey,Metal,24
+PROD124,Desk Calendar,Stationery,Organization,PaperPro,4.99,9.99,SUPP006,100,25,0.3,25x20x1,Mixed,Paper,0

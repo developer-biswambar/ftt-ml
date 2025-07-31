@@ -1,0 +1,21 @@
+Customer_ID,First_Name,Last_Name,Email,Phone,Date_Joined,Account_Type,Balance,Status,Region,City,Age,Gender,Membership_Level,Last_Login
+CUST001,John,Smith,john.smith@email.com,555-0101,2024-01-15,Premium,15000.50,Active,North,New York,35,M,Gold,2024-01-20
+CUST002,Mary,Johnson,mary.j@email.com,555-0102,2024-01-16,Standard,2500.75,Active,South,Atlanta,28,F,Silver,2024-01-21
+CUST003,Robert,Brown,r.brown@email.com,555-0103,2024-01-17,Basic,750.00,Inactive,East,Boston,42,M,Bronze,2024-01-18
+CUST004,Lisa,Davis,lisa.davis@email.com,555-0104,2024-01-18,Premium,25000.00,Active,West,Los Angeles,31,F,Platinum,2024-01-22
+CUST005,James,Wilson,j.wilson@email.com,555-0105,2024-01-19,Standard,1200.25,Pending,North,Chicago,38,M,Silver,2024-01-19
+CUST006,Jennifer,Taylor,jen.taylor@email.com,555-0106,2024-01-20,Basic,500.00,Active,South,Miami,25,F,Bronze,2024-01-23
+CUST007,Michael,Anderson,m.anderson@email.com,555-0107,2024-01-21,Premium,18500.75,Suspended,East,Philadelphia,45,M,Gold,2024-01-21
+CUST008,Sarah,Thomas,sarah.t@email.com,555-0108,2024-01-22,Standard,3200.50,Active,West,San Francisco,29,F,Silver,2024-01-24
+CUST009,David,Jackson,d.jackson@email.com,555-0109,2024-01-23,Basic,950.25,Active,North,Detroit,33,M,Bronze,2024-01-25
+CUST010,Ashley,White,ashley.white@email.com,555-0110,2024-01-24,Premium,22000.00,Active,South,Dallas,27,F,Platinum,2024-01-26
+CUST011,Christopher,Harris,c.harris@email.com,555-0111,2024-01-25,Standard,1800.00,Inactive,East,Washington,39,M,Silver,2024-01-25
+CUST012,Amanda,Martin,amanda.m@email.com,555-0112,2024-01-26,Basic,650.75,Active,West,Seattle,32,F,Bronze,2024-01-27
+CUST013,Matthew,Thompson,m.thompson@email.com,555-0113,2024-01-27,Premium,16750.25,Active,North,Minneapolis,36,M,Gold,2024-01-28
+CUST014,Jessica,Garcia,j.garcia@email.com,555-0114,2024-01-28,Standard,2750.50,Pending,South,Houston,26,F,Silver,2024-01-28
+CUST015,Daniel,Martinez,d.martinez@email.com,555-0115,2024-01-29,Basic,425.00,Active,East,Baltimore,41,M,Bronze,2024-01-30
+CUST016,Michelle,Robinson,m.robinson@email.com,555-0116,2024-01-30,Premium,19250.75,Active,West,Portland,34,F,Gold,2024-02-01
+CUST017,Joshua,Clark,josh.clark@email.com,555-0117,2024-02-01,Standard,1950.25,Active,North,Milwaukee,37,M,Silver,2024-02-02
+CUST018,Nicole,Rodriguez,n.rodriguez@email.com,555-0118,2024-02-02,Basic,775.50,Suspended,South,Orlando,30,F,Bronze,2024-02-02
+CUST019,Ryan,Lewis,ryan.lewis@email.com,555-0119,2024-02-03,Premium,21500.00,Active,East,Richmond,28,M,Platinum,2024-02-04
+CUST020,Stephanie,Lee,steph.lee@email.com,555-0120,2024-02-04,Standard,3100.75,Active,West,Denver,35,F,Silver,2024-02-05
