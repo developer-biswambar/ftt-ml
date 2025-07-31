@@ -158,6 +158,96 @@ class CacheConfig(BaseModel):
     max_cache_size_mb: int = Field(512, description="Maximum cache size in MB")
 
 
+# AI Configuration Generation Models
+class ReconciliationConfigRequest(BaseModel):
+    """
+    Request model for AI-powered reconciliation configuration generation.
+    
+    Similar to transformation requirements, this allows users to specify
+    their reconciliation needs in natural language.
+    """
+    requirements: str = Field(..., description="Natural language description of reconciliation requirements", 
+                             example="Reconcile bank statements with internal transaction records based on transaction ID and amount")
+    source_files: List[Dict[str, Any]] = Field(..., description="Information about the two files to be reconciled")
+
+
+class ReconciliationConfigResponse(BaseModel):
+    """
+    Response model for AI-generated reconciliation configuration.
+    
+    Returns a complete reconciliation configuration that can be used
+    directly in the reconciliation process.
+    """
+    success: bool = Field(..., description="Whether configuration generation was successful")
+    message: str = Field(..., description="Status message")
+    data: Dict[str, Any] = Field(..., description="Generated reconciliation configuration")
+
+
+class SourceFileInfo(BaseModel):
+    """
+    Information about a source file for reconciliation configuration generation.
+    
+    Provides context to the AI about the structure and content of files
+    to be reconciled.
+    """
+    file_id: str = Field(..., description="Unique identifier for the uploaded file", example="file_abc123")
+    filename: str = Field(..., description="Name of the uploaded file", example="bank_statements.csv")
+    columns: List[str] = Field(..., description="List of column names in the file", 
+                              example=["transaction_id", "date", "amount", "description"])
+    totalRows: int = Field(..., description="Total number of rows in the file", example=1000)
+    role: Optional[str] = Field(None, description="Role of this file in reconciliation", example="primary")
+    label: Optional[str] = Field(None, description="Human-readable label for this file", example="Bank Statements")
+
+
+class ReconciliationTemplateRequest(BaseModel):
+    """
+    Request model for creating reconciliation templates.
+    
+    Allows saving frequently used reconciliation configurations
+    for reuse across similar data sets.
+    """
+    name: str = Field(..., description="Template name", example="Bank vs Internal Reconciliation")
+    description: Optional[str] = Field(None, description="Template description")
+    category: str = Field(..., description="Template category", example="financial")
+    tags: List[str] = Field(default_factory=list, description="Template tags for organization")
+    configuration: Dict[str, Any] = Field(..., description="Reconciliation configuration to save as template")
+    is_public: bool = Field(default=False, description="Whether template is publicly available")
+
+
+class ReconciliationTemplate(BaseModel):
+    """
+    Model for reconciliation templates.
+    
+    Stores reusable reconciliation configurations that can be applied
+    to similar data sets with minimal modification.
+    """
+    id: str = Field(..., description="Unique template identifier")
+    name: str = Field(..., description="Template name")
+    description: Optional[str] = Field(None, description="Template description")
+    category: str = Field(..., description="Template category")
+    tags: List[str] = Field(default_factory=list, description="Template tags")
+    configuration: Dict[str, Any] = Field(..., description="Reconciliation configuration")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last update timestamp")
+    usage_count: int = Field(default=0, description="Number of times template has been used")
+    is_public: bool = Field(default=False, description="Whether template is publicly available")
+
+
+class ValidationResult(BaseModel):
+    """
+    Result of reconciliation configuration validation.
+    
+    Provides feedback on whether a configuration is valid and
+    suggests improvements if needed.
+    """
+    is_valid: bool = Field(..., description="Whether the configuration is valid")
+    errors: List[str] = Field(default_factory=list, description="Configuration errors")
+    warnings: List[str] = Field(default_factory=list, description="Configuration warnings")
+    suggestions: List[str] = Field(default_factory=list, description="Improvement suggestions")
+    missing_columns: List[str] = Field(default_factory=list, description="Referenced columns not found in source files")
+    confidence_score: float = Field(default=1.0, description="Confidence in configuration validity (0-1)")
+
+
 # Update forward references
 PatternCondition.model_rebuild()
 OptimizedRulesConfig.model_rebuild()

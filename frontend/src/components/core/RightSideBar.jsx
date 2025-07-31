@@ -900,7 +900,7 @@ const RightSidebar = ({
                             </div>
                             <div className="grid grid-cols-1 gap-2">
                                 <button
-                                    className="px-3 py-2 text-xs bg-red-300 text-blue-700 rounded hover:bg-red-600 transition-all duration-200 flex items-center justify-center space-x-1"
+                                    className="px-3 py-2 text-xs bg-gray-100 text-blue-700 rounded hover:bg-red-600 transition-all duration-200 flex items-center justify-center space-x-1"
                                     title="Delete all results"
                                 >
                                     <Delete size={12}/>

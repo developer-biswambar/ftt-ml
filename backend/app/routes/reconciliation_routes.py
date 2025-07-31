@@ -491,14 +491,217 @@ async def delete_reconciliation_results(reconciliation_id: str):
         raise HTTPException(status_code=404, detail="Reconciliation ID not found in storage")
 
 
+@router.post("/generate-config/")
+async def generate_reconciliation_config(request: dict):
+    """Generate reconciliation configuration using AI based on user requirements"""
+    
+    try:
+        requirements = request.get('requirements', '')
+        source_files = request.get('source_files', [])
+        
+        if not requirements:
+            raise HTTPException(status_code=400, detail="Requirements are required")
+        
+        if not source_files or len(source_files) != 2:
+            raise HTTPException(status_code=400, detail="Exactly 2 source files are required for reconciliation")
+        
+        # Import LLM service
+        from app.services.llm_service import get_llm_service, get_llm_generation_params, LLMMessage
+        
+        llm_service = get_llm_service()
+        if not llm_service.is_available():
+            raise HTTPException(status_code=500, detail=f"LLM service ({llm_service.get_provider_name()}) not configured")
+        
+        # Get generation parameters from config
+        generation_params = get_llm_generation_params()
+        
+        # Prepare context about source files
+        files_context = []
+        for i, sf in enumerate(source_files):
+            role = f"file_{i}"
+            files_context.append(f"File {i + 1} ({role}): {sf['filename']}")
+            files_context.append(f"  Columns: {', '.join(sf['columns'])}")
+            files_context.append(f"  Rows: {sf['totalRows']}")
+        
+        files_info = "\\n".join(files_context)
+        
+        # Create prompt for AI configuration generation
+        prompt = f"""
+You are an expert financial data reconciliation configuration generator. Based on the user requirements and source file information, generate a JSON configuration for data reconciliation.
+
+Source Files Available:
+{files_info}
+
+User Requirements:
+{requirements}
+
+Generate a reconciliation configuration with this exact JSON structure:
+{{
+    "Files": [
+        {{
+            "Name": "FileA",
+            "Extract": [
+                {{
+                    "ResultColumnName": "extracted_column_name",
+                    "SourceColumn": "source_column_name",
+                    "MatchType": "regex|exact|contains",
+                    "Patterns": ["regex_pattern_if_needed"]
+                }}
+            ],
+            "Filter": [
+                {{
+                    "ColumnName": "column_to_filter",
+                    "MatchType": "equals|contains|greater_than|less_than|not_equals",
+                    "Value": "filter_value"
+                }}
+            ]
+        }},
+        {{
+            "Name": "FileB", 
+            "Extract": [],
+            "Filter": []
+        }}
+    ],
+    "ReconciliationRules": [
+        {{
+            "LeftFileColumn": "column_from_fileA",
+            "RightFileColumn": "column_from_fileB", 
+            "MatchType": "equals|tolerance|fuzzy|date",
+            "ToleranceValue": 0.01
+        }}
+    ],
+    "selected_columns_file_a": ["list", "of", "relevant", "columns", "from", "file1"],
+    "selected_columns_file_b": ["list", "of", "relevant", "columns", "from", "file2"]
+}}
+
+Configuration Rules:
+1. ONLY use column names that exist in the source files
+2. File 1 columns: {', '.join(source_files[0].get('columns', []))}
+3. File 2 columns: {', '.join(source_files[1].get('columns', []))}
+4. For exact matches, use MatchType "equals" with ToleranceValue 0
+5. For amount/numeric tolerance, use MatchType "tolerance" with appropriate ToleranceValue (e.g., 0.01 for currency)
+6. For date matching, use MatchType "date" with ToleranceValue 0
+7. For fuzzy/text matching, use MatchType "fuzzy" with ToleranceValue between 0.7-0.9
+8. Extract rules are optional - only add if data transformation is needed
+9. Filter rules are optional - only add if data filtering is needed
+10. Select relevant columns that are needed for reconciliation and reporting
+
+Common Reconciliation Patterns:
+- Transaction ID matching: exact match on ID fields
+- Amount matching: tolerance match with 0.01 tolerance for currency
+- Date matching: date match type for date fields
+- Reference number matching: exact or fuzzy match depending on format
+- Account matching: exact match on account identifiers
+
+IMPORTANT: Return ONLY the JSON configuration, no additional text or explanation.
+
+Examples of good matching:
+- Transaction IDs: {{"LeftFileColumn": "transaction_id", "RightFileColumn": "ref_id", "MatchType": "equals", "ToleranceValue": 0}}
+- Amounts: {{"LeftFileColumn": "amount", "RightFileColumn": "value", "MatchType": "tolerance", "ToleranceValue": 0.01}}
+- Dates: {{"LeftFileColumn": "date", "RightFileColumn": "transaction_date", "MatchType": "date", "ToleranceValue": 0}}
+- Names: {{"LeftFileColumn": "customer_name", "RightFileColumn": "client_name", "MatchType": "fuzzy", "ToleranceValue": 0.8}}
+"""
+        
+        # Call LLM service
+        messages = [
+            LLMMessage(role="system", content="You are a financial data reconciliation expert. Return only valid JSON configuration."),
+            LLMMessage(role="user", content=prompt)
+        ]
+        
+        response = llm_service.generate_text(
+            messages=messages,
+            **generation_params
+        )
+        
+        if not response.success:
+            raise HTTPException(status_code=500, detail=f"LLM generation failed: {response.error}")
+        
+        generated_config_text = response.content
+        
+        # Parse the JSON response
+        import json
+        try:
+            generated_config = json.loads(generated_config_text)
+        except json.JSONDecodeError:
+            # Try to extract JSON from response if it contains extra text
+            import re
+            json_match = re.search(r'\\{.*\\}', generated_config_text, re.DOTALL)
+            if json_match:
+                generated_config = json.loads(json_match.group())
+            else:
+                raise HTTPException(status_code=500, detail="Failed to parse AI-generated configuration")
+        
+        # Validate the generated configuration has required fields
+        required_fields = ['Files', 'ReconciliationRules']
+        missing_fields = [field for field in required_fields if field not in generated_config]
+        if missing_fields:
+            raise HTTPException(status_code=500, detail=f"AI generated config missing fields: {missing_fields}")
+        
+        # Ensure we have exactly 2 files
+        if len(generated_config.get('Files', [])) != 2:
+            # Fix the configuration
+            file_a_columns = source_files[0].get('columns', [])
+            file_b_columns = source_files[1].get('columns', [])
+            
+            generated_config['Files'] = [
+                {
+                    "Name": "FileA",
+                    "Extract": generated_config.get('Files', [{}])[0].get('Extract', []),
+                    "Filter": generated_config.get('Files', [{}])[0].get('Filter', [])
+                },
+                {
+                    "Name": "FileB", 
+                    "Extract": generated_config.get('Files', [{}, {}])[1].get('Extract', []) if len(generated_config.get('Files', [])) > 1 else [],
+                    "Filter": generated_config.get('Files', [{}, {}])[1].get('Filter', []) if len(generated_config.get('Files', [])) > 1 else []
+                }
+            ]
+        
+        # Ensure selected columns are present
+        if 'selected_columns_file_a' not in generated_config:
+            generated_config['selected_columns_file_a'] = source_files[0].get('columns', [])
+        if 'selected_columns_file_b' not in generated_config:
+            generated_config['selected_columns_file_b'] = source_files[1].get('columns', [])
+        
+        return {
+            "success": True,
+            "message": "Reconciliation configuration generated successfully",
+            "data": generated_config
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating AI reconciliation configuration: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Configuration generation error: {str(e)}")
+
+
 @router.get("/health")
 async def reconciliation_health_check():
     """Health check for reconciliation service"""
+    
+    # Check LLM service status
+    try:
+        from app.services.llm_service import get_llm_service
+        llm_service = get_llm_service()
+        llm_status = {
+            "provider": llm_service.get_provider_name(),
+            "model": llm_service.get_model_name(),
+            "available": llm_service.is_available()
+        }
+    except Exception as e:
+        llm_status = {
+            "provider": "unknown",
+            "model": "unknown",
+            "available": False,
+            "error": str(e)
+        }
+    
     storage_count = len(optimized_reconciliation_storage.storage)
 
     return {
         "status": "healthy",
         "service": "optimized_reconciliation",
+        "llm_service": llm_status,
         "active_reconciliations": storage_count,
         "memory_usage": "optimized",
         "features": [
@@ -509,6 +712,7 @@ async def reconciliation_health_check():
             "streaming_downloads",
             "batch_processing",
             "json_input_support",
-            "file_id_retrieval"
+            "file_id_retrieval",
+            "ai_configuration_generation"
         ]
     }

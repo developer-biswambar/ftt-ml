@@ -200,16 +200,6 @@ const RowGenerationStep = ({
 
     const renderOutputColumnConfig = (rule, ruleIndex, column, columnIndex) => {
         const allColumns = getAllSourceColumns();
-        
-        // Debug logging for dynamic columns
-        if (column.mapping_type === 'dynamic') {
-            console.log(`[UI DEBUG] Dynamic column "${column.name}":`, {
-                mapping_type: column.mapping_type,
-                dynamic_conditions: column.dynamic_conditions,
-                default_value: column.default_value,
-                available_columns: allColumns.map(col => col.value)
-            });
-        }
 
         return (
             <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
@@ -299,21 +289,6 @@ const RowGenerationStep = ({
                             >
                                 Add Condition
                             </button>
-                        </div>
-                        
-                        {/* Debug info */}
-                        <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                            <strong>Debug:</strong> {(column.dynamic_conditions || []).length} conditions configured
-                            {column.dynamic_conditions?.map((cond, idx) => {
-                                const isValidColumn = allColumns.some(col => col.value === cond.condition_column);
-                                return (
-                                    <div key={idx} className={`ml-2 font-mono ${!isValidColumn ? 'text-red-600 font-bold' : ''}`}>
-                                        • {cond.condition_column} {cond.operator} "{cond.condition_value}" → "{cond.output_value}"
-                                        {!isValidColumn && <span className="text-red-600"> ⚠️ INVALID COLUMN</span>}
-                                    </div>
-                                );
-                            })}
-                            <div className="mt-1">Default: "{column.default_value}"</div>
                         </div>
 
                         {(column.dynamic_conditions || []).map((condition, condIndex) => (

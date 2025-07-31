@@ -57,35 +57,53 @@ class ConditionOperator(str, Enum):
 
 
 class SourceFile(BaseModel):
-    file_id: str
-    alias: str
-    purpose: Optional[str] = None
+    """
+    Source file configuration for transformation processing.
+    
+    Represents a source file that will be used in the transformation process.
+    Each file must have a unique file_id obtained from the file upload endpoint.
+    """
+    file_id: str = Field(..., description="Unique identifier for the uploaded file", example="file_abc123")
+    alias: str = Field(..., description="Alias name for referencing this file in transformations", example="customers")
+    purpose: Optional[str] = Field(None, description="Description of the file's purpose in the transformation", example="Primary customer data source")
 
 
 class DynamicCondition(BaseModel):
-    """Individual condition for dynamic column mapping"""
-    id: str
-    condition_column: str = Field(..., description="Source column to evaluate")
-    operator: ConditionOperator = Field(default=ConditionOperator.EQUALS)
-    condition_value: str = Field(..., description="Value to compare against")
-    output_value: str = Field(..., description="Value to output when condition is met")
+    """
+    Individual condition for dynamic column mapping.
+    
+    Defines a conditional rule where if the condition_column meets the specified
+    criteria (operator + condition_value), then output_value is returned.
+    """
+    id: str = Field(..., description="Unique identifier for this condition", example="cond_001")
+    condition_column: str = Field(..., description="Source column to evaluate", example="amount")
+    operator: ConditionOperator = Field(default=ConditionOperator.EQUALS, description="Comparison operator", example=">=")
+    condition_value: str = Field(..., description="Value to compare against", example="1000")
+    output_value: str = Field(..., description="Value to output when condition is met (supports expressions)", example="Premium")
 
 
 class RuleOutputColumn(BaseModel):
-    """Configuration for output column in transformation rules"""
-    id: str
-    name: str = Field(..., description="Output column name")
-    mapping_type: MappingType = Field(default=MappingType.DIRECT)
+    """
+    Configuration for output column in transformation rules.
+    
+    Defines how an output column should be populated using one of three mapping types:
+    - Direct: Copy value directly from a source column
+    - Static: Use a fixed value or expression for all rows  
+    - Dynamic: Use conditional logic to determine the value
+    """
+    id: str = Field(..., description="Unique identifier for this column mapping", example="col_001")
+    name: str = Field(..., description="Output column name", example="customer_tier")
+    mapping_type: MappingType = Field(default=MappingType.DIRECT, description="Type of mapping to use")
 
     # Direct mapping
-    source_column: Optional[str] = Field(None, description="Source column for direct mapping")
+    source_column: Optional[str] = Field(None, description="Source column for direct mapping", example="customer_id")
 
-    # Static mapping
-    static_value: Optional[str] = Field(None, description="Static value for all rows")
+    # Static mapping  
+    static_value: Optional[str] = Field(None, description="Static value or expression for all rows", example="{first_name} {last_name}")
 
     # Dynamic mapping
-    dynamic_conditions: Optional[List[DynamicCondition]] = Field(default_factory=list)
-    default_value: Optional[str] = Field(None, description="Default value when no conditions match")
+    dynamic_conditions: Optional[List[DynamicCondition]] = Field(default_factory=list, description="List of conditions for dynamic mapping")
+    default_value: Optional[str] = Field(None, description="Default value when no dynamic conditions match", example="Standard")
 
 
 class ConditionBuilder(BaseModel):
@@ -211,24 +229,36 @@ class LegacyTransformationConfig(BaseModel):
 
 
 class TransformationRequest(BaseModel):
-    process_name: str
-    description: Optional[str] = None
-    source_files: List[SourceFile]
-    transformation_config: Union[NewTransformationConfig, LegacyTransformationConfig, Dict[str, Any]]
-    preview_only: bool = False
-    row_limit: Optional[int] = None  # For preview mode
+    """
+    Request model for processing data transformations.
+    
+    Contains all the information needed to execute a transformation including
+    source files, transformation rules, and processing options.
+    """
+    process_name: str = Field(..., description="Name of the transformation process", example="Customer Data Standardization")
+    description: Optional[str] = Field(None, description="Description of what this transformation does", example="Standardize customer data and calculate totals")
+    source_files: List[SourceFile] = Field(..., description="List of source files to transform")
+    transformation_config: Union[NewTransformationConfig, LegacyTransformationConfig, Dict[str, Any]] = Field(..., description="Transformation configuration with rules and mappings")
+    preview_only: bool = Field(default=False, description="If true, only process a small sample for preview")
+    row_limit: Optional[int] = Field(None, description="Maximum number of rows to process (for preview mode)", example=10)
 
 
 class TransformationResult(BaseModel):
-    success: bool
-    transformation_id: str
-    total_input_rows: int
-    total_output_rows: int
-    processing_time_seconds: float
-    validation_summary: Dict[str, Any]
-    warnings: List[str] = []
-    errors: List[str] = []
-    preview_data: Optional[List[Dict[str, Any]]] = None
+    """
+    Result model for transformation processing.
+    
+    Contains the results and metadata from a completed transformation operation,
+    including performance metrics, validation results, and any errors or warnings.
+    """
+    success: bool = Field(..., description="Whether the transformation completed successfully")
+    transformation_id: str = Field(..., description="Unique identifier for this transformation", example="transform_abc123")
+    total_input_rows: int = Field(..., description="Total number of input rows processed", example=1000)
+    total_output_rows: int = Field(..., description="Total number of output rows generated", example=1000)
+    processing_time_seconds: float = Field(..., description="Time taken to process the transformation", example=2.456)
+    validation_summary: Dict[str, Any] = Field(..., description="Summary of validation results and processing statistics")
+    warnings: List[str] = Field(default_factory=list, description="Non-critical warnings encountered during processing")
+    errors: List[str] = Field(default_factory=list, description="Critical errors encountered during processing")
+    preview_data: Optional[List[Dict[str, Any]]] = Field(None, description="Sample of output data (only included in preview mode)")
 
 
 class DatasetInfo(BaseModel):

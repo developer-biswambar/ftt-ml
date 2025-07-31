@@ -292,6 +292,31 @@ Please provide helpful guidance for this transformation challenge.
     }
 
     /**
+     * Generate reconciliation configuration based on requirements
+     */
+    async generateReconciliationConfig({ requirements, sourceFiles }) {
+        try {
+            const response = await fetch(`http://localhost:8000/reconciliation/generate-config/`, {
+                method: 'POST',
+                headers: this.getAuthHeaders(),
+                body: JSON.stringify({
+                    requirements,
+                    source_files: sourceFiles
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Reconciliation config generation failed: ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Reconciliation config generation error:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Validate transformation configuration with AI
      */
     async validateTransformationConfig(config) {

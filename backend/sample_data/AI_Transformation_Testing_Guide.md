@@ -53,7 +53,6 @@ Transform the sales data for regional analysis:
 - Add sales_category based on line_total: HIGH (>$800), MEDIUM ($200-$800), LOW (<$200)
 - Add quarter column with static value "Q1_2024"
 - Include product_category and payment_method
-- Add processed_date with today's date as static value
 ```
 
 **Expected Output Columns**:

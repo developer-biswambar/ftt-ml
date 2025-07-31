@@ -256,7 +256,13 @@ class LLMServiceFactory:
             raise ValueError(f"Unknown LLM provider: {provider}. Available: {available_providers}")
         
         service_class = self._providers[provider]
-        service = service_class(**kwargs)
+        
+        # Filter kwargs to only pass constructor arguments
+        # Remove generation parameters that should go to generate_text()
+        constructor_kwargs = {k: v for k, v in kwargs.items() 
+                            if k in ['api_key', 'model']}
+        
+        service = service_class(**constructor_kwargs)
         
         if not service.is_available():
             logger.warning(f"LLM provider '{provider}' is not available. Check configuration.")
@@ -305,7 +311,11 @@ def get_llm_service() -> LLMServiceInterface:
             config = LLMConfig.get_provider_config()
             
             logger.info(f"Initializing LLM service: {config['provider']} with model {config['model']}")
-            _llm_service = LLMServiceFactory.create_service(**config)
+            _llm_service = LLMServiceFactory.create_service(
+                provider=config.get('provider'),
+                api_key=config.get('api_key'),
+                model=config.get('model')
+            )
         except Exception as e:
             logger.error(f"Failed to load LLM config: {e}")
             # Fallback to basic OpenAI configuration
@@ -319,6 +329,25 @@ def set_llm_service(service: LLMServiceInterface):
     global _llm_service
     _llm_service = service
     logger.info(f"LLM service set to: {service.get_provider_name()} ({service.get_model_name()})")
+
+
+def get_llm_generation_params() -> dict:
+    """Get the LLM generation parameters from config"""
+    try:
+        from app.config.llm_config import LLMConfig
+        config = LLMConfig.get_provider_config()
+        
+        # Return only generation parameters
+        return {
+            'temperature': config.get('temperature', 0.3),
+            'max_tokens': config.get('max_tokens', 2000)
+        }
+    except Exception:
+        # Fallback defaults
+        return {
+            'temperature': 0.3,
+            'max_tokens': 2000
+        }
 
 
 def reset_llm_service():

@@ -37,11 +37,109 @@ print(f"📊 Batch Size: {BATCH_SIZE}")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Create FastAPI app with comprehensive OpenAPI documentation
 app = FastAPI(
-    title="Optimized Financial Data Extraction & Reconciliation API",
+    title="Financial Data Transformation Platform (FTT-ML) API",
     version="4.1.0",
-    description="High-performance AI-powered financial data extraction, comparison, and reconciliation with AI regex generation"
+    description="""
+## 🚀 Financial Data Transformation Platform API
+
+A comprehensive platform for financial data processing, reconciliation, and AI-powered transformation.
+
+### 🏗️ Architecture
+- **Backend**: FastAPI (Python) - High-performance API with async support
+- **AI Integration**: Pluggable LLM providers (OpenAI, Anthropic, Gemini)
+- **Storage**: Local/S3 with pluggable storage backends
+
+### 📋 Core Features
+- ✅ **File Processing** - CSV, Excel upload and processing
+- ✅ **Data Reconciliation** - Match financial transactions between sources
+- ✅ **Data Transformation** - AI-powered data transformation with expressions
+- ✅ **Delta Generation** - Compare file versions to identify changes
+- ✅ **AI Integration** - Pluggable LLM providers for intelligent processing
+
+### 🔧 Performance Features
+- **High Performance** - Optimized for 50k-100k record datasets
+- **Hash-based Matching** - Fast lookups for reconciliation
+- **Vectorized Operations** - Pandas optimization for data processing
+- **Streaming I/O** - Memory-efficient file processing
+- **Batch Processing** - Configurable batch sizes for large datasets
+
+### 🤖 AI-Powered Features
+- **Smart Configuration Generation** - AI generates transformation rules
+- **Expression Evaluation** - Mathematical and string expressions
+- **Dynamic Conditions** - Complex conditional logic
+- **Regex Generation** - AI-powered pattern generation
+
+### 📖 Documentation
+- **Interactive API Docs**: Available at `/docs` (Swagger UI)
+- **Alternative Docs**: Available at `/redoc` (ReDoc)
+- **Health Checks**: Available at `/health`
+
+### 🔐 Authentication
+Currently using API key authentication for LLM providers. Extend as needed for production use.
+
+### 📊 Rate Limits
+Configured for high-throughput financial data processing. Adjust based on your infrastructure.
+    """,
+    terms_of_service="https://example.com/terms/",
+    contact={
+        "name": "FTT-ML Support",
+        "url": "https://example.com/contact/",
+        "email": "support@example.com",
+    },
+    license_info={
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+    },
+    servers=[
+        {
+            "url": "http://localhost:8000",
+            "description": "Development server"
+        },
+        {
+            "url": "https://api.example.com",
+            "description": "Production server"
+        }
+    ],
+    tags_metadata=[
+        {
+            "name": "health",
+            "description": "Health check and system status endpoints",
+        },
+        {
+            "name": "files",
+            "description": "File upload, processing, and management operations",
+        },
+        {
+            "name": "transformation",
+            "description": "Data transformation operations with AI-powered rule generation",
+        },
+        {
+            "name": "reconciliation",
+            "description": "Financial transaction reconciliation and matching",
+        },
+        {
+            "name": "delta",
+            "description": "Delta generation and file comparison operations",
+        },
+        {
+            "name": "ai-assistance",
+            "description": "AI-powered assistance features including regex generation",
+        },
+        {
+            "name": "viewer",
+            "description": "Data viewing and preview operations",
+        },
+        {
+            "name": "performance",
+            "description": "Performance monitoring and system metrics",
+        },
+        {
+            "name": "debug",
+            "description": "Debug information and system diagnostics",
+        }
+    ]
 )
 
 app.add_middleware(
@@ -94,8 +192,8 @@ async def get_templates():
     """Get enhanced templates with column selection examples"""
     templates = [
         {
-            "name": "💰 Financial Transaction Reconciliation",
-            "description": "Match financial transactions between two sources using amount, date, and reference matching",
+            "name": "Reconciliation",
+            "description": "Match financial transactions between two sources using any kinds of columns matching",
             "user_requirements": "Please configure the reconciliation to match financial transactions between the two files.",
             "prompt": "Configure reconciliation for financial transactions with amount tolerance matching",
             "category": "reconciliation",

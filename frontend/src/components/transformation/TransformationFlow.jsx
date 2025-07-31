@@ -170,26 +170,6 @@ const TransformationFlow = ({
     const generateResults = async () => {
         setIsProcessing(true);
         
-        // Debug: Log the transformation config being sent
-        console.log('[UI DEBUG] Transformation config being sent:', {
-            source_files: config.source_files,
-            row_generation_rules: config.row_generation_rules,
-            rules_count: config.row_generation_rules?.length || 0
-        });
-        
-        // Debug: Log dynamic conditions specifically
-        config.row_generation_rules?.forEach((rule, ruleIndex) => {
-            rule.output_columns?.forEach((column, colIndex) => {
-                if (column.mapping_type === 'dynamic') {
-                    console.log(`[UI DEBUG] Rule ${ruleIndex}, Column ${colIndex} - Dynamic mapping:`, {
-                        column_name: column.name,
-                        mapping_type: column.mapping_type,
-                        dynamic_conditions: column.dynamic_conditions,
-                        default_value: column.default_value
-                    });
-                }
-            });
-        });
         
         try {
             const response = await transformationApiService.processTransformation({

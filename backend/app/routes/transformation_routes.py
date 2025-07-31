@@ -18,15 +18,6 @@ from app.utils.uuid_generator import generate_uuid
 
 # Setup logging
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# Add console handler if not already present
-if not logger.handlers:
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
 
 # Create router
 router = APIRouter(prefix="/transformation", tags=["transformation"])
@@ -52,7 +43,6 @@ def evaluate_expression(expression: str, row_data: Dict[str, Any]) -> Any:
     try:
         # Check if it's an expression with variables (contains curly braces)
         if '{' in expression and '}' in expression:
-            logger.debug(f"Evaluating expression: {expression}")
             import re
             
             # Find all variables in curly braces
@@ -72,7 +62,7 @@ def evaluate_expression(expression: str, row_data: Dict[str, Any]) -> Any:
                     else:
                         result_expression = result_expression.replace(f'{{{var}}}', f'"{str(value)}"')
                 else:
-                    logger.warning(f"Variable '{var}' not found in row data. Available: {list(row_data.keys())}")
+                    logger.warning(f"Variable '{var}' not found in row data")
                     return expression  # Return original if variable not found
             
             # Try to evaluate as mathematical expression first
@@ -92,13 +82,11 @@ def evaluate_expression(expression: str, row_data: Dict[str, Any]) -> Any:
                 # If it looks like a math expression, evaluate it
                 if any(op in result_expression for op in ['+', '-', '*', '/', '(', ')', '%']):
                     result = eval(result_expression, safe_context)
-                    logger.debug(f"Mathematical result: {result}")
                     return result
                 else:
                     # For string concatenation, just remove quotes and return as string
                     # Handle patterns like "John" "Doe" -> "John Doe"
                     result = result_expression.replace('" "', ' ').replace('"', '')
-                    logger.debug(f"String concatenation result: {result}")
                     return result.strip()
                     
             except Exception as e:
@@ -173,22 +161,15 @@ def apply_column_mapping(mapping_config: Dict[str, Any], row_data: Dict[str, Any
         # Evaluate dynamic conditions
         conditions = mapping_config.get('dynamic_conditions', [])
         default_value = mapping_config.get('default_value', '')
-        
-        logger.debug(f"Processing dynamic mapping with {len(conditions)} conditions")
-        logger.debug(f"Available row_data keys: {list(row_data.keys())}")
-        logger.debug(f"Dynamic conditions: {conditions}")
 
         for condition in conditions:
             condition_column = condition.get('condition_column', '')
             operator = condition.get('operator', '==')
             condition_value = condition.get('condition_value', '')
             output_value = condition.get('output_value', '')
-            
-            logger.debug(f"Checking condition: {condition_column} {operator} {condition_value} -> {output_value}")
 
             if condition_column in row_data:
                 row_value = row_data[condition_column]
-                logger.debug(f"Dynamic condition evaluation - Column: {condition_column}, Value: {row_value}, Operator: {operator}, Expected: {condition_value}")
 
                 # Evaluate condition based on operator
                 condition_met = False
@@ -238,22 +219,15 @@ def apply_column_mapping(mapping_config: Dict[str, Any], row_data: Dict[str, Any
                             condition_met = row_value_str.endswith(condition_value_str)
 
                     if condition_met:
-                        logger.debug(f"Condition met! Returning output_value: {output_value}")
                         # Evaluate expressions in output values
                         result = evaluate_expression(output_value, row_data)
-                        logger.debug(f"Evaluated output_value: {result}")
                         return result
 
                 except Exception as e:
                     logger.warning(f"Error evaluating dynamic condition: {str(e)}")
                     continue
-            else:
-                logger.debug(f"Dynamic condition column '{condition_column}' not found in row_data. Available keys: {list(row_data.keys())}")
-
-        logger.debug(f"Dynamic condition returning default value: {default_value}")
         # Evaluate expressions in default values
         result = evaluate_expression(default_value, row_data)
-        logger.debug(f"Evaluated default value: {result}")
         return result
 
     return ''
@@ -301,10 +275,8 @@ def process_transformation_rules(source_data: Dict[str, pd.DataFrame], config: D
                     column_name = column_config.get('name', '')
                     if column_name:
                         try:
-                            logger.debug(f"Processing column '{column_name}' with config: {column_config}")
                             result_value = apply_column_mapping(column_config, source_row, {})
                             output_row[column_name] = result_value
-                            logger.debug(f"Column '{column_name}' result: {result_value}")
                         except Exception as e:
                             logger.error(f"Error processing column '{column_name}' in rule '{rule_name}': {str(e)}")
                             output_row[column_name] = ''
@@ -712,11 +684,14 @@ async def generate_transformation_config(request: dict):
             raise HTTPException(status_code=400, detail="Source files information is required")
         
         # Import LLM service
-        from app.services.llm_service import get_llm_service, LLMMessage
+        from app.services.llm_service import get_llm_service, get_llm_generation_params, LLMMessage
         
         llm_service = get_llm_service()
         if not llm_service.is_available():
             raise HTTPException(status_code=500, detail=f"LLM service ({llm_service.get_provider_name()}) not configured")
+        
+        # Get generation parameters from config
+        generation_params = get_llm_generation_params()
         
         # Prepare context about source files
         files_context = []
@@ -816,8 +791,7 @@ Use {{column_name}} syntax to reference column values in expressions.
         
         response = llm_service.generate_text(
             messages=messages,
-            temperature=0.3,
-            max_tokens=2000
+            **generation_params
         )
         
         if not response.success:

@@ -19,6 +19,8 @@ import {
 import AIRegexGenerator from '../core/AIRegexGenerator.jsx';
 import RuleSaveLoad from '../rules/RuleSaveLoad.jsx';
 import IntegratedFilterDataStep from "./IntegratedFilterDataStep.jsx";
+import AIRequirementsStep from '../reconciliation/AIRequirementsStep.jsx';
+import { aiAssistanceService } from '../../services/aiAssistanceService.js';
 
 const ReconciliationFlow = ({
                                 files,
@@ -52,9 +54,15 @@ const ReconciliationFlow = ({
         columnName: ''
     });
 
+    // AI Requirements State
+    const [aiRequirements, setAiRequirements] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [generatedConfig, setGeneratedConfig] = useState(null);
+
     // Step definitions
     const steps = [
         {id: 'rule_management', title: 'Load/Save Rules', icon: Save},
+        {id: 'ai_requirements', title: 'AI Configuration', icon: Wand2},
         {id: 'file_selection', title: 'File Selection', icon: FileText},
         {id: 'extraction_rules', title: 'Data Parsing', icon: Target},
         {id: 'filter_rules', title: 'Data Filtering', icon: Filter},
@@ -364,6 +372,62 @@ const ReconciliationFlow = ({
         onSendMessage('system', '✨ AI generated regex pattern applied to extraction rule');
     };
 
+    // AI Configuration handlers
+    const handleGenerateAIConfig = async (requirements, sourceFiles) => {
+        setIsGenerating(true);
+        try {
+            // Normalize source files to match backend expectations
+            const normalizedSourceFiles = sourceFiles.map(file => ({
+                file_id: file.file_id,
+                filename: file.filename,
+                columns: file.columns || [],
+                totalRows: file.totalRows || file.total_rows || 0,
+                label: file.label || ''
+            }));
+
+            const response = await aiAssistanceService.generateReconciliationConfig({
+                requirements,
+                sourceFiles: normalizedSourceFiles
+            });
+            
+            if (response.success) {
+                setGeneratedConfig(response.data);
+                onSendMessage('system', '✨ AI configuration generated successfully! Review and apply it to continue.');
+            } else {
+                throw new Error(response.message || 'Failed to generate configuration');
+            }
+        } catch (error) {
+            console.error('AI configuration generation failed:', error);
+            onSendMessage('system', `❌ Failed to generate AI configuration: ${error.message}`);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleUseAIConfiguration = (aiConfig) => {
+        // Apply the AI generated configuration
+        setConfig({
+            Files: aiConfig.Files || [],
+            ReconciliationRules: []
+        });
+        setReconciliationRules(aiConfig.ReconciliationRules || []);
+        
+        // Update selected columns
+        if (aiConfig.selected_columns_file_a) {
+            setSelectedColumnsFileA(aiConfig.selected_columns_file_a);
+        }
+        if (aiConfig.selected_columns_file_b) {
+            setSelectedColumnsFileB(aiConfig.selected_columns_file_b);
+        }
+        
+        setHasUnsavedChanges(true);
+        setGeneratedConfig(null);
+        onSendMessage('system', '✅ AI configuration applied! You can now review and modify it in the following steps.');
+        
+        // Navigate to file selection step
+        setCurrentStep('file_selection');
+    };
+
     // Filter rule handlers
     const addFilterRule = (fileIndex) => {
         const newRule = {
@@ -425,44 +489,61 @@ const ReconciliationFlow = ({
             case 'rule_management':
                 return (
                     <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-800">Load Existing Rule or Start Fresh</h3>
+                        <h3 className="text-lg font-semibold text-gray-800">Choose Configuration Method</h3>
                         <p className="text-sm text-gray-600">
-                            You can load a previously saved reconciliation rule to reuse your configuration,
-                            or start fresh with a new configuration.
+                            You can use AI to generate configuration from requirements, load a previously saved rule, 
+                            or start fresh with manual configuration.
                         </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="p-4 border border-purple-200 bg-purple-50 rounded-lg h-full flex flex-col">
+                                <div className="flex items-center space-x-2 mb-3">
+                                    <Wand2 size={20} className="text-purple-600"/>
+                                    <h4 className="text-md font-medium text-purple-800">AI Configuration</h4>
+                                </div>
+                                <p className="text-sm text-purple-700 mb-4 flex-grow">
+                                    Describe your requirements and let AI generate the configuration.
+                                </p>
+                                <button
+                                    onClick={() => setCurrentStep('ai_requirements')}
+                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 min-h-[40px]"
+                                >
+                                    <Wand2 size={16}/>
+                                    <span>Use AI Assistant</span>
+                                </button>
+                            </div>
+
+                            <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg h-full flex flex-col">
                                 <div className="flex items-center space-x-2 mb-3">
                                     <Upload size={20} className="text-blue-600"/>
                                     <h4 className="text-md font-medium text-blue-800">Load Existing Rule</h4>
                                 </div>
-                                <p className="text-sm text-blue-700 mb-4">
+                                <p className="text-sm text-blue-700 mb-4 flex-grow">
                                     Load a previously saved rule template and adapt it to your current files.
                                 </p>
                                 <button
                                     onClick={() => setShowRuleSaveLoad(true)}
-                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 min-h-[40px]"
                                 >
                                     <Upload size={16}/>
                                     <span>Browse Saved Rules</span>
                                 </button>
                             </div>
 
-                            <div className="p-4 border border-green-200 bg-green-50 rounded-lg">
+                            <div className="p-4 border border-green-200 bg-green-50 rounded-lg h-full flex flex-col">
                                 <div className="flex items-center space-x-2 mb-3">
                                     <FileText size={20} className="text-green-600"/>
-                                    <h4 className="text-md font-medium text-green-800">Start Fresh</h4>
+                                    <h4 className="text-md font-medium text-green-800">Start Fresh Manually</h4>
                                 </div>
-                                <p className="text-sm text-green-700 mb-4">
-                                    Create a new reconciliation configuration from scratch.
+                                <p className="text-sm text-green-700 mb-4 flex-grow">
+                                    Create a new reconciliation configuration manually from scratch.
                                 </p>
                                 <button
-                                    onClick={() => nextStep()}
-                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                                    onClick={() => setCurrentStep('file_selection')}
+                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 min-h-[40px]"
                                 >
                                     <FileText size={16}/>
-                                    <span>Start New Configuration</span>
+                                    <span>Start Fresh</span>
                                 </button>
                             </div>
                         </div>
@@ -488,6 +569,20 @@ const ReconciliationFlow = ({
                             </div>
                         )}
                     </div>
+                );
+
+            case 'ai_requirements':
+                return (
+                    <AIRequirementsStep
+                        sourceFiles={getSelectedFilesArray()}
+                        onGenerateConfig={handleGenerateAIConfig}
+                        onConfigGenerated={setGeneratedConfig}
+                        isGenerating={isGenerating}
+                        generatedConfig={generatedConfig}
+                        onUseConfiguration={handleUseAIConfiguration}
+                        requirements={aiRequirements}
+                        onRequirementsChange={setAiRequirements}
+                    />
                 );
 
             case 'file_selection':
@@ -1009,7 +1104,7 @@ const ReconciliationFlow = ({
 
     return (
         <>
-            <div className="bg-white border border-gray-300 rounded-lg p-6 shadow-lg max-w-4xl mx-auto">
+            <div className="bg-white border border-gray-300 rounded-lg p-6 shadow-lg max-w-6xl mx-auto">
                 {/* Step Progress */}
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-4">
