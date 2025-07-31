@@ -212,8 +212,8 @@ class OptimizedFileProcessor:
         if self._is_date_value(val_a) and self._is_date_value(val_b):
             return self._check_date_equals_match(val_a, val_b)
 
-        # Convert to strings and compare
-        return str(val_a).strip() == str(val_b).strip()
+        # Convert to strings and compare (case insensitive)
+        return str(val_a).strip().lower() == str(val_b).strip().lower()
 
     def validate_rules_against_columns(self, df: pd.DataFrame, file_rule: FileRule) -> List[str]:
         """Validate that all columns mentioned in rules exist in the DataFrame"""
@@ -238,8 +238,8 @@ class OptimizedFileProcessor:
 
     @lru_cache(maxsize=1000)
     def _get_compiled_pattern(self, pattern: str) -> re.Pattern:
-        """Cache compiled regex patterns for better performance"""
-        return re.compile(pattern)
+        """Cache compiled regex patterns for better performance with case insensitive flag"""
+        return re.compile(pattern, re.IGNORECASE)
 
     def evaluate_pattern_condition(self, text: str, condition: PatternCondition) -> bool:
         """Recursively evaluate pattern conditions with caching"""
@@ -377,9 +377,17 @@ class OptimizedFileProcessor:
 
             try:
                 if match_type == "equals":
-                    filtered_df = filtered_df[filtered_df[column] == value]
+                    # Case insensitive string comparison for equals
+                    if isinstance(value, str):
+                        filtered_df = filtered_df[filtered_df[column].astype(str).str.lower() == str(value).lower()]
+                    else:
+                        filtered_df = filtered_df[filtered_df[column] == value]
                 elif match_type == "not_equals":
-                    filtered_df = filtered_df[filtered_df[column] != value]
+                    # Case insensitive string comparison for not_equals
+                    if isinstance(value, str):
+                        filtered_df = filtered_df[filtered_df[column].astype(str).str.lower() != str(value).lower()]
+                    else:
+                        filtered_df = filtered_df[filtered_df[column] != value]
                 elif match_type == "greater_than":
                     numeric_col = pd.to_numeric(filtered_df[column], errors='coerce')
                     filtered_df = filtered_df[numeric_col > value]
@@ -387,11 +395,18 @@ class OptimizedFileProcessor:
                     numeric_col = pd.to_numeric(filtered_df[column], errors='coerce')
                     filtered_df = filtered_df[numeric_col < value]
                 elif match_type == "contains":
-                    filtered_df = filtered_df[filtered_df[column].astype(str).str.contains(str(value), na=False)]
+                    # Case insensitive contains
+                    filtered_df = filtered_df[filtered_df[column].astype(str).str.contains(str(value), case=False, na=False)]
                 elif match_type == "in":
                     if isinstance(value, str):
                         value = [v.strip() for v in value.split(',')]
-                    filtered_df = filtered_df[filtered_df[column].isin(value)]
+                    # Case insensitive in operation
+                    if all(isinstance(v, str) for v in value):
+                        # Convert both column values and filter values to lowercase for comparison
+                        value_lower = [str(v).lower() for v in value]
+                        filtered_df = filtered_df[filtered_df[column].astype(str).str.lower().isin(value_lower)]
+                    else:
+                        filtered_df = filtered_df[filtered_df[column].isin(value)]
                 else:
                     self.warnings.append(f"Unknown filter match type: {match_type}")
             except Exception as e:
@@ -455,7 +470,8 @@ class OptimizedFileProcessor:
 
         # Create composite key for exact matches only (dates and tolerance handled separately)
         if exact_match_cols:
-            df_work['_match_key'] = df_work[exact_match_cols].astype(str).agg('|'.join, axis=1)
+            # Make match key case insensitive by converting to lowercase
+            df_work['_match_key'] = df_work[exact_match_cols].astype(str).apply(lambda x: x.str.lower()).agg('|'.join, axis=1)
         else:
             df_work['_match_key'] = df_work.index.astype(str)
 
@@ -523,6 +539,11 @@ class OptimizedFileProcessor:
                                 if not self._check_tolerance_match(val_a, val_b, rule.ToleranceValue):
                                     all_rules_match = False
                                     break
+                            elif rule.MatchType.lower() == "fuzzy":
+                                # Fuzzy matching (case insensitive)
+                                if not self._check_fuzzy_match(val_a, val_b, rule.ToleranceValue):
+                                    all_rules_match = False
+                                    break
 
                         if all_rules_match:
                             matched_indices_a.add(row_a['_orig_index_a'])
@@ -573,6 +594,32 @@ class OptimizedFileProcessor:
             else:
                 return num_a == 0
         except (ValueError, TypeError):
+            return False
+
+    def _check_fuzzy_match(self, val_a, val_b, threshold: float) -> bool:
+        """Check if two string values match using fuzzy matching (case insensitive)"""
+        try:
+            if pd.isna(val_a) or pd.isna(val_b):
+                return pd.isna(val_a) and pd.isna(val_b)
+
+            str_a = str(val_a).strip().lower()
+            str_b = str(val_b).strip().lower()
+            
+            # Simple fuzzy matching using character overlap ratio
+            if len(str_a) == 0 and len(str_b) == 0:
+                return True
+            if len(str_a) == 0 or len(str_b) == 0:
+                return False
+            
+            # Calculate similarity ratio
+            # Use a simple approach: common characters / max length
+            common_chars = sum(1 for c in str_a if c in str_b)
+            max_len = max(len(str_a), len(str_b))
+            similarity = common_chars / max_len
+            
+            return similarity >= threshold
+            
+        except Exception:
             return False
 
     def _create_match_record(self, row_a, row_b, df_a, df_b,
