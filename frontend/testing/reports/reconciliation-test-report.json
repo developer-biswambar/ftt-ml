@@ -1,0 +1,26 @@
+{
+  "timestamp": "2025-08-01T06:15:03.679Z",
+  "testType": "Reconciliation Functionality",
+  "features": {
+    "fileUpload": true,
+    "processButton": false,
+    "configuration": true,
+    "results": true,
+    "export": false
+  },
+  "testFiles": [
+    "recon-test-file-a.csv",
+    "recon-test-file-b.csv"
+  ],
+  "expectedMatches": 4,
+  "expectedUnmatched": 1,
+  "screenshots": [
+    "recon-00-initial-state.png",
+    "recon-01-navigation.png",
+    "recon-02-files-uploaded.png",
+    "recon-03-configuration.png",
+    "recon-04-processing.png",
+    "recon-05-results.png",
+    "recon-06-export.png"
+  ]
+}

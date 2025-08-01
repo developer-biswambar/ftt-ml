@@ -1,0 +1,12 @@
+Statement_ID,Reference,Value,Date_Processed,Bank_Status,Notes,Bank_Account
+STMT001,REF12345,1000.50,15/01/2024,Settled,Vendor payment processed,BANK001
+STMT002,REF12346,2500.75,15/01/2024,Settled,Invoice cleared successfully,BANK002
+STMT003,REF12347,750.25,16/01/2024,Processing,Service payment pending,BANK001
+STMT004,REF12348,1200.01,16/01/2024,Settled,Purchase completed with fee,BANK003
+STMT005,REF12349,850.33,17/01/2024,Complete,Refund processed,BANK002
+STMT006,REF12350,1499.99,17/01/2024,Settled,Large transaction processed,BANK001
+STMT007,REF12351,99.98,18/01/2024,Pending,Small payment processing,BANK003
+STMT008,REF12352,3000.25,18/01/2024,Settled,Bulk payment cleared,BANK002
+STMT009,REF12354,2200.50,19/01/2024,Settled,Final payment processed,BANK003
+STMT010,REF88888,888.88,20/01/2024,Settled,Unmatched bank transaction,BANK001
+STMT011,REF12355,1750.01,20/01/2024,Processing,Processing with small difference,BANK002

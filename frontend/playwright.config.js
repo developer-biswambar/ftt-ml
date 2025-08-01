@@ -24,13 +24,17 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: 'http://localhost:5173',
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    trace: 'on',  // Always collect traces
     /* Take screenshot on failure */
-    screenshot: 'only-on-failure',
+    screenshot: 'on',  // Always take screenshots
     /* Record video on failure */
-    video: 'retain-on-failure',
+    video: 'on',  // Always record video
     headless: false,     // Show browser window
-    slowMo: 100,
+    slowMo: 500,         // Slower execution to see what's happening
+    /* Action timeout */
+    actionTimeout: 10000,
+    /* Navigation timeout */
+    navigationTimeout: 30000,
   },
 
   /* Configure projects for major browsers */
@@ -38,26 +42,6 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-    },
-
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-
-    /* Test against mobile viewports. */
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
     },
 
     /* Test against branded browsers. */

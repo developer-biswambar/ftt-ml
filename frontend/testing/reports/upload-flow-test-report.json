@@ -1,0 +1,23 @@
+{
+  "timestamp": "2025-08-01T05:58:37.792Z",
+  "testType": "Complete Upload Flow",
+  "results": {
+    "fileAUploaded": true,
+    "fileBUploaded": true,
+    "filesDetectedInUI": true,
+    "processButtonWorked": true,
+    "resultsFound": false
+  },
+  "filesDetected": 2,
+  "screenshots": [
+    "upload-flow-01-modal-opened.png",
+    "upload-flow-02-file-a-selected.png",
+    "upload-flow-03-file-a-uploaded.png",
+    "upload-flow-04-second-modal.png",
+    "upload-flow-05-file-b-selected.png",
+    "upload-flow-06-file-b-uploaded.png",
+    "upload-flow-07-files-verified.png",
+    "upload-flow-08-processing.png",
+    "upload-flow-09-results.png"
+  ]
+}

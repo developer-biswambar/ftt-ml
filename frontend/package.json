@@ -7,7 +7,34 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "playwright test",
+    "test:ui:all": "node testing/test-runner.js all",
+    "test:smoke": "node testing/test-runner.js smoke",
+    "test:workflows": "node testing/test-runner.js workflows",
+    "test:performance": "node testing/test-runner.js performance",
+    "test:mobile": "node testing/test-runner.js mobile",
+    "test:integration": "playwright test testing/e2e/",
+    "test:integration:watch": "playwright test testing/e2e/ --ui",
+    "test:report": "playwright show-report",
+    "test:setup": "node testing/utils/test-data-setup.js",
+    "test:debug": "playwright test --headed --debug",
+    "test:visual": "node testing/visual-test-runner.js demo",
+    "test:watch": "node testing/visual-test-runner.js interactive", 
+    "test:step": "node testing/visual-test-runner.js debug",
+    "test:discover": "playwright test testing/e2e/simple-ui-test.spec.js --headed --reporter=line",
+    "test:reconciliation": "playwright test testing/e2e/reconciliation-functionality.spec.js --headed --reporter=line",
+    "test:reconciliation:debug": "playwright test testing/e2e/reconciliation-functionality.spec.js --headed --debug",
+    "test:reconciliation:full": "playwright test testing/e2e/reconciliation-functionality.spec.js --headed --reporter=html",
+    "test:reconciliation:focused": "playwright test testing/e2e/reconciliation-focused.spec.js --headed --reporter=line",
+    "test:reconciliation:quick": "playwright test testing/e2e/reconciliation-focused.spec.js --headed --reporter=line --timeout=60000",
+    "test:reconciliation:modal": "playwright test testing/e2e/reconciliation-modal-aware.spec.js --headed --reporter=line",
+    "test:reconciliation:modal-debug": "playwright test testing/e2e/reconciliation-modal-aware.spec.js --headed --debug",
+    "test:reconciliation:upload": "playwright test testing/e2e/reconciliation-upload-flow.spec.js --headed --reporter=line",
+    "test:reconciliation:upload-debug": "playwright test testing/e2e/reconciliation-upload-flow.spec.js --headed --debug",
+    "test:reconciliation:complete": "playwright test testing/e2e/reconciliation-complete-workflow.spec.js --headed --reporter=line --timeout=120000",
+    "test:reconciliation:force": "playwright test testing/e2e/reconciliation-force-upload.spec.js --headed --reporter=line --timeout=60000"
   },
   "dependencies": {
     "axios": "^1.10.0",
@@ -18,6 +45,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
+    "@playwright/test": "^1.40.0",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
@@ -28,6 +56,7 @@
     "globals": "^16.0.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.1",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "^1.0.0"
   }
 }

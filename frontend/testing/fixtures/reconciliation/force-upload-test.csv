@@ -1,0 +1,3 @@
+Transaction_ID,Reference_Number,Amount,Transaction_Date,Status
+TXN001,REF12345,1000.50,2024-01-15,SETTLED
+TXN002,REF12346,2500.75,2024-01-15,SETTLED

@@ -2,6 +2,13 @@
 **.env
 __pycache__
 
+/frontend/test-results
+
+**/test-results
+
+frontend/test-results
+
+*.png
 __pycache__/
 *.py[cod]
 *$py.class

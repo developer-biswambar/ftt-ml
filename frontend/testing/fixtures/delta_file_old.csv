@@ -1,0 +1,5 @@
+ID,Name,Amount,Status
+1,Item A,100.00,Active
+2,Item B,200.00,Active
+3,Item C,300.00,Inactive
+4,Item D,400.00,Active

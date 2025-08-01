@@ -1,382 +1,289 @@
-# Frontend Testing Framework
+# 🎯 FTT-ML UI Testing Suite
 
-This directory contains a comprehensive testing framework for the Financial Transaction Transformation (FTT-ML) frontend application.
+## Overview
+Comprehensive testing strategy covering all UI scenarios with maximum speed and coverage.
 
-## 📁 Testing Structure
+## 🚀 Quick Start (5 minutes to test everything)
+
+### 1. Prerequisites
+```bash
+# Ensure backend is running
+cd backend
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Ensure frontend is running  
+cd frontend
+npm run dev
+```
+
+### 2. Run All Tests (Fastest)
+```bash
+# Single command - tests everything
+npm run test:ui:all
+
+# Or manually
+node testing/test-runner.js all
+```
+
+### 3. Quick Smoke Test (30 seconds)
+```bash
+# Just verify core functionality works
+node testing/test-runner.js smoke
+```
+
+## 📋 Testing Levels
+
+### 🚀 **Level 1: Smoke Tests** (30 seconds)
+**What**: Quick verification that app loads and core navigation works
+**Run**: `node testing/test-runner.js smoke`
+**Coverage**: 
+- App loads without errors
+- All main tabs accessible
+- File upload UI functional
+- AI assistance buttons visible
+
+### 🔄 **Level 2: Workflow Tests** (5-10 minutes)
+**What**: Complete end-to-end workflows for all features
+**Run**: `node testing/test-runner.js workflows`
+**Coverage**:
+- Complete reconciliation workflow
+- Complete transformation workflow  
+- Complete delta generation workflow
+- Data viewer integration
+- AI assistance integration
+- Error handling scenarios
+
+### ⚡ **Level 3: Performance Tests** (2-3 minutes)
+**What**: Load times, large file handling, responsiveness
+**Run**: `node testing/test-runner.js performance`
+**Coverage**:
+- Page load performance
+- Large dataset processing
+- Memory usage
+- API response times
+
+### 📱 **Level 4: Mobile Tests** (2-3 minutes)
+**What**: Mobile responsiveness and touch interactions
+**Run**: `node testing/test-runner.js mobile`
+**Coverage**:
+- Different viewport sizes
+- Touch interactions
+- Mobile navigation
+- Responsive layouts
+
+## 🎯 **Best Testing Strategy by Time Available**
+
+### ⚡ **5 Minutes Available**
+```bash
+# Run smoke tests + one full workflow
+node testing/test-runner.js smoke
+npx playwright test testing/e2e/complete-workflow.spec.js --grep "Complete Reconciliation Workflow"
+```
+
+### ⏱️ **15 Minutes Available**
+```bash
+# Run comprehensive suite
+node testing/test-runner.js all
+```
+
+### 🏃 **30 Minutes Available**
+```bash
+# Run all tests + manual exploratory testing
+node testing/test-runner.js all
+# Then manually test edge cases and new features
+```
+
+## 📁 Test Structure
 
 ```
 testing/
-├── README.md                     # This guide
-├── e2e/                         # End-to-end tests with Playwright
-│   ├── reconciliation.spec.js   # Reconciliation workflow tests
-│   ├── transformation.spec.js   # Transformation workflow tests
-│   ├── file-upload.spec.js      # File upload and management tests
-│   └── delta.spec.js            # Delta generation tests (to be added)
-├── integration/                 # API integration tests
-│   ├── api-services.test.js     # API service integration tests
-│   └── workflow-integration.test.js  # Cross-feature integration tests
-├── fixtures/                   # Test data and mock files
-│   ├── sample-files/           # Sample CSV/Excel files for testing
-│   ├── mock-responses/         # Mock API responses
-│   └── test-scenarios/         # Test scenario configurations
-├── mocks/                      # Mock Service Worker setup
-│   ├── server.js              # MSW server configuration
-│   └── handlers.js            # API request handlers
-├── reports/                    # Test reports and artifacts
-└── utils/                      # Testing utilities and helpers
+├── e2e/
+│   ├── smoke-tests.spec.js          # Quick core verification
+│   ├── complete-workflow.spec.js    # Full workflow testing
+│   └── edge-cases.spec.js           # Error scenarios & edge cases
+├── utils/
+│   └── test-data-setup.js           # Test data utilities
+├── fixtures/                        # Test data files
+├── reports/                         # Test reports
+└── test-runner.js                   # Main test orchestrator
 ```
 
-## 🚀 Quick Start
+## 🎪 **Test Scenarios Covered**
 
-### Prerequisites
+### **Reconciliation Testing**
+- ✅ File upload (single & multiple)
+- ✅ AI configuration generation
+- ✅ Manual configuration setup
+- ✅ Rule validation
+- ✅ Processing with different data types
+- ✅ Results viewing and downloading
+- ✅ Error handling (invalid files, network errors)
+
+### **Transformation Testing**
+- ✅ Multi-file source setup
+- ✅ Rule builder interface
+- ✅ Column mapping (direct, static, dynamic)
+- ✅ Row generation and expansion
+- ✅ Preview functionality
+- ✅ Complex multi-rule scenarios
+- ✅ Validation and error states
+
+### **Delta Generation Testing**
+- ✅ File comparison setup
+- ✅ Key column selection
+- ✅ Delta categorization
+- ✅ Results visualization
+- ✅ Export functionality
+
+### **Data Viewer Testing**
+- ✅ File navigation
+- ✅ Data filtering and sorting
+- ✅ Pagination
+- ✅ Export options
+- ✅ Large dataset handling
+
+### **AI Integration Testing**
+- ✅ AI configuration generation
+- ✅ Regex pattern generation
+- ✅ Mapping suggestions
+- ✅ Error handling for AI failures
+- ✅ Response parsing and validation
+
+### **Cross-Cutting Concerns**
+- ✅ Mobile responsiveness
+- ✅ Performance with large files
+- ✅ Error states and recovery
+- ✅ Loading states and feedback
+- ✅ Accessibility basics
+- ✅ Security (XSS prevention, file validation)
+
+## 🛠️ **Custom Test Commands**
+
 ```bash
-# Install dependencies
-npm install
+# Quick verification
+npm run test:smoke
 
-# Install Playwright browsers (first time only)
+# Full workflow testing
+npm run test:workflows
+
+# Performance testing only
+npm run test:performance
+
+# Mobile testing only
+npm run test:mobile
+
+# Test specific feature
+npx playwright test --grep "reconciliation"
+npx playwright test --grep "transformation"
+npx playwright test --grep "delta"
+
+# Debug mode (see browser)
+npx playwright test --headed --debug
+
+# Generate test report
+npm run test:report
+```
+
+## 📊 **Test Reports**
+
+After running tests, check:
+- `testing/reports/ui-test-report.json` - Detailed JSON report
+- `testing/reports/test-results.html` - Visual HTML report
+- `testing/screenshots/` - Screenshots of failures
+
+## 🔧 **Test Data**
+
+All test data is automatically set up in `testing/fixtures/`:
+- Reconciliation test files
+- Transformation source files  
+- Delta comparison files
+- Large files for performance testing
+- Invalid files for error testing
+
+## 🚨 **Troubleshooting**
+
+### Common Issues:
+
+**Backend not running:**
+```bash
+cd backend && python -m uvicorn app.main:app --reload
+```
+
+**Frontend not running:**
+```bash
+cd frontend && npm run dev
+```
+
+**Test files missing:**
+```bash
+# Files are auto-created, but you can manually copy:
+cp ../backend/docs/testing/reconciliation/*.csv testing/fixtures/
+```
+
+**Browser issues:**
+```bash
+# Install/update browsers
 npx playwright install
 ```
 
-### Running Tests
-
+**Slow tests:**
 ```bash
-# Run all E2E tests
-npm run test:e2e
-
-# Run E2E tests with UI
-npm run test:e2e:ui
-
-# Run specific test file
-npx playwright test reconciliation.spec.js
-
-# Run integration tests
-npm run test:integration
-
-# Run integration tests in watch mode
-npm run test:integration:watch
-
-# Run visual regression tests
-npm run test:visual
+# Run specific tests only
+npx playwright test testing/e2e/smoke-tests.spec.js
 ```
 
-## 🧪 Testing Types
+## 🎯 **Optimization Tips**
 
-### 1. End-to-End Tests (E2E)
-**Location**: `testing/e2e/`
-**Framework**: Playwright
+### **For Speed:**
+1. Run smoke tests first - fails fast if major issues
+2. Use `--grep` to test specific features
+3. Run tests in parallel: `--workers=4`
+4. Skip mobile tests during development: `--grep "Mobile" --invert`
 
-**Coverage**:
-- ✅ Complete user workflows from start to finish
-- ✅ Multi-browser testing (Chrome, Firefox, Safari)
-- ✅ Mobile viewport testing
-- ✅ Visual regression testing
-- ✅ Performance testing
+### **For Coverage:**
+1. Run full suite: `node testing/test-runner.js all`
+2. Check test report for gaps
+3. Add custom test cases for your specific scenarios
+4. Use manual exploratory testing for edge cases
 
-**Key Test Files**:
-- `reconciliation.spec.js` - Full reconciliation workflow testing
-- `transformation.spec.js` - Data transformation workflow testing
-- `file-upload.spec.js` - File upload and management testing
+### **For CI/CD:**
+1. Use `--reporter=json` for machine-readable results
+2. Set appropriate timeouts for CI environment
+3. Use headless mode: `--headed=false`
+4. Store test artifacts and screenshots
 
-### 2. Integration Tests
-**Location**: `testing/integration/`  
-**Framework**: Vitest + MSW
+## 🏆 **Success Criteria**
 
-**Coverage**:
-- ✅ API service integration
-- ✅ Cross-component interactions
-- ✅ Error handling and recovery
-- ✅ Data flow validation
+### **Green Light (Ready for Production):**
+- ✅ All smoke tests pass
+- ✅ Core workflows complete successfully  
+- ✅ Performance under acceptable limits
+- ✅ Mobile responsiveness working
+- ✅ Error handling graceful
 
-## 📊 Test Scenarios
+### **Yellow Light (Needs Attention):**
+- ⚠️ Some performance issues
+- ⚠️ Minor mobile responsiveness issues
+- ⚠️ Non-critical workflow failures
 
-### Reconciliation Workflow Testing
-```javascript
-// Example: Full reconciliation workflow
-test('should complete full reconciliation workflow', async ({ page }) => {
-  // 1. Upload files
-  // 2. Configure AI matching rules
-  // 3. Execute reconciliation
-  // 4. Verify results
-  // 5. Export data
-})
-```
+### **Red Light (Not Ready):**
+- ❌ Smoke tests failing
+- ❌ Core workflows broken
+- ❌ Major performance problems
+- ❌ Security vulnerabilities
 
-**Scenarios Covered**:
-- ✅ File upload and validation
-- ✅ AI configuration generation
-- ✅ Manual rule configuration
-- ✅ Reconciliation execution
-- ✅ Results validation and export
-- ✅ Error handling and recovery
+## 🎪 **Advanced Testing**
 
-### Transformation Workflow Testing
-```javascript
-// Example: AI-powered transformation
-test('should generate transformation rules with AI', async ({ page }) => {
-  // 1. Upload source data
-  // 2. Define output schema
-  // 3. Use AI to generate rules
-  // 4. Execute transformation
-  // 5. Validate results
-})
-```
-
-**Scenarios Covered**:
-- ✅ Data upload and schema detection
-- ✅ AI rule generation
-- ✅ Manual column mapping
-- ✅ Row generation rules
-- ✅ Transformation execution
-- ✅ Result validation and export
-
-### File Management Testing
-**Scenarios Covered**:
-- ✅ Single and multiple file uploads
-- ✅ File format validation (CSV, Excel)
-- ✅ Large file processing
-- ✅ File library management
-- ✅ Error handling for invalid files
-
-## 🎯 Test Data Management
-
-### Sample Files
-Located in `testing/fixtures/sample-files/`:
-
-- **test_data.csv** - Basic test data (5 rows)
-- **recon_file_a.csv** - Reconciliation source file
-- **recon_file_b.csv** - Reconciliation target file  
-- **customer_sales_test.csv** - Customer sales data for transformation
-- **large_test_data.csv** - Large dataset for performance testing
-
-### Mock API Responses
-Located in `testing/mocks/handlers.js`:
-
-- ✅ Health check responses
-- ✅ File upload responses
-- ✅ Reconciliation API responses
-- ✅ Transformation API responses  
-- ✅ Error scenarios
-
-## 📈 Performance Testing
-
-### E2E Performance Tests
-```javascript
-test('should handle large file reconciliation within time limit', async ({ page }) => {
-  const startTime = Date.now();
-  // Execute reconciliation workflow
-  const endTime = Date.now();
-  expect(processingTime).toBeLessThan(120); // 2 minutes max
-});
-```
-
-**Performance Benchmarks**:
-- ✅ File upload: < 30 seconds for 100MB files
-- ✅ Reconciliation: < 2 minutes for 50K records
-- ✅ Transformation: < 1 minute for 10K records
-- ✅ Page load: < 3 seconds initial load
-
-## 🎨 Visual Regression Testing
-
-### Visual Tests
-Tagged with `@visual` for easy filtering:
-
-```javascript
-test('@visual should match reconciliation page screenshot', async ({ page }) => {
-  await page.goto('/reconciliation');
-  await expect(page).toHaveScreenshot('reconciliation-page.png');
-});
-```
-
-**Visual Coverage**:
-- ✅ Main application pages
-- ✅ Modal dialogs
-- ✅ Form states (empty, filled, error)
-- ✅ Data tables and previews
-- ✅ Mobile responsive layouts
-
-## 🔧 Configuration Files
-
-### Playwright Configuration (`playwright.config.js`)
-```javascript
-export default defineConfig({
-  testDir: './testing/e2e',
-  use: {
-    baseURL: 'http://localhost:5173',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-  },
-  projects: [
-    { name: 'chromium' },
-    { name: 'firefox' },
-    { name: 'webkit' },
-    { name: 'Mobile Chrome' },
-    { name: 'Mobile Safari' },
-  ],
-})
-```
-
-### Vitest Configuration (`vitest.config.js`)
-```javascript
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./testing/setup.js'],
-    include: ['testing/integration/**/*.{test,spec}.{js,jsx}'],
-  },
-})
-```
-
-## 🚦 Test Commands Reference
-
-### Development Workflow
-```bash
-# Run tests during development
-npm run test:integration:watch    # Watch integration tests
-npm run test:e2e:debug           # Debug E2E tests
-npm run test:e2e:ui              # Run E2E with UI
-
-# Before committing
-npm run test:integration         # Run all integration tests
-npm run test:e2e                 # Run all E2E tests
-npm run test:visual              # Run visual regression tests
-```
-
-### CI/CD Pipeline
-```bash
-# Continuous Integration
-npm run test:integration         # Fast integration tests
-npm run test:e2e -- --workers=1 # E2E tests with limited workers
-npm run test:visual              # Visual regression validation
-```
-
-## 📊 Test Reporting
-
-### HTML Reports
-- **Playwright**: `playwright-report/index.html`
-- **Vitest**: Console output with detailed error information
-
-### Test Artifacts
-- **Screenshots**: Saved on test failures
-- **Videos**: Recorded for failed E2E tests
-- **Traces**: Detailed execution traces for debugging
-
-## 🔍 Debugging Tests
-
-### Playwright Debugging
-```bash
-# Run in debug mode
-npm run test:e2e:debug
-
-# Run specific test in debug mode
-npx playwright test reconciliation.spec.js --debug
-
-# View test traces
-npx playwright show-trace trace.zip
-```
-
-### Integration Test Debugging
-```bash
-# Run with detailed output
-npm run test:integration -- --reporter=verbose
-
-# Run specific test file
-npx vitest api-services.test.js
-```
-
-## 📋 Testing Checklist
-
-### Before Release
-- [ ] All E2E tests pass across browsers
-- [ ] Integration tests pass
-- [ ] Visual regression tests pass
-- [ ] Performance benchmarks met
-- [ ] Error scenarios handled
-- [ ] Mobile responsiveness validated
-
-### Test Coverage Goals
-- [ ] **E2E Coverage**: All major user workflows
-- [ ] **Integration Coverage**: All API endpoints
-- [ ] **Error Coverage**: All error scenarios
-- [ ] **Performance Coverage**: All critical operations
-- [ ] **Visual Coverage**: Key UI components
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-1. **Playwright Browser Installation**
-   ```bash
-   npx playwright install
-   ```
-
-2. **Test Timeouts**
-   - Increase timeout in test configuration
-   - Check for slow API responses
-   - Verify mock service responses
-
-3. **Visual Test Failures**
-   - Update baseline screenshots: `npx playwright test --update-snapshots`
-   - Check for browser differences
-   - Verify consistent test data
-
-4. **Integration Test Failures**
-   - Check MSW handler configurations
-   - Verify API endpoint mocks
-   - Check network connectivity
-
-### Debug Commands
-```bash
-# Check test configuration
-npx playwright --version
-npx vitest --version
-
-# Validate test files
-npx playwright test --list
-npx vitest --run --reporter=verbose
-```
-
-## 📞 Support and Resources
-
-### Documentation
-- [Playwright Documentation](https://playwright.dev/)
-- [Vitest Documentation](https://vitest.dev/)
-- [MSW Documentation](https://mswjs.io/)
-- [Testing Library](https://testing-library.com/)
-
-### Internal Resources
-- Backend API Documentation: `../backend/docs/API_DOCUMENTATION.md`
-- Sample Data: `../backend/docs/testing/`
-- Component Documentation: `../src/components/`
+For more thorough testing, consider:
+- Load testing with multiple concurrent users
+- Cross-browser testing (Chrome, Firefox, Safari)
+- Accessibility testing with screen readers
+- Visual regression testing
+- API contract testing
+- Database state verification
 
 ---
 
-**Last Updated**: December 2024  
-**Version**: 1.0.0  
-**Testing Framework**: Playwright + Vitest + MSW  
-**Maintainer**: FTT-ML Frontend Team
+**🚀 Start with: `node testing/test-runner.js all`**
 
-## 🚀 Getting Started Checklist
-
-For new team members:
-
-1. **Setup Environment**
-   - [ ] Install Node.js dependencies: `npm install`
-   - [ ] Install Playwright browsers: `npx playwright install`
-   - [ ] Verify backend is running on `http://localhost:8000`
-
-2. **Run Initial Tests**
-   - [ ] Run integration tests: `npm run test:integration`
-   - [ ] Run a simple E2E test: `npx playwright test file-upload.spec.js`
-   - [ ] Check visual tests: `npm run test:visual`
-
-3. **Explore Test Structure**
-   - [ ] Review test files in `testing/e2e/`
-   - [ ] Check mock configurations in `testing/mocks/`
-   - [ ] Examine sample data in `testing/fixtures/`
-
-4. **Start Contributing**
-   - [ ] Add test scenarios for new features
-   - [ ] Update mock handlers for new API endpoints
-   - [ ] Maintain visual regression baselines
-   - [ ] Document new testing patterns
+This will give you comprehensive coverage of all UI scenarios in the fastest possible time!

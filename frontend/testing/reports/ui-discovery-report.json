@@ -1,0 +1,19 @@
+{
+  "timestamp": "2025-08-01T05:14:18.140Z",
+  "url": "http://localhost:5173/",
+  "title": "Financial Reconciliation Chat",
+  "hasContent": true,
+  "elementCounts": {
+    "buttons": 19,
+    "links": 0,
+    "inputs": 2,
+    "forms": 0,
+    "images": 0,
+    "divs": 154
+  },
+  "screenshots": [
+    "app-actual-state.png",
+    "ui-analysis-complete.png",
+    "final-ui-state.png"
+  ]
+}
