@@ -69,7 +69,6 @@ const ReconciliationFlow = ({
     const steps = [
         {id: 'rule_management', title: 'Load/Save Rules', icon: Save},
         {id: 'ai_requirements', title: 'AI Configuration', icon: Wand2},
-        {id: 'file_selection', title: 'File Selection', icon: FileText},
         {id: 'extraction_rules', title: 'Data Parsing', icon: Target},  
         {id: 'filter_rules', title: 'Data Filtering', icon: Filter},
         {id: 'reconciliation_rules', title: 'Matching Rules', icon: Settings},
@@ -212,7 +211,7 @@ const ReconciliationFlow = ({
         }
 
         setTimeout(() => {
-            setCurrentStep('file_selection');
+            setCurrentStep('extraction_rules');
         }, 1000);
     };
 
@@ -495,8 +494,8 @@ const ReconciliationFlow = ({
         setGeneratedConfig(null);
         onSendMessage('system', '✅ AI configuration applied! You can now review and modify it in the following steps.');
         
-        // Navigate to file selection step
-        setCurrentStep('file_selection');
+        // Navigate to extraction rules step
+        setCurrentStep('extraction_rules');
     };
 
     // Filter rule handlers
@@ -636,7 +635,7 @@ const ReconciliationFlow = ({
                                     Create a new reconciliation configuration manually from scratch.
                                 </p>
                                 <button
-                                    onClick={() => setCurrentStep('file_selection')}
+                                    onClick={() => setCurrentStep('extraction_rules')}
                                     className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 min-h-[40px]"
                                 >
                                     <FileText size={16}/>
@@ -682,42 +681,6 @@ const ReconciliationFlow = ({
                     />
                 );
 
-            case 'file_selection':
-                return (
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-800">Selected Files for Reconciliation</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            {filesArray.slice(0, 2).map((file, index) => {
-                                const colors = ['green', 'purple'];
-                                const labels = ['Primary File', 'Comparison File'];
-                                const letters = ['A', 'B'];
-
-                                return (
-                                    <div key={index}
-                                         className={`p-4 border border-${colors[index]}-200 bg-${colors[index]}-50 rounded-lg`}>
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <div
-                                                className={`w-6 h-6 bg-${colors[index]}-500 rounded-full flex items-center justify-center text-white text-sm font-bold`}>
-                                                {letters[index]}
-                                            </div>
-                                            <span
-                                                className={`font-medium text-${colors[index]}-800`}>{labels[index]}</span>
-                                        </div>
-                                        <div className={`text-sm text-${colors[index]}-700`}>
-                                            <p className="font-medium">{file?.filename}</p>
-                                            <p className="text-xs">{file?.total_rows} rows
-                                                • {file?.columns?.length} columns</p>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-                            <p>✅ Files are ready for reconciliation configuration. Click "Next" to proceed with Data
-                                Parsing rules.</p>
-                        </div>
-                    </div>
-                );
 
             case 'extraction_rules':
                 return (
