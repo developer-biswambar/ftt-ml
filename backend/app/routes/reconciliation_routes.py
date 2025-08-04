@@ -6,6 +6,7 @@ from typing import Optional, List, Dict, Any
 import pandas as pd
 from fastapi import APIRouter, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
+from pyasn1_modules.rfc8018 import algid_hmacWithSHA1
 from pydantic import BaseModel
 
 from app.models.recon_models import ReconciliationResponse, ReconciliationSummary, OptimizedRulesConfig
@@ -284,6 +285,34 @@ async def _process_reconciliation_core(
     )
 
     print(f"Reconciliation completed in {processing_time:.2f}s - {matched} matches found")
+
+    from app.routes.save_results_routes import SaveResultsRequest
+    from app.routes.save_results_routes import save_results_to_server
+
+    save_request_matched = SaveResultsRequest(
+        result_id=recon_id,
+        file_id=recon_id,
+        result_type="matched",
+        process_type="reconciliation",
+        file_format="csv",
+        description="Matched records from reconciliation job"  # optional
+    )
+
+    save_request_all = SaveResultsRequest(
+        result_id=recon_id,
+        file_id=recon_id+'_all',
+        result_type="all",
+        process_type="reconciliation",
+        file_format="csv",
+        description="Matched records from reconciliation job"  # optional
+    )
+
+    save_result_res_matched = await save_results_to_server(save_request_matched)
+
+    save_result_all  = await save_results_to_server(save_request_all)
+
+    print(save_result_res_matched)
+    print(save_result_all)
 
     return ReconciliationResponse(
         success=True,

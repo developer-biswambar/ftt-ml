@@ -20,7 +20,9 @@ import AIRegexGenerator from '../core/AIRegexGenerator.jsx';
 import RuleSaveLoad from '../rules/RuleSaveLoad.jsx';
 import IntegratedFilterDataStep from "./IntegratedFilterDataStep.jsx";
 import AIRequirementsStep from '../reconciliation/AIRequirementsStep.jsx';
+import ReconciliationPreviewStep from './ReconciliationPreviewStep.jsx';
 import { aiAssistanceService } from '../../services/aiAssistanceService.js';
+import { processManagementService } from '../../services/processManagementService.js';
 
 const ReconciliationFlow = ({
                                 files,
@@ -59,16 +61,21 @@ const ReconciliationFlow = ({
     const [isGenerating, setIsGenerating] = useState(false);
     const [generatedConfig, setGeneratedConfig] = useState(null);
 
+    // Preview Step State
+    const [generatedResults, setGeneratedResults] = useState(null);
+    const [isProcessing, setIsProcessing] = useState(false);
+
     // Step definitions
     const steps = [
         {id: 'rule_management', title: 'Load/Save Rules', icon: Save},
         {id: 'ai_requirements', title: 'AI Configuration', icon: Wand2},
         {id: 'file_selection', title: 'File Selection', icon: FileText},
-        {id: 'extraction_rules', title: 'Data Parsing', icon: Target},
+        {id: 'extraction_rules', title: 'Data Parsing', icon: Target},  
         {id: 'filter_rules', title: 'Data Filtering', icon: Filter},
         {id: 'reconciliation_rules', title: 'Matching Rules', icon: Settings},
         {id: 'result_columns', title: 'Result Columns', icon: Columns},
-        {id: 'review', title: 'Review & Confirm', icon: Check}
+        {id: 'review', title: 'Review & Confirm', icon: Check},
+        {id: 'generate_view', title: 'Generate & View', icon: Upload}
     ];
 
     // Helper functions
@@ -226,11 +233,16 @@ const ReconciliationFlow = ({
     };
 
     // Navigation handlers
-    const nextStep = () => {
+    const nextStep = async () => {
         const currentIndex = getCurrentStepIndex();
         if (currentIndex < steps.length - 1) {
             const nextStepId = steps[currentIndex + 1].id;
             setCurrentStep(nextStepId);
+            
+            // Generate results when reaching generate_view step
+            if (nextStepId === 'generate_view') {
+                await generateReconciliationResults();
+            }
         }
     };
 
@@ -241,22 +253,81 @@ const ReconciliationFlow = ({
         }
     };
 
-    const completeFlow = () => {
-        const finalConfig = {
-            ...config,
-            ReconciliationRules: reconciliationRules,
-            selected_columns_file_a: selectedColumnsFileA,
-            selected_columns_file_b: selectedColumnsFileB,
-            user_requirements: 'Reconcile files using the configured rules',
-            files: getSelectedFilesArray().map((file, index) => ({
-                file_id: file.file_id,
-                role: `file_${index}`,
-                label: selectedTemplate?.fileLabels[index] || `File ${index + 1}`
-            }))
-        };
+    // Generate reconciliation results
+    const generateReconciliationResults = async () => {
+        setIsProcessing(true);
+        try {
+            const filesArray = getSelectedFilesArray();
+            const finalConfig = {
+                process_type: 'reconciliation',
+                process_name: 'Custom Reconciliation Process',
+                user_requirements: 'Reconcile files using the configured rules',
+                files: filesArray.map((file, index) => ({
+                    file_id: file.file_id,
+                    role: `file_${index}`,
+                    label: selectedTemplate?.fileLabels[index] || `File ${index + 1}`
+                })),
+                reconciliation_config: {
+                    Files: config.Files,
+                    ReconciliationRules: reconciliationRules,
+                    selected_columns_file_a: selectedColumnsFileA,
+                    selected_columns_file_b: selectedColumnsFileB,
+                    user_requirements: 'Reconcile files using the configured rules',
+                    files: filesArray.map((file, index) => ({
+                        file_id: file.file_id,
+                        role: `file_${index}`,
+                        label: selectedTemplate?.fileLabels[index] || `File ${index + 1}`
+                    }))
+                }
+            };
 
-        onSendMessage('system', '🎉 Reconciliation configuration completed! Starting process...');
-        onComplete(finalConfig);
+            onSendMessage('system', '🎉 Starting reconciliation process...');
+            
+            const response = await processManagementService.startReconciliation(finalConfig);
+            
+            if (response.success) {
+                // Check if response has direct data or is wrapped in process format
+                const resultData = response.data || response;
+                const summary = resultData.summary || {};
+                
+                setGeneratedResults({
+                    reconciliation_id: resultData.reconciliation_id || response.processId,
+                    matched_count: summary.matched_records || 0,
+                    unmatched_file_a_count: summary.unmatched_file_a || 0,
+                    unmatched_file_b_count: summary.unmatched_file_b || 0,
+                    total_records_file_a: summary.total_records_file_a || 0,
+                    total_records_file_b: summary.total_records_file_b || 0,
+                    processing_time: summary.processing_time_seconds || 0,
+                    match_percentage: summary.match_percentage || 0,
+                    errors: resultData.errors || [],
+                    warnings: resultData.warnings || [],
+                    processing_info: resultData.processing_info || {}
+                });
+                onSendMessage('system', '✅ Reconciliation completed successfully!');
+            } else {
+                setGeneratedResults({
+                    errors: [response.error || 'Reconciliation failed']
+                });
+                onSendMessage('system', `❌ Reconciliation failed: ${response.error}`);
+            }
+        } catch (error) {
+            console.error('Reconciliation error:', error);
+            setGeneratedResults({
+                errors: [error.message || 'An unexpected error occurred']
+            });
+            onSendMessage('system', `❌ Reconciliation error: ${error.message}`);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const completeFlow = () => {
+        // This function is now primarily for backwards compatibility
+        // The actual processing happens in generateReconciliationResults
+        if (generatedResults && !generatedResults.errors) {
+            onSendMessage('system', '🎉 Reconciliation configuration completed!');
+            // Could optionally call onComplete here if needed for external handling
+        }
     };
 
     // Column selection handlers
@@ -479,6 +550,32 @@ const ReconciliationFlow = ({
     const removeReconciliationRule = (ruleIndex) => {
         const updatedRules = reconciliationRules.filter((_, index) => index !== ruleIndex);
         setReconciliationRules(updatedRules);
+    };
+
+    // Result handlers
+    const openFileViewer = (reconciliationId) => {
+        if (reconciliationId) {
+            const viewerUrl = `/viewer/${reconciliationId}`;
+            const newWindow = window.open(
+                viewerUrl,
+                `reconciliation_viewer_${reconciliationId}`,
+                'toolbar=yes,scrollbars=yes,resizable=yes,width=1400,height=900,menubar=yes,location=yes,directories=no,status=yes'
+            );
+
+            if (newWindow) {
+                newWindow.focus();
+            } else {
+                window.open(viewerUrl, '_blank');
+            }
+        }
+    };
+
+    const handleSaveResults = (reconciliationId) => {
+        // This would typically show a save dialog or perform save operation
+        if (reconciliationId) {
+            onSendMessage('system', `💾 Reconciliation results saved! ID: ${reconciliationId}`);
+            // You could add additional save logic here
+        }
     };
 
     // Step content renderer
@@ -1097,6 +1194,32 @@ const ReconciliationFlow = ({
                     </div>
                 );
 
+            case 'generate_view':
+                return (
+                    <ReconciliationPreviewStep
+                        config={{
+                            ...config,
+                            ReconciliationRules: reconciliationRules,
+                            selected_columns_file_a: selectedColumnsFileA,
+                            selected_columns_file_b: selectedColumnsFileB,
+                            user_requirements: 'Reconcile files using the configured rules',
+                            files: getSelectedFilesArray().map((file, index) => ({
+                                file_id: file.file_id,
+                                role: `file_${index}`,
+                                label: selectedTemplate?.fileLabels[index] || `File ${index + 1}`
+                            }))
+                        }}
+                        generatedResults={generatedResults}
+                        isLoading={isProcessing}
+                        onRefresh={generateReconciliationResults}
+                        onViewResults={openFileViewer}
+                        onSaveResults={handleSaveResults}
+                        onRetry={() => setCurrentStep('review')}
+                        onUpdateConfig={() => setCurrentStep('review')}
+                        onClose={onCancel}
+                    />
+                );
+
             default:
                 return <div>Unknown step</div>;
         }
@@ -1168,19 +1291,19 @@ const ReconciliationFlow = ({
                         {getCurrentStepIndex() < steps.length - 1 ? (
                             <button
                                 onClick={nextStep}
-                                className="flex items-center space-x-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                disabled={currentStep === 'review' && reconciliationRules.length === 0}
+                                className="flex items-center space-x-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
-                                <span>Next</span>
+                                <span>{currentStep === 'review' ? 'Generate Results' : 'Next'}</span>
                                 <ChevronRight size={16}/>
                             </button>
                         ) : (
                             <button
-                                onClick={completeFlow}
-                                disabled={reconciliationRules.length === 0}
-                                className="flex items-center space-x-1 px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                onClick={onCancel}
+                                className="flex items-center space-x-1 px-6 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
                             >
-                                <Check size={16}/>
-                                <span>Start Reconciliation</span>
+                                <X size={16}/>
+                                <span>Close</span>
                             </button>
                         )}
                     </div>

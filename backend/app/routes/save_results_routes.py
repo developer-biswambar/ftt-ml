@@ -21,6 +21,7 @@ router = APIRouter(prefix="/save-results", tags=["save-results"])
 class SaveResultsRequest(BaseModel):
     """Request model for saving results to server"""
     result_id: str  # reconciliation_id or delta_id
+    file_id: Optional[str] = None
     result_type: str  # all, unchanged, amended, deleted, newly_added, matched, unmatched_a, unmatched_b, etc.
     file_format: str = "csv"  # csv, excel
     custom_filename: Optional[str] = None
@@ -261,7 +262,7 @@ async def save_results_to_server(request: SaveResultsRequest):
         )
 
         # Generate saved file ID
-        saved_file_id = generate_uuid('saved_result')
+        saved_file_id = generate_uuid('saved_result') if request.file_id is None else request.file_id
 
         # Save DataFrame to storage
         saved_file_info = saver.save_dataframe_to_storage(

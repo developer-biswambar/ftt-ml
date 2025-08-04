@@ -48,7 +48,7 @@ const DataViewer = ({fileId, onClose}) => {
         headerHeight: 'compact', // compact, normal, comfortable
         fontSize: 'small', // small, normal, large
         showGridLines: true,
-        autoSizeColumns: false
+        autoSizeColumns: true
     });
     const [showConfigPanel, setShowConfigPanel] = useState(false);
 
