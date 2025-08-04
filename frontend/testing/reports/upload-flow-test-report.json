@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-08-01T05:58:37.792Z",
+  "timestamp": "2025-08-01T06:20:59.078Z",
   "testType": "Complete Upload Flow",
   "results": {
     "fileAUploaded": true,
@@ -8,7 +8,7 @@
     "processButtonWorked": true,
     "resultsFound": false
   },
-  "filesDetected": 2,
+  "filesDetected": 4,
   "screenshots": [
     "upload-flow-01-modal-opened.png",
     "upload-flow-02-file-a-selected.png",

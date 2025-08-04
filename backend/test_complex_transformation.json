@@ -1,0 +1,47 @@
+{
+  "name": "Complex Expression Test",
+  "description": "Test complex expressions with calculated field references",
+  "source_files": [
+    {
+      "file_id": "test_file",
+      "alias": "test_file",
+      "purpose": "Test data source"
+    }
+  ],
+  "row_generation_rules": [
+    {
+      "id": "rule_1",
+      "name": "Complex Calculation Rule",
+      "enabled": true,
+      "output_columns": [
+        {
+          "id": "col_1",
+          "name": "roi_percentage",
+          "mapping_type": "static",
+          "static_value": "({Retail_Price} - {Cost_Price}) / {Cost_Price} * 100"
+        },
+        {
+          "id": "col_2",
+          "name": "investment_efficiency",
+          "mapping_type": "static",
+          "static_value": "{Stock_Quantity} / 10"
+        },
+        {
+          "id": "col_3",
+          "name": "capital_turnover_potential",
+          "mapping_type": "static",
+          "static_value": "{Retail_Price} / 1000"
+        },
+        {
+          "id": "col_4",
+          "name": "composite_score",
+          "mapping_type": "static",
+          "static_value": "({roi_percentage} + {investment_efficiency} + {capital_turnover_potential}) / 3"
+        }
+      ],
+      "priority": 0
+    }
+  ],
+  "merge_datasets": false,
+  "validation_rules": []
+}

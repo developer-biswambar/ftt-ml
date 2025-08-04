@@ -1,0 +1,68 @@
+{
+  "success": true,
+  "message": "Configuration generated successfully",
+  "data": {
+    "name": "Product Profitability Analysis",
+    "description": "Calculate profit margins, markup percentages, and profitability rating for products",
+    "source_files": [
+      {
+        "file_id": "file_20250804_12h58m00s_763",
+        "alias": "file_20250804_12h58m00s_763",
+        "purpose": "Primary data source"
+      }
+    ],
+    "row_generation_rules": [
+      {
+        "id": "rule_1",
+        "name": "Calculate Profitability Metrics",
+        "enabled": true,
+        "output_columns": [
+          {
+            "id": "col_1",
+            "name": "Profit_Margin",
+            "mapping_type": "static",
+            "static_value": "{Retail_Price} - {Cost_Price}"
+          },
+          {
+            "id": "col_2", 
+            "name": "Markup_Percentage",
+            "mapping_type": "static",
+            "static_value": "({Retail_Price} - {Cost_Price}) / {Cost_Price} * 100"
+          },
+          {
+            "id": "col_3",
+            "name": "Profitability_Rating",
+            "mapping_type": "dynamic",
+            "dynamic_conditions": [
+              {
+                "id": "cond_001",
+                "condition_column": "Retail_Price",
+                "operator": ">=",
+                "condition_value": "1000",
+                "output_value": "Very High"
+              },
+              {
+                "id": "cond_002", 
+                "condition_column": "Retail_Price",
+                "operator": ">=",
+                "condition_value": "500",
+                "output_value": "High"
+              },
+              {
+                "id": "cond_003",
+                "condition_column": "Retail_Price", 
+                "operator": ">=",
+                "condition_value": "100",
+                "output_value": "Medium"
+              }
+            ],
+            "default_value": "Low"
+          }
+        ],
+        "priority": 0
+      }
+    ],
+    "merge_datasets": false,
+    "validation_rules": []
+  }
+}

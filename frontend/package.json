@@ -34,7 +34,8 @@
     "test:reconciliation:upload": "playwright test testing/e2e/reconciliation-upload-flow.spec.js --headed --reporter=line",
     "test:reconciliation:upload-debug": "playwright test testing/e2e/reconciliation-upload-flow.spec.js --headed --debug",
     "test:reconciliation:complete": "playwright test testing/e2e/reconciliation-complete-workflow.spec.js --headed --reporter=line --timeout=120000",
-    "test:reconciliation:force": "playwright test testing/e2e/reconciliation-force-upload.spec.js --headed --reporter=line --timeout=60000"
+    "test:reconciliation:force": "playwright test testing/e2e/reconciliation-force-upload.spec.js --headed --reporter=line --timeout=60000",
+    "test:reconciliation:correct": "playwright test testing/e2e/reconciliation-correct-workflow.spec.js --headed --reporter=line --timeout=90000"
   },
   "dependencies": {
     "axios": "^1.10.0",

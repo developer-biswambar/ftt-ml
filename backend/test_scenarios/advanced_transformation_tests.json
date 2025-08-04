@@ -1,0 +1,378 @@
+{
+  "test_scenarios": [
+    {
+      "id": "TEST_001",
+      "name": "Basic Direct Mapping",
+      "description": "Test simple column-to-column mapping",
+      "difficulty": "Level 1",
+      "expected_output_rows": 10,
+      "transformation_config": {
+        "name": "Basic Customer Mapping",
+        "description": "Simple direct mapping of customer fields",
+        "row_generation_rules": [
+          {
+            "id": "rule_001",
+            "name": "Direct Customer Mapping",
+            "enabled": true,
+            "priority": 0,
+            "condition": "",
+            "output_columns": [
+              {
+                "id": "col_001",
+                "name": "customer_id",
+                "mapping_type": "direct",
+                "source_column": "Customer_ID"
+              },
+              {
+                "id": "col_002",
+                "name": "full_name",
+                "mapping_type": "static",
+                "static_value": "{First_Name} {Last_Name}"
+              },
+              {
+                "id": "col_003",
+                "name": "email",
+                "mapping_type": "direct",
+                "source_column": "Email"
+              },
+              {
+                "id": "col_004",
+                "name": "balance",
+                "mapping_type": "direct",
+                "source_column": "Balance"
+              }
+            ]
+          }
+        ]
+      },
+      "validation_rules": [
+        {
+          "field": "customer_id",
+          "rule": "starts_with",
+          "value": "CUST",
+          "required": true
+        },
+        {
+          "field": "full_name",
+          "rule": "contains",
+          "value": " ",
+          "required": true
+        },
+        {
+          "field": "email",
+          "rule": "contains",
+          "value": "@",
+          "required": true
+        },
+        {
+          "field": "balance",
+          "rule": "is_numeric",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "TEST_002",
+      "name": "Static Expression Evaluation",
+      "description": "Test static value assignment and expressions - THIS IS THE CRITICAL TEST FOR account_summary",
+      "difficulty": "Level 2",
+      "expected_output_rows": 10,
+      "transformation_config": {
+        "name": "Customer Enrichment with Static Values",
+        "description": "Add static computed fields to customer data",
+        "row_generation_rules": [
+          {
+            "id": "rule_002",
+            "name": "Customer Enrichment",
+            "enabled": true,
+            "priority": 0,
+            "condition": "",
+            "output_columns": [
+              {
+                "id": "col_001",
+                "name": "customer_id",
+                "mapping_type": "direct",
+                "source_column": "Customer_ID"
+              },
+              {
+                "id": "col_002",
+                "name": "full_name",
+                "mapping_type": "static",
+                "static_value": "{First_Name} {Last_Name}"
+              },
+              {
+                "id": "col_003",
+                "name": "data_source",
+                "mapping_type": "static",
+                "static_value": "Customer Master File"
+              },
+              {
+                "id": "col_004",
+                "name": "processing_date",
+                "mapping_type": "static",
+                "static_value": "2024-01-31"
+              },
+              {
+                "id": "col_005",
+                "name": "account_summary",
+                "mapping_type": "static",
+                "static_value": "{Account_Type} account with balance ${Balance}"
+              }
+            ]
+          }
+        ]
+      },
+      "validation_rules": [
+        {
+          "field": "data_source",
+          "rule": "equals",
+          "value": "Customer Master File",
+          "required": true
+        },
+        {
+          "field": "processing_date",
+          "rule": "equals",
+          "value": "2024-01-31",
+          "required": true
+        },
+        {
+          "field": "account_summary",
+          "rule": "not_empty",
+          "required": true,
+          "critical": true
+        },
+        {
+          "field": "account_summary",
+          "rule": "contains",
+          "value": "account with balance $",
+          "required": true,
+          "critical": true
+        }
+      ],
+      "expected_samples": [
+        "Premium account with balance $15000.5",
+        "Standard account with balance $2500.75",
+        "Basic account with balance $750.0"
+      ]
+    },
+    {
+      "id": "TEST_003",
+      "name": "Dynamic Conditional Logic",
+      "description": "Test conditional logic based on source data values",
+      "difficulty": "Level 3",
+      "expected_output_rows": 10,
+      "transformation_config": {
+        "name": "Customer Tier Classification",
+        "description": "Classify customers based on balance and account type",
+        "row_generation_rules": [
+          {
+            "id": "rule_003",
+            "name": "Customer Classification",
+            "enabled": true,
+            "priority": 0,
+            "condition": "",
+            "output_columns": [
+              {
+                "id": "col_001",
+                "name": "customer_id",
+                "mapping_type": "direct",
+                "source_column": "Customer_ID"
+              },
+              {
+                "id": "col_002",
+                "name": "customer_tier",
+                "mapping_type": "dynamic",
+                "dynamic_conditions": [
+                  {
+                    "id": "cond_001",
+                    "condition_column": "Balance",
+                    "operator": ">=",
+                    "condition_value": "20000",
+                    "output_value": "VIP"
+                  },
+                  {
+                    "id": "cond_002",
+                    "condition_column": "Balance",
+                    "operator": ">=",
+                    "condition_value": "10000",
+                    "output_value": "Premium"
+                  },
+                  {
+                    "id": "cond_003",
+                    "condition_column": "Balance",
+                    "operator": ">=",
+                    "condition_value": "1000",
+                    "output_value": "Standard"
+                  }
+                ],
+                "default_value": "Basic"
+              },
+              {
+                "id": "col_003",
+                "name": "status_description",
+                "mapping_type": "dynamic",
+                "dynamic_conditions": [
+                  {
+                    "id": "cond_004",
+                    "condition_column": "Status",
+                    "operator": "==",
+                    "condition_value": "Active",
+                    "output_value": "Account is active and in good standing"
+                  },
+                  {
+                    "id": "cond_005",
+                    "condition_column": "Status",
+                    "operator": "==",
+                    "condition_value": "Suspended",
+                    "output_value": "Account is temporarily suspended"
+                  }
+                ],
+                "default_value": "Account status requires review"
+              }
+            ]
+          }
+        ]
+      },
+      "validation_rules": [
+        {
+          "field": "customer_tier",
+          "rule": "in_list",
+          "value": ["VIP", "Premium", "Standard", "Basic"],
+          "required": true
+        }
+      ],
+      "expected_tier_counts": {
+        "VIP": 2,
+        "Premium": 2,
+        "Standard": 4,
+        "Basic": 2
+      }
+    },
+    {
+      "id": "TEST_004",
+      "name": "Complex Multi-Column Expressions",
+      "description": "Test complex expressions with multiple variables",
+      "difficulty": "Level 4",
+      "expected_output_rows": 10,
+      "transformation_config": {
+        "name": "Complex Customer Analytics",
+        "description": "Complex multi-variable expressions",
+        "row_generation_rules": [
+          {
+            "id": "rule_004",
+            "name": "Complex Analytics",
+            "enabled": true,
+            "priority": 0,
+            "condition": "",
+            "output_columns": [
+              {
+                "id": "col_001",
+                "name": "customer_profile",
+                "mapping_type": "static",
+                "static_value": "{First_Name} {Last_Name} ({Age}y, {Gender}) - {Account_Type}"
+              },
+              {
+                "id": "col_002",
+                "name": "location_summary",
+                "mapping_type": "static",
+                "static_value": "{City}, {Region} region"
+              },
+              {
+                "id": "col_003",
+                "name": "account_details",
+                "mapping_type": "static",
+                "static_value": "{Account_Type} account: ${Balance} ({Status})"
+              },
+              {
+                "id": "col_004",
+                "name": "contact_info",
+                "mapping_type": "static",
+                "static_value": "Email: {Email} | Phone: {Phone}"
+              },
+              {
+                "id": "col_005",
+                "name": "membership_info",
+                "mapping_type": "static",
+                "static_value": "{Membership_Level} member since {Date_Joined}"
+              }
+            ]
+          }
+        ]
+      },
+      "validation_rules": [
+        {
+          "field": "customer_profile",
+          "rule": "contains_all",
+          "value": ["y,", "-"],
+          "required": true
+        },
+        {
+          "field": "location_summary",
+          "rule": "contains",
+          "value": " region",
+          "required": true
+        },
+        {
+          "field": "account_details",
+          "rule": "contains",
+          "value": "account: $",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "TEST_005",
+      "name": "Edge Case Testing",
+      "description": "Test edge cases and error conditions",
+      "difficulty": "Level 5",
+      "expected_output_rows": 10,
+      "transformation_config": {
+        "name": "Edge Case Testing",
+        "description": "Test various edge cases",
+        "row_generation_rules": [
+          {
+            "id": "rule_005",
+            "name": "Edge Cases",
+            "enabled": true,
+            "priority": 0,
+            "condition": "",
+            "output_columns": [
+              {
+                "id": "col_001",
+                "name": "missing_field_test",
+                "mapping_type": "static",
+                "static_value": "{NonExistentField} default"
+              },
+              {
+                "id": "col_002",
+                "name": "empty_expression",
+                "mapping_type": "static",
+                "static_value": ""
+              },
+              {
+                "id": "col_003",
+                "name": "special_characters",
+                "mapping_type": "static",
+                "static_value": "{First_Name}'s account ($@#%)"
+              },
+              {
+                "id": "col_004",
+                "name": "numeric_as_string",
+                "mapping_type": "static",
+                "static_value": "ID: {Customer_ID}, Age: {Age}, Balance: {Balance}"
+              }
+            ]
+          }
+        ]
+      },
+      "validation_rules": [
+        {
+          "field": "missing_field_test",
+          "rule": "not_contains",
+          "value": "{NonExistentField}",
+          "description": "Should handle missing fields gracefully"
+        }
+      ]
+    }
+  ]
+}

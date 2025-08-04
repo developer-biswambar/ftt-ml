@@ -1,0 +1,26 @@
+{
+  "timestamp": "2025-08-01T06:22:21.392Z",
+  "testType": "Correct Reconciliation Workflow",
+  "workflow": {
+    "filesCreated": 2,
+    "filesUploaded": 2,
+    "primaryFileAssigned": true,
+    "comparisonFileAssigned": true,
+    "startButtonEnabled": false,
+    "reconciliationInitiated": true
+  },
+  "files": {
+    "primary": "correct-primary-transactions.csv",
+    "comparison": "correct-comparison-transactions.csv"
+  },
+  "screenshots": [
+    "correct-01-start.png",
+    "correct-02-primary-uploaded.png",
+    "correct-03-both-uploaded.png",
+    "correct-04-primary-assigned.png",
+    "correct-05-both-assigned.png",
+    "correct-06-processing.png",
+    "correct-07-results.png",
+    "correct-08-final.png"
+  ]
+}

@@ -1,0 +1,4 @@
+Statement_ID,Reference,Value,Date_Processed,Bank_Status
+STMT001,REF12345,1000.50,15/01/2024,Settled
+STMT002,REF12346,2500.75,15/01/2024,Settled
+STMT003,REF12347,750.25,16/01/2024,Processing

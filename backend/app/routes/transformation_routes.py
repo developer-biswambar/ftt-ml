@@ -271,15 +271,23 @@ def process_transformation_rules(source_data: Dict[str, pd.DataFrame], config: D
             try:
                 # Generate output row based on column mappings
                 output_row = {}
+                # Create combined context that includes source data and progressively built output columns
+                combined_row_data = source_row.copy()
+                
                 for column_config in output_columns:
                     column_name = column_config.get('name', '')
                     if column_name:
                         try:
-                            result_value = apply_column_mapping(column_config, source_row, {})
+                            # Pass combined data that includes both source and previously calculated columns
+                            result_value = apply_column_mapping(column_config, combined_row_data, {})
                             output_row[column_name] = result_value
+                            # Add the newly calculated column to combined_row_data for subsequent calculations
+                            combined_row_data[column_name] = result_value
                         except Exception as e:
                             logger.error(f"Error processing column '{column_name}' in rule '{rule_name}': {str(e)}")
                             output_row[column_name] = ''
+                            # Still add to combined_row_data as empty value to prevent KeyError
+                            combined_row_data[column_name] = ''
                             rule_errors.append(f"Column '{column_name}': {str(e)}")
 
                 if output_row:  # Only add if we have data
@@ -726,7 +734,7 @@ Generate a transformation configuration with this exact JSON structure:
     "row_generation_rules": [
         {{
             "id": "rule_1",
-            "name": "Rule Name",
+            "name": "Main Transformation Rule",
             "enabled": true,
             "output_columns": [
                 {{
@@ -744,6 +752,11 @@ Generate a transformation configuration with this exact JSON structure:
                         }}
                     ],
                     "default_value": "default_value_for_dynamic"
+                }},
+                {{
+                    "id": "col_2",
+                    "name": "another_output_column",
+                    "mapping_type": "direct|static|dynamic"
                 }}
             ],
             "priority": 0
@@ -753,39 +766,119 @@ Generate a transformation configuration with this exact JSON structure:
     "validation_rules": []
 }}
 
-Mapping Types:
-- "direct": Copy value directly from source column
-- "static": Use a fixed static value
-- "dynamic": Use conditional logic with dynamic_conditions array
+**CRITICAL: Create only ONE rule in the "row_generation_rules" array. Put ALL requested columns inside the "output_columns" array of this single rule.**
 
-For dynamic mapping, use dynamic_conditions array with condition objects.
-For static mapping, use static_value field.
-For direct mapping, use source_column field.
+MAPPING TYPE SELECTION RULES:
 
-IMPORTANT RULES:
-1. ONLY use column names that exist in the source files: {', '.join([col for file_info in source_files for col in file_info.get('columns', [])])}
-2. DO NOT reference columns that don't exist (like calculated fields in conditions)
-3. For dynamic conditions, ONLY use existing source columns in condition_column
-4. If you need calculated values, create them as separate output columns first
-5. Use appropriate operators for conditions
-6. Generate meaningful output column names
-7. Return ONLY the JSON configuration, no additional text
+1. **DIRECT MAPPING** - Use when copying a column as-is:
+   - "mapping_type": "direct"
+   - "source_column": "existing_column_name"
+   - Example: Copy Product_Name directly
 
-EXAMPLES:
-1. Direct column mapping: "source_column": "customer_id"
-2. Static value with expression: "static_value": "{{first_name}} {{last_name}}"
-3. Dynamic condition with expression: 
-   - "condition_column": "unit_price" (must exist in source)
-   - "output_value": "{{quantity}} * {{unit_price}}"
-4. Mathematical expressions: "{{quantity}} * {{unit_price}} * (1 - {{discount_percent}}/100)"
-5. String concatenation: "{{first_name}} {{last_name}}"
+2. **STATIC MAPPING** - Use for calculations, expressions, and fixed values:
+   - "mapping_type": "static" 
+   - "static_value": "expression or fixed value"
+   - Use for: Mathematical calculations, string concatenation, fixed text, complex expressions
+   - Examples:
+     * Calculations: "{{Retail_Price}} - {{Cost_Price}}"
+     * Percentages: "({{Retail_Price}} - {{Cost_Price}}) / {{Cost_Price}} * 100"
+     * Complex expressions: "({{roi_percentage}} + {{investment_efficiency}} + {{capital_turnover}}) / 3"
+     * Concatenation: "{{First_Name}} {{Last_Name}}"
+     * Fixed values: "Active Status"
+   - **IMPORTANT**: Can reference previously calculated columns within the same rule
+
+3. **DYNAMIC MAPPING** - Use ONLY for conditional logic based on source columns:
+   - "mapping_type": "dynamic"
+   - "dynamic_conditions": array of condition objects
+   - Use for: Categorization, status assignment, conditional text
+   - CRITICAL: condition_column MUST be an existing source column, NOT a calculated field
+
+VALID OPERATORS for dynamic conditions:
+- "==" (equals)
+- "!=" (not equals)
+- ">" (greater than)
+- "<" (less than)
+- ">=" (greater than or equal)  
+- "<=" (less than or equal)
+
+INVALID OPERATORS (DO NOT USE):
+- "-", "+", "*", "/" (these are for calculations, use static mapping instead)
+- "&&", "||" (compound operators not supported)
+- ">= && <" (not supported)
+
+CRITICAL RULES:
+1. ONLY use column names that exist in source files: {', '.join([col for file_info in source_files for col in file_info.get('columns', [])])}
+2. For calculations → Use "static" mapping with mathematical expressions
+3. For Mathematical expressions enclose the entire expression with curly brackets '{''}'
+4. For categorization → Use "dynamic" mapping with comparison operators on source columns
+5. NEVER reference calculated/output columns in condition_column
+6. Create calculated fields first, then categorize based on source data
+7. **ALWAYS CREATE EXACTLY ONE (1) RULE** - Put all columns in a single rule unless user explicitly asks for multiple rules
+8. Never create multiple rules unless the user specifically mentions "multiple rules", "separate rules", or "different rules"
+9. Return ONLY valid JSON configuration, no additional text
+
+**IMPORTANT: DEFAULT BEHAVIOR = SINGLE RULE WITH ALL COLUMNS**
+
+CORRECT EXAMPLES:
+
+Example 1 - Mathematical Calculation (STATIC):
+{{
+  "name": "profit_margin",
+  "mapping_type": "static",
+  "static_value": "{{Retail_Price}} - {{Cost_Price}}"
+}}
+
+Example 2 - Percentage Calculation (STATIC):
+{{
+  "name": "markup_percentage", 
+  "mapping_type": "static",
+  "static_value": "({{Retail_Price}} - {{Cost_Price}}) / {{Cost_Price}} * 100"
+}}
+
+Example 3 - Conditional Categorization (DYNAMIC):
+{{
+  "name": "price_tier",
+  "mapping_type": "dynamic",
+  "dynamic_conditions": [
+    {{
+      "id": "cond_001",
+      "condition_column": "Retail_Price",
+      "operator": ">=",
+      "condition_value": "1000",
+      "output_value": "Premium"
+    }},
+    {{
+      "id": "cond_002", 
+      "condition_column": "Retail_Price",
+      "operator": ">=", 
+      "condition_value": "100",
+      "output_value": "Standard"
+    }}
+  ],
+  "default_value": "Budget"
+}}
+
+Example 4 - Complex Expression with Calculated Fields (STATIC):
+{{
+  "name": "composite_score",
+  "mapping_type": "static",
+  "static_value": "({{roi_percentage}} + {{investment_efficiency}} + {{capital_turnover}}) / 3"
+}}
+
+Example 5 - Direct Copy (DIRECT):
+{{
+  "name": "product_name",
+  "mapping_type": "direct",
+  "source_column": "Product_Name"
+}}
 
 Use {{column_name}} syntax to reference column values in expressions.
+**COLUMN DEPENDENCY**: Calculated columns can reference other calculated columns defined earlier in the same rule.
 """
         
         # Call LLM service
         messages = [
-            LLMMessage(role="system", content="You are a data transformation expert. Return only valid JSON configuration."),
+            LLMMessage(role="system", content="You are a data transformation expert. Return only valid JSON configuration. ALWAYS create exactly ONE rule with ALL columns inside it unless explicitly asked for multiple rules."),
             LLMMessage(role="user", content=prompt)
         ]
         

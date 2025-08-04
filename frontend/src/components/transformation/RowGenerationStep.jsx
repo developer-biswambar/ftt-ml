@@ -198,6 +198,48 @@ const RowGenerationStep = ({
         return columns;
     };
 
+    const getAllAvailableColumns = (ruleIndex, columnIndex) => {
+        const columns = [];
+        
+        // Add source columns first (marked as existing)
+        Object.entries(sourceColumns).forEach(([alias, cols]) => {
+            cols.forEach(col => {
+                columns.push({
+                    value: col,
+                    label: col,
+                    alias,
+                    column: col,
+                    isSource: true,
+                    category: 'source'
+                });
+            });
+        });
+        
+        // Add previously created output columns from all rules up to current position
+        rules.forEach((rule, rIdx) => {
+            if (rule.output_columns && rule.output_columns.length > 0) {
+                rule.output_columns.forEach((outputCol, cIdx) => {
+                    // Only include columns that are defined before current position
+                    if (rIdx < ruleIndex || (rIdx === ruleIndex && cIdx < columnIndex)) {
+                        if (outputCol.name && outputCol.name.trim()) {
+                            columns.push({
+                                value: outputCol.name,
+                                label: outputCol.name,
+                                column: outputCol.name,
+                                isSource: false,
+                                category: 'created',
+                                ruleIndex: rIdx,
+                                columnIndex: cIdx
+                            });
+                        }
+                    }
+                });
+            }
+        });
+        
+        return columns;
+    };
+
     const renderOutputColumnConfig = (rule, ruleIndex, column, columnIndex) => {
         const allColumns = getAllSourceColumns();
 
@@ -302,12 +344,23 @@ const RowGenerationStep = ({
                                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                         >
                                             <option value="">Select...</option>
-                                            {allColumns.map(col => (
-                                                <option key={col.value} value={col.value}>
-                                                    {col.label}
+                                            {getAllAvailableColumns(ruleIndex, columnIndex).map(col => (
+                                                <option 
+                                                    key={`${col.category}-${col.value}`} 
+                                                    value={col.value}
+                                                    className={col.isSource ? "" : "font-medium"}
+                                                    style={{
+                                                        color: col.isSource ? '#374151' : '#059669',
+                                                        fontWeight: col.isSource ? 'normal' : '600'
+                                                    }}
+                                                >
+                                                    {col.isSource ? `📊 ${col.label}` : `🧮 ${col.label}`}
                                                 </option>
                                             ))}
                                         </select>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            📊 Source columns | 🧮 Created columns
+                                        </p>
                                     </div>
 
                                     <div>
@@ -436,12 +489,22 @@ const RowGenerationStep = ({
                                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                 >
                                     <option value="">Select column...</option>
-                                    {allColumns.map(col => (
-                                        <option key={col.value} value={col.value}>
-                                            {col.label}
+                                    {getAllAvailableColumns(ruleIndex, 999).map(col => (
+                                        <option 
+                                            key={`${col.category}-${col.value}`} 
+                                            value={col.value}
+                                            style={{
+                                                color: col.isSource ? '#374151' : '#059669',
+                                                fontWeight: col.isSource ? 'normal' : '600'
+                                            }}
+                                        >
+                                            {col.isSource ? `📊 ${col.label}` : `🧮 ${col.label}`}
                                         </option>
                                     ))}
                                 </select>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    📊 Source columns | 🧮 Created columns
+                                </p>
                             </div>
 
                             <div>
@@ -693,6 +756,7 @@ const RowGenerationStep = ({
                             <li>Direct mapping copies values from source columns</li>
                             <li>Static values set fixed values for all records</li>
                             <li>Dynamic conditions set column values based on other column values</li>
+                            <li>Dynamic conditions can reference both source columns (📊) and previously created columns (🧮)</li>
                             <li>Each rule processes all input data and generates its own output dataset</li>
                         </ul>
                     </div>
