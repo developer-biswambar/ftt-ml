@@ -11,9 +11,10 @@ const RuleSaveLoad = ({
                           hasUnsavedChanges,
                           onRuleLoaded,
                           onRuleSaved,
-                          onClose
+                          onClose,
+                          defaultTab = 'load' // 'load' for beginning, 'save' for end
                       }) => {
-    const [activeTab, setActiveTab] = useState('load');
+    const [activeTab, setActiveTab] = useState(defaultTab);
     const [rules, setRules] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');

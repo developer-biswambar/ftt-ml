@@ -740,6 +740,7 @@ const DeltaGenerationFlow = ({
                                                         <option value="equals">Exact Match</option>
                                                         <option value="case_insensitive">Case Insensitive</option>
                                                         <option value="numeric_tolerance">Numeric Tolerance</option>
+                                                        <option value="date_equals">Date Match</option>
                                                     </select>
                                                 </div>
                                                 <div>
@@ -859,6 +860,7 @@ const DeltaGenerationFlow = ({
                                                         <option value="equals">Exact Match</option>
                                                         <option value="case_insensitive">Case Insensitive</option>
                                                         <option value="numeric_tolerance">Numeric Tolerance</option>
+                                                        <option value="date_equals">Date Match</option>
                                                     </select>
                                                 </div>
                                                 <div>

@@ -24,7 +24,7 @@ class DeltaKeyRule(BaseModel):
     """Delta generation rule for key field matching (composite keys)"""
     LeftFileColumn: str
     RightFileColumn: str
-    MatchType: str = "equals"  # equals, case_insensitive, numeric_tolerance
+    MatchType: str = "equals"  # equals, case_insensitive, numeric_tolerance, date_equals
     ToleranceValue: Optional[float] = None
     IsKey: bool = True  # True for key fields, False for optional comparison fields
 
@@ -33,7 +33,7 @@ class DeltaComparisonRule(BaseModel):
     """Delta generation rule for optional field comparison"""
     LeftFileColumn: str
     RightFileColumn: str
-    MatchType: str = "equals"  # equals, case_insensitive, numeric_tolerance, date_match
+    MatchType: str = "equals"  # equals, case_insensitive, numeric_tolerance, date_equals
     ToleranceValue: Optional[float] = None
     IsKey: bool = False  # Always False for comparison fields
 
@@ -111,6 +111,7 @@ class DeltaProcessor:
     def __init__(self):
         self.errors = []
         self.warnings = []
+        self._date_cache = {}  # Cache parsed dates for performance
 
     def read_file_from_storage(self, file_id: str):
         """Read file from storage service"""
@@ -183,43 +184,132 @@ class DeltaProcessor:
 
         return pd.Series(normalized_values, index=series_data.index)
 
-    def parse_excel_date(self, value):
-        """Parse Excel date in various formats"""
+    def _normalize_date_value(self, value):
+        """
+        Normalize date value to datetime object, handling all Excel date formats.
+        Returns only the date part (ignoring time components).
+        """
         if pd.isna(value) or value is None:
             return None
 
-        # Handle Excel serial date numbers (days since 1900-01-01)
-        if self.is_numeric(value):
-            try:
-                days_since_1900 = float(value)
+        # Convert to string for caching key
+        cache_key = str(value)
+        if cache_key in self._date_cache:
+            return self._date_cache[cache_key]
 
-                # Adjust for Excel's incorrect leap year in 1900
-                adjusted_days = days_since_1900 - 2 if days_since_1900 > 59 else days_since_1900 - 1
-                excel_epoch = pd.Timestamp('1900-01-01')
-                date = excel_epoch + pd.Timedelta(days=adjusted_days)
+        parsed_date = None
 
-                # Only accept dates >= Jan 1, 2024
-                if date < pd.Timestamp('2024-01-01'):
-                    return None
-
-                return date
-            except:
-                return None
-
-        # Handle string dates
         try:
-            date = pd.to_datetime(value, errors='coerce')
-            if pd.notna(date) and date >= pd.Timestamp('2024-01-01'):
-                return date
-        except:
-            pass
+            # Handle different input types
+            if isinstance(value, (datetime, pd.Timestamp)):
+                # Already a datetime, just extract date part
+                parsed_date = value.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif isinstance(value, (int, float)):
+                # Handle Excel serial date numbers
+                if 1 <= value <= 2958465:  # Valid Excel date range (1900-01-01 to 9999-12-31)
+                    # Excel serial date (days since 1900-01-01, accounting for Excel's leap year bug)
+                    if value >= 60:  # After Feb 28, 1900
+                        excel_epoch = datetime(1899, 12, 30)  # Account for Excel's 1900 leap year bug
+                    else:
+                        excel_epoch = datetime(1899, 12, 31)
+                    parsed_date = excel_epoch + pd.Timedelta(days=value)
+                    parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            else:
+                # String parsing with comprehensive format support
+                value_str = str(value).strip()
 
-        return None
+                # Try pandas date parsing first (handles most formats automatically)
+                try:
+                    parsed_date = pd.to_datetime(value_str, dayfirst=False, errors='raise')
+                    if isinstance(parsed_date, pd.Timestamp):
+                        parsed_date = parsed_date.to_pydatetime()
+                    parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                except:
+                    # Try with dayfirst=True for DD/MM/YYYY formats
+                    try:
+                        parsed_date = pd.to_datetime(value_str, dayfirst=True, errors='raise')
+                        if isinstance(parsed_date, pd.Timestamp):
+                            parsed_date = parsed_date.to_pydatetime()
+                        parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                    except:
+                        # Manual parsing for specific Excel formats
+                        date_formats = [
+                            # Standard numeric formats
+                            '%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d', '%Y/%m/%d',
+                            '%d-%m-%Y', '%m-%d-%Y', '%d.%m.%Y', '%m.%d.%Y',
 
-    def compare_dates(self, date_a, date_b, tolerance_days=0):
-        """Compare two dates with optional tolerance"""
-        parsed_a = self.parse_excel_date(date_a)
-        parsed_b = self.parse_excel_date(date_b)
+                            # Month name formats (covers "10-Jul-2025" style)
+                            '%d %b %Y', '%d %B %Y', '%b %d, %Y', '%B %d, %Y',
+                            '%d-%b-%Y', '%d-%B-%Y', '%b-%d-%Y', '%B-%d-%Y',
+                            '%d.%b.%Y', '%d.%B.%Y', '%b.%d.%Y', '%B.%d.%Y',
+                            '%d/%b/%Y', '%d/%B/%Y', '%b/%d/%Y', '%B/%d/%Y',
+
+                            # Additional month name variations
+                            '%b %d %Y', '%B %d %Y', '%d %b, %Y', '%d %B, %Y',
+                            '%b-%d-%Y', '%B-%d-%Y', '%b.%d.%Y', '%B.%d.%Y',
+                            '%b/%d/%Y', '%B/%d/%Y',
+
+                            # Compact formats
+                            '%Y%m%d', '%d%m%Y', '%m%d%Y',
+
+                            # 2-digit year formats
+                            '%d/%m/%y', '%m/%d/%y', '%y-%m-%d', '%y/%m/%d',
+                            '%d-%m-%y', '%m-%d-%y', '%d.%m.%y', '%m.%d.%y',
+                            '%d-%b-%y', '%d-%B-%y', '%b-%d-%y', '%B-%d-%y',
+
+                            # With time components (will be ignored)
+                            '%d/%m/%Y %H:%M:%S', '%m/%d/%Y %H:%M:%S',
+                            '%Y-%m-%d %H:%M:%S', '%Y/%m/%d %H:%M:%S',
+                            '%d-%m-%Y %H:%M:%S', '%m-%d-%Y %H:%M:%S',
+                            '%d-%b-%Y %H:%M:%S', '%d-%B-%Y %H:%M:%S',
+                            '%b-%d-%Y %H:%M:%S', '%B-%d-%Y %H:%M:%S',
+                            '%d/%m/%Y %H:%M', '%m/%d/%Y %H:%M',
+                            '%Y-%m-%d %H:%M', '%Y/%m/%d %H:%M',
+                            '%d-%m-%Y %H:%M', '%m-%d-%Y %H:%M',
+                            '%d-%b-%Y %H:%M', '%d-%B-%Y %H:%M',
+                            '%b-%d-%Y %H:%M', '%B-%d-%Y %H:%M',
+                        ]
+
+                        for fmt in date_formats:
+                            try:
+                                parsed_date = datetime.strptime(value_str, fmt)
+                                # Always set time to 00:00:00 for date-only comparison
+                                parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                                break
+                            except ValueError:
+                                continue
+
+        except Exception as e:
+            # If all parsing fails, return None
+            self.warnings.append(f"Could not parse date value: {value} - {str(e)}")
+            parsed_date = None
+
+        # Cache the result
+        self._date_cache[cache_key] = parsed_date
+        return parsed_date
+
+    def _check_date_equals_match(self, val_a, val_b) -> bool:
+        """Check if two values match as dates (exact date comparison, ignoring time)"""
+        date_a = self._normalize_date_value(val_a)
+        date_b = self._normalize_date_value(val_b)
+
+        # Both must be valid dates or both None/NaN
+        if date_a is None and date_b is None:
+            return True
+        if date_a is None or date_b is None:
+            return False
+
+        # Compare only the date parts
+        return date_a.date() == date_b.date()
+
+    def parse_excel_date(self, value):
+        """Legacy method - redirects to comprehensive date parsing"""
+        return self._normalize_date_value(value)
+
+    def compare_dates(self, date_a, date_b):
+        """Compare two dates for exact match using comprehensive date parsing"""
+        parsed_a = self._normalize_date_value(date_a)
+        parsed_b = self._normalize_date_value(date_b)
 
         if parsed_a is None and parsed_b is None:
             return True
@@ -230,11 +320,8 @@ class DeltaProcessor:
         date_a_only = parsed_a.date() if hasattr(parsed_a, 'date') else parsed_a
         date_b_only = parsed_b.date() if hasattr(parsed_b, 'date') else parsed_b
 
-        if tolerance_days == 0:
-            return date_a_only == date_b_only
-        else:
-            diff_days = abs((date_a_only - date_b_only).days)
-            return diff_days <= tolerance_days
+        # Exact date match only
+        return date_a_only == date_b_only
 
     def apply_filters(self, df: pd.DataFrame, filters: List[Dict[str, Any]], file_label: str) -> pd.DataFrame:
         """Apply filters to a DataFrame based on filter configuration"""
@@ -307,8 +394,8 @@ class DeltaProcessor:
                 if pd.isna(value):
                     continue
 
-                # Try to parse the value as a date using our existing method
-                parsed_date = self.parse_excel_date(value)
+                # Try to parse the value as a date using comprehensive parsing
+                parsed_date = self._normalize_date_value(value)
                 if parsed_date is not None:
                     # Convert to date only for comparison
                     value_date_only = parsed_date.date() if hasattr(parsed_date, 'date') else parsed_date
@@ -431,9 +518,8 @@ class DeltaProcessor:
                 else:
                     values_match = str(val_a).strip() == str(val_b).strip()
 
-            elif rule.MatchType == "date_match":
-                tolerance_days = rule.ToleranceValue if rule.ToleranceValue is not None else 0
-                values_match = self.compare_dates(val_a, val_b, tolerance_days)
+            elif rule.MatchType == "date_equals":
+                values_match = self.compare_dates(val_a, val_b)
 
             else:  # equals - FIXED to handle numeric values properly
                 if self.is_numeric(val_a) and self.is_numeric(val_b):
@@ -703,7 +789,7 @@ Generate a delta configuration with this exact JSON structure:
         {{
             "LeftFileColumn": "column_from_older_file",
             "RightFileColumn": "column_from_newer_file", 
-            "MatchType": "equals|case_insensitive|numeric_tolerance",
+            "MatchType": "equals|case_insensitive|numeric_tolerance|date_equals",
             "ToleranceValue": null,
             "IsKey": true
         }}
@@ -712,7 +798,7 @@ Generate a delta configuration with this exact JSON structure:
         {{
             "LeftFileColumn": "column_from_older_file",
             "RightFileColumn": "column_from_newer_file",
-            "MatchType": "equals|case_insensitive|numeric_tolerance",
+            "MatchType": "equals|case_insensitive|numeric_tolerance|date_equals",
             "ToleranceValue": null,
             "IsKey": false
         }}
@@ -730,9 +816,10 @@ Configuration Rules:
 6. For exact matches, use MatchType "equals" with ToleranceValue null
 7. For case insensitive text matching, use MatchType "case_insensitive" with ToleranceValue null
 8. For numeric tolerance, use MatchType "numeric_tolerance" with appropriate ToleranceValue (e.g., 0.01 for currency)
-9. Extract rules are optional - only add if data transformation is needed
-10. Filter rules are optional - only add if data filtering is needed
-11. Select relevant columns that are needed for delta analysis and reporting
+9. For date matching, use MatchType "date_equals" with ToleranceValue null
+10. Extract rules are optional - only add if data transformation is needed
+11. Filter rules are optional - only add if data filtering is needed
+12. Select relevant columns that are needed for delta analysis and reporting
 
 Delta Generation Logic:
 - UNCHANGED: Records with same keys and same optional fields
@@ -744,7 +831,7 @@ Common Delta Patterns:
 - ID matching: exact match on unique identifier fields
 - Account matching: exact match on account numbers/codes
 - Amount comparison: numeric tolerance for currency values
-- Date comparison: exact match for date fields
+- Date comparison: date_equals match type for date fields
 - Status comparison: exact match for status/category fields
 
 IMPORTANT: Return ONLY the JSON configuration, no additional text or explanation.
@@ -755,6 +842,7 @@ Examples of good key rules:
 
 Examples of good comparison rules:
 - Amount comparison: {{"LeftFileColumn": "amount", "RightFileColumn": "value", "MatchType": "numeric_tolerance", "ToleranceValue": 0.01, "IsKey": false}}
+- Date comparison: {{"LeftFileColumn": "date", "RightFileColumn": "transaction_date", "MatchType": "date_equals", "ToleranceValue": null, "IsKey": false}}
 - Status comparison: {{"LeftFileColumn": "status", "RightFileColumn": "record_status", "MatchType": "equals", "ToleranceValue": null, "IsKey": false}}
 """
         

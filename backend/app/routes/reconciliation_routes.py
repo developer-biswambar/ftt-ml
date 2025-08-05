@@ -595,7 +595,7 @@ Generate a reconciliation configuration with this exact JSON structure:
         {{
             "LeftFileColumn": "column_from_fileA",
             "RightFileColumn": "column_from_fileB", 
-            "MatchType": "equals|tolerance|fuzzy|date",
+            "MatchType": "equals|tolerance|fuzzy|date_equals",
             "ToleranceValue": 0.01
         }}
     ],
@@ -609,7 +609,7 @@ Configuration Rules:
 3. File 2 columns: {', '.join(source_files[1].get('columns', []))}
 4. For exact matches, use MatchType "equals" with ToleranceValue 0
 5. For amount/numeric tolerance, use MatchType "tolerance" with appropriate ToleranceValue (e.g., 0.01 for currency)
-6. For date matching, use MatchType "date" with ToleranceValue 0
+6. For date matching, use MatchType "date_equals" with ToleranceValue 0
 7. For fuzzy/text matching, use MatchType "fuzzy" with ToleranceValue between 0.7-0.9
 8. Extract rules are optional - only add if data transformation is needed
 9. Filter rules are optional - only add if data filtering is needed
@@ -618,7 +618,7 @@ Configuration Rules:
 Common Reconciliation Patterns:
 - Transaction ID matching: exact match on ID fields
 - Amount matching: tolerance match with 0.01 tolerance for currency
-- Date matching: date match type for date fields
+- Date matching: date_equals match type for date fields
 - Reference number matching: exact or fuzzy match depending on format
 - Account matching: exact match on account identifiers
 
@@ -627,7 +627,7 @@ IMPORTANT: Return ONLY the JSON configuration, no additional text or explanation
 Examples of good matching:
 - Transaction IDs: {{"LeftFileColumn": "transaction_id", "RightFileColumn": "ref_id", "MatchType": "equals", "ToleranceValue": 0}}
 - Amounts: {{"LeftFileColumn": "amount", "RightFileColumn": "value", "MatchType": "tolerance", "ToleranceValue": 0.01}}
-- Dates: {{"LeftFileColumn": "date", "RightFileColumn": "transaction_date", "MatchType": "date", "ToleranceValue": 0}}
+- Dates: {{"LeftFileColumn": "date", "RightFileColumn": "transaction_date", "MatchType": "date_equals", "ToleranceValue": 0}}
 - Names: {{"LeftFileColumn": "customer_name", "RightFileColumn": "client_name", "MatchType": "fuzzy", "ToleranceValue": 0.8}}
 """
         

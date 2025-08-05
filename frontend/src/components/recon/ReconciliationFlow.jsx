@@ -47,6 +47,7 @@ const ReconciliationFlow = ({
     // AI and Rule Management State
     const [showAIRegexGenerator, setShowAIRegexGenerator] = useState(false);
     const [showRuleSaveLoad, setShowRuleSaveLoad] = useState(false);
+    const [ruleModalTab, setRuleModalTab] = useState('load'); // Track which tab to show
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [loadedRuleId, setLoadedRuleId] = useState(null);
     const [currentAIContext, setCurrentAIContext] = useState({
@@ -134,6 +135,17 @@ const ReconciliationFlow = ({
             .slice(0, 3);
 
         return sampleValues.join(', ');
+    };
+
+    // Helper functions to open rule modal with correct tab
+    const openRuleModalForLoading = () => {
+        setRuleModalTab('load');
+        setShowRuleSaveLoad(true);
+    };
+
+    const openRuleModalForSaving = () => {
+        setRuleModalTab('save');
+        setShowRuleSaveLoad(true);
     };
 
     // Effects
@@ -618,7 +630,7 @@ const ReconciliationFlow = ({
                                     Load a previously saved rule template and adapt it to your current files.
                                 </p>
                                 <button
-                                    onClick={() => setShowRuleSaveLoad(true)}
+                                    onClick={() => openRuleModalForLoading()}
                                     className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 min-h-[40px]"
                                 >
                                     <Upload size={16}/>
@@ -655,7 +667,7 @@ const ReconciliationFlow = ({
                                     </div>
                                     {hasUnsavedChanges && (
                                         <button
-                                            onClick={() => setShowRuleSaveLoad(true)}
+                                            onClick={() => openRuleModalForSaving()}
                                             className="text-xs px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
                                         >
                                             Save Changes
@@ -1141,7 +1153,7 @@ const ReconciliationFlow = ({
                             <div className="flex items-center justify-between mb-2">
                                 <h4 className="font-medium text-blue-800">Save This Configuration</h4>
                                 <button
-                                    onClick={() => setShowRuleSaveLoad(true)}
+                                    onClick={() => openRuleModalForSaving()}
                                     disabled={reconciliationRules.length === 0}
                                     className="flex items-center space-x-1 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
                                 >
@@ -1182,7 +1194,7 @@ const ReconciliationFlow = ({
                         onClose={onCancel}
                         loadedRuleId={loadedRuleId}
                         hasUnsavedChanges={hasUnsavedChanges}
-                        onShowRuleModal={() => setShowRuleSaveLoad(true)}
+                        onShowRuleModal={() => openRuleModalForSaving()}
                     />
                 );
 
@@ -1297,6 +1309,7 @@ const ReconciliationFlow = ({
                     onRuleLoaded={handleRuleLoaded}
                     onRuleSaved={handleRuleSaved}
                     onClose={() => setShowRuleSaveLoad(false)}
+                    defaultTab={ruleModalTab}
                 />
             )}
         </>
