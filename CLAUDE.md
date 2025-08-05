@@ -109,13 +109,18 @@ npm run preview
 
 ### 3. Delta Generation
 - **Purpose**: Compare file versions to identify changes
-- **Key Files**: `delta_routes.py`, `DeltaGenerationFlow.jsx`
+- **Key Files**: `delta_routes.py`, `DeltaGenerationFlow.jsx`, `DeltaAIRequirementsStep.jsx`, `DeltaPreviewStep.jsx`
 - **Capabilities**: Track unchanged, amended, deleted, and new records
+- **AI Configuration**: AI-powered delta configuration generation from natural language requirements
+- **Auto-Save Results**: Automatically saves all result types to server storage for easy access
+- **Multi-View Interface**: Dedicated view buttons for each result category (All, Amended, Deleted, Added, Unchanged)
 
 ### 4. AI-Powered Features
 - **Regex Generation**: AI-generated patterns for data extraction
+- **Reconciliation Configuration**: AI-generated reconciliation rules from user requirements
+- **Delta Configuration**: AI-generated delta comparison rules from natural language prompts
 - **Intelligent Processing**: OpenAI integration for advanced data processing
-- **Key Files**: `ai_assistance.py`, `openai_service.py`
+- **Key Files**: `ai_assistance.py`, `openai_service.py`, reconciliation and delta route AI endpoints
 
 ### 5. File Management
 - **Purpose**: Upload, process, and manage data files
@@ -144,6 +149,7 @@ DEBUG=false
   - Feature-specific test folders (reconciliation, transformation, delta, ai-features, file-processing)
   - Complete test scenarios with sample data and expected results
   - Performance benchmarks and validation criteria
+  - **AI Configuration Testing**: `DELTA_AI_CONFIGURATION_TESTING.md` - Complete guide for testing AI-powered delta configuration generation with 12+ test scenarios
 
 ## Performance Optimizations
 
@@ -185,8 +191,14 @@ The sample data covers:
 - **Health**: `/health` - System status
 - **Upload**: `/upload` - File upload endpoint
 - **Reconciliation**: `/reconciliation/*` - Reconciliation operations
+  - `/reconciliation/generate-config/` - AI-powered reconciliation configuration generation
 - **Transformation**: `/transformation/*` - Data transformation
 - **Delta**: `/delta/*` - Delta generation
+  - `/delta/process/` - Process delta generation with JSON configuration
+  - `/delta/generate-config/` - AI-powered delta configuration generation
+  - `/delta/results/{delta_id}` - Get delta results with pagination (supports result_type: all, unchanged, amended, deleted, newly_added)
+  - `/delta/download/{delta_id}` - Download delta results in CSV/Excel formats
+  - `/delta/results/{delta_id}/summary` - Get delta summary statistics
 - **AI Assistance**: `/ai-assistance/*` - AI-powered features
 - **Debug**: `/debug/status` - System debugging information
 
@@ -206,7 +218,28 @@ The sample data covers:
 2. **Extract** → Pattern-based data extraction
 3. **Filter** → Rule-based data filtering
 4. **Process** → Reconciliation/Transformation/Delta
-5. **Export** → Result generation and download
+5. **Auto-Save** → Results automatically saved to server storage
+6. **View** → Multi-format result viewing and download options
+
+### Results Storage and Viewing
+Both reconciliation and delta generation automatically save results to server storage for easy access:
+
+#### Reconciliation Results
+- `{recon_id}` - Matched records
+- `{recon_id}_all` - All results (matched + unmatched)
+
+#### Delta Generation Results
+- `{delta_id}_all` - All delta results combined
+- `{delta_id}_amended` - Records with changes between files
+- `{delta_id}_deleted` - Records present in older file but missing in newer
+- `{delta_id}_newly_added` - Records present in newer file but missing in older
+- `{delta_id}_unchanged` - Records with identical values in both files
+
+#### Result Viewing
+- Results accessible via `/viewer/{file_id}` URL pattern
+- Each result type opens in new tab for comparison
+- Results include categorization and change tracking
+- Supports CSV and Excel export formats
 
 ### API Response Format
 ```json
@@ -233,8 +266,61 @@ The sample data covers:
 - Maintain consistency with existing UI patterns
 - Test with the full stack running (backend + frontend)
 
+### Delta Generation Development
+- **Multi-Step Flow**: Delta generation uses 8-step workflow (removed file selection, added preview step)
+- **AI Configuration**: Use `/delta/generate-config/` for AI-powered rule generation from natural language
+- **Result Categories**: Five result types (all, unchanged, amended, deleted, newly_added) automatically saved
+- **File ID Pattern**: Results saved with `{delta_id}_{result_type}` naming convention
+- **View Integration**: Results open in `/viewer/{file_id}` pattern for consistent viewing experience
+- **Error Handling**: Proper validation for file_filters (must be object, not array)
+
 ### Performance Considerations
 - Test with large datasets (sample data simulates 50k+ records)
 - Use batch processing for operations
 - Implement proper error handling for timeout scenarios
 - Monitor memory usage during development
+
+## AI Configuration Features
+
+### Overview
+The platform includes comprehensive AI-powered configuration generation for both reconciliation and delta analysis, enabling users to create complex data processing rules through natural language prompts.
+
+### Delta AI Configuration
+- **Endpoint**: `POST /delta/generate-config/`
+- **Frontend Component**: `DeltaAIRequirementsStep.jsx`
+- **Service**: `deltaApiService.generateDeltaConfig()`
+- **Capabilities**: 
+  - Natural language prompt processing
+  - Automatic KeyRules generation for composite key matching
+  - ComparisonRules creation for field-level analysis
+  - Column selection optimization
+  - Support for multiple matching types (exact, case-insensitive, numeric tolerance)
+
+### AI Configuration Examples
+```javascript
+// Example: Basic transaction matching
+const prompt = "Compare transaction files using transaction_id as key. Track changes in amounts, status, and dates.";
+
+// Generated configuration includes:
+// - KeyRules for transaction_id matching
+// - ComparisonRules for amount, status, date fields
+// - Appropriate MatchType selection (equals, numeric_tolerance)
+```
+
+### Testing AI Configuration
+- **Test Guide**: `backend/docs/testing/DELTA_AI_CONFIGURATION_TESTING.md`
+- **Test Scenarios**: 12 comprehensive test cases covering:
+  - Basic ID matching
+  - Tolerance matching for financial data
+  - Composite key scenarios
+  - Case-insensitive text handling
+  - Performance optimization
+  - Error handling and edge cases
+- **Sample Prompts**: Real-world business scenarios for validation
+
+### AI Configuration Best Practices
+- Provide clear, specific requirements in prompts
+- Mention key fields explicitly for accurate matching
+- Specify tolerance requirements for numeric data
+- Include business context for better rule generation
+- Test generated configurations with sample data before production use

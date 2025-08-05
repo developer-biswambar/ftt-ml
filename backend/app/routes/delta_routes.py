@@ -641,6 +641,197 @@ async def get_file_by_id(file_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to retrieve file: {str(e)}")
 
 
+@router.post("/generate-config/")
+async def generate_delta_config(request: dict):
+    """Generate delta configuration using AI based on user requirements"""
+    
+    try:
+        requirements = request.get('requirements', '')
+        source_files = request.get('source_files', [])
+        
+        if not requirements:
+            raise HTTPException(status_code=400, detail="Requirements are required")
+        
+        if not source_files or len(source_files) != 2:
+            raise HTTPException(status_code=400, detail="Exactly 2 source files are required for delta generation")
+        
+        # Import LLM service
+        from app.services.llm_service import get_llm_service, get_llm_generation_params, LLMMessage
+        
+        llm_service = get_llm_service()
+        if not llm_service.is_available():
+            raise HTTPException(status_code=500, detail=f"LLM service ({llm_service.get_provider_name()}) not configured")
+        
+        # Get generation parameters from config
+        generation_params = get_llm_generation_params()
+        
+        # Prepare context about source files
+        files_context = []
+        for i, sf in enumerate(source_files):
+            role = f"file_{i}"
+            files_context.append(f"File {i + 1} ({role}): {sf['filename']}")
+            files_context.append(f"  Columns: {', '.join(sf['columns'])}")
+            files_context.append(f"  Rows: {sf['totalRows']}")
+        
+        files_info = "\\n".join(files_context)
+        
+        # Create prompt for AI delta configuration generation
+        prompt = f"""
+You are an expert financial data delta generation configuration generator. Based on the user requirements and source file information, generate a JSON configuration for delta analysis between two data files.
+
+Source Files Available:
+{files_info}
+
+User Requirements:
+{requirements}
+
+Generate a delta configuration with this exact JSON structure:
+{{
+    "Files": [
+        {{
+            "Name": "FileA",
+            "Extract": [],
+            "Filter": []
+        }},
+        {{
+            "Name": "FileB", 
+            "Extract": [],
+            "Filter": []
+        }}
+    ],
+    "KeyRules": [
+        {{
+            "LeftFileColumn": "column_from_older_file",
+            "RightFileColumn": "column_from_newer_file", 
+            "MatchType": "equals|case_insensitive|numeric_tolerance",
+            "ToleranceValue": null,
+            "IsKey": true
+        }}
+    ],
+    "ComparisonRules": [
+        {{
+            "LeftFileColumn": "column_from_older_file",
+            "RightFileColumn": "column_from_newer_file",
+            "MatchType": "equals|case_insensitive|numeric_tolerance",
+            "ToleranceValue": null,
+            "IsKey": false
+        }}
+    ],
+    "selected_columns_file_a": ["list", "of", "relevant", "columns", "from", "older_file"],
+    "selected_columns_file_b": ["list", "of", "relevant", "columns", "from", "newer_file"]
+}}
+
+Configuration Rules:
+1. ONLY use column names that exist in the source files
+2. Older File (File A) columns: {', '.join(source_files[0].get('columns', []))}
+3. Newer File (File B) columns: {', '.join(source_files[1].get('columns', []))}
+4. KeyRules define composite key for record matching - REQUIRED for delta generation
+5. ComparisonRules define optional fields to compare for amendments - optional
+6. For exact matches, use MatchType "equals" with ToleranceValue null
+7. For case insensitive text matching, use MatchType "case_insensitive" with ToleranceValue null
+8. For numeric tolerance, use MatchType "numeric_tolerance" with appropriate ToleranceValue (e.g., 0.01 for currency)
+9. Extract rules are optional - only add if data transformation is needed
+10. Filter rules are optional - only add if data filtering is needed
+11. Select relevant columns that are needed for delta analysis and reporting
+
+Delta Generation Logic:
+- UNCHANGED: Records with same keys and same optional fields
+- AMENDED: Records with same keys but different optional fields
+- DELETED: Records present in older file but not in newer file
+- NEWLY_ADDED: Records present in newer file but not in older file
+
+Common Delta Patterns:
+- ID matching: exact match on unique identifier fields
+- Account matching: exact match on account numbers/codes
+- Amount comparison: numeric tolerance for currency values
+- Date comparison: exact match for date fields
+- Status comparison: exact match for status/category fields
+
+IMPORTANT: Return ONLY the JSON configuration, no additional text or explanation.
+
+Examples of good key rules:
+- ID matching: {{"LeftFileColumn": "id", "RightFileColumn": "record_id", "MatchType": "equals", "ToleranceValue": null, "IsKey": true}}
+- Account matching: {{"LeftFileColumn": "account_no", "RightFileColumn": "account_number", "MatchType": "equals", "ToleranceValue": null, "IsKey": true}}
+
+Examples of good comparison rules:
+- Amount comparison: {{"LeftFileColumn": "amount", "RightFileColumn": "value", "MatchType": "numeric_tolerance", "ToleranceValue": 0.01, "IsKey": false}}
+- Status comparison: {{"LeftFileColumn": "status", "RightFileColumn": "record_status", "MatchType": "equals", "ToleranceValue": null, "IsKey": false}}
+"""
+        
+        # Call LLM service
+        messages = [
+            LLMMessage(role="system", content="You are a financial data delta generation expert. Return only valid JSON configuration."),
+            LLMMessage(role="user", content=prompt)
+        ]
+        
+        response = llm_service.generate_text(
+            messages=messages,
+            **generation_params
+        )
+        
+        if not response.success:
+            raise HTTPException(status_code=500, detail=f"LLM generation failed: {response.error}")
+        
+        generated_config_text = response.content
+        
+        # Parse the JSON response
+        import json
+        try:
+            generated_config = json.loads(generated_config_text)
+        except json.JSONDecodeError:
+            # Try to extract JSON from response if it contains extra text
+            import re
+            json_match = re.search(r'\\{.*\\}', generated_config_text, re.DOTALL)
+            if json_match:
+                generated_config = json.loads(json_match.group())
+            else:
+                raise HTTPException(status_code=500, detail="Failed to parse AI-generated configuration")
+        
+        # Validate the generated configuration has required fields
+        required_fields = ['Files', 'KeyRules']
+        missing_fields = [field for field in required_fields if field not in generated_config]
+        if missing_fields:
+            raise HTTPException(status_code=500, detail=f"AI generated config missing fields: {missing_fields}")
+        
+        # Ensure we have exactly 2 files
+        if len(generated_config.get('Files', [])) != 2:
+            # Fix the configuration
+            generated_config['Files'] = [
+                {
+                    "Name": "FileA",
+                    "Extract": generated_config.get('Files', [{}])[0].get('Extract', []),
+                    "Filter": generated_config.get('Files', [{}])[0].get('Filter', [])
+                },
+                {
+                    "Name": "FileB", 
+                    "Extract": generated_config.get('Files', [{}, {}])[1].get('Extract', []) if len(generated_config.get('Files', [])) > 1 else [],
+                    "Filter": generated_config.get('Files', [{}, {}])[1].get('Filter', []) if len(generated_config.get('Files', [])) > 1 else []
+                }
+            ]
+        
+        # Ensure selected columns are present
+        if 'selected_columns_file_a' not in generated_config:
+            generated_config['selected_columns_file_a'] = source_files[0].get('columns', [])
+        if 'selected_columns_file_b' not in generated_config:
+            generated_config['selected_columns_file_b'] = source_files[1].get('columns', [])
+        
+        # Ensure ComparisonRules is present (optional but should be in structure)
+        if 'ComparisonRules' not in generated_config:
+            generated_config['ComparisonRules'] = []
+        
+        return {
+            "success": True,
+            "message": "Delta configuration generated successfully",
+            "data": generated_config
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating AI delta configuration: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Configuration generation error: {str(e)}")
+
+
 @router.post("/process/", response_model=DeltaResponse)
 async def process_delta_generation(request: JSONDeltaRequest):
     """Process delta generation with JSON input - File ID Version with Filter Support"""
@@ -795,6 +986,79 @@ async def process_delta_generation(request: JSONDeltaRequest):
         print(f"Delta generation completed in {processing_time:.2f}s")
         print(f"Results: Unchanged: {len(delta_results['unchanged'])}, Amended: {len(delta_results['amended'])}")
         print(f"Deleted: {len(delta_results['deleted'])}, New: {len(delta_results['newly_added'])}")
+
+        # Save results to server similar to reconciliation
+        from app.routes.save_results_routes import SaveResultsRequest
+        from app.routes.save_results_routes import save_results_to_server
+
+        # Save all results
+        save_request_all = SaveResultsRequest(
+            result_id=delta_id,
+            file_id=delta_id + '_all',
+            result_type="all",
+            process_type="delta",
+            file_format="csv",
+            description="All delta results from delta generation job"
+        )
+
+        # Save amended results
+        save_request_amended = SaveResultsRequest(
+            result_id=delta_id,
+            file_id=delta_id + '_amended',
+            result_type="amended",
+            process_type="delta",
+            file_format="csv",
+            description="Amended records from delta generation job"
+        )
+
+        # Save deleted results
+        save_request_deleted = SaveResultsRequest(
+            result_id=delta_id,
+            file_id=delta_id + '_deleted',
+            result_type="deleted",
+            process_type="delta",
+            file_format="csv",
+            description="Deleted records from delta generation job"
+        )
+
+        # Save newly added results
+        save_request_added = SaveResultsRequest(
+            result_id=delta_id,
+            file_id=delta_id + '_newly_added',
+            result_type="newly_added",
+            process_type="delta",
+            file_format="csv",
+            description="Newly added records from delta generation job"
+        )
+
+        # Save unchanged results
+        save_request_unchanged = SaveResultsRequest(
+            result_id=delta_id,
+            file_id=delta_id + '_unchanged',
+            result_type="unchanged",
+            process_type="delta",
+            file_format="csv",
+            description="Unchanged records from delta generation job"
+        )
+
+        # Execute save operations
+        try:
+            save_result_all = await save_results_to_server(save_request_all)
+            save_result_amended = await save_results_to_server(save_request_amended)
+            save_result_deleted = await save_results_to_server(save_request_deleted)
+            save_result_added = await save_results_to_server(save_request_added)
+            save_result_unchanged = await save_results_to_server(save_request_unchanged)
+            
+            print("Delta results saved successfully:")
+            print(f"All: {save_result_all}")
+            print(f"Amended: {save_result_amended}")
+            print(f"Deleted: {save_result_deleted}")
+            print(f"Added: {save_result_added}")
+            print(f"Unchanged: {save_result_unchanged}")
+        except Exception as e:
+            print(f"Error saving delta results to server: {str(e)}")
+            # Don't fail the main process if saving fails, just log the error
+            processor.warnings.append(f"Failed to save results to server: {str(e)}")
 
         return DeltaResponse(
             success=True,
@@ -1040,11 +1304,30 @@ async def delete_delta_results(delta_id: str):
 @router.get("/health")
 async def delta_health_check():
     """Health check for delta generation service"""
+    
+    # Check LLM service status
+    try:
+        from app.services.llm_service import get_llm_service
+        llm_service = get_llm_service()
+        llm_status = {
+            "provider": llm_service.get_provider_name(),
+            "model": llm_service.get_model_name(),
+            "available": llm_service.is_available()
+        }
+    except Exception as e:
+        llm_status = {
+            "provider": "unknown",
+            "model": "unknown",
+            "available": False,
+            "error": str(e)
+        }
+    
     storage_count = len(delta_storage)
 
     return {
         "status": "healthy",
         "service": "delta_generation",
+        "llm_service": llm_status,
         "active_deltas": storage_count,
         "features": [
             "composite_key_matching",
@@ -1053,8 +1336,8 @@ async def delta_health_check():
             "change_categorization",
             "amendment_tracking",
             "column_selection",
-            "data_filtering",  # NEW
-            "date_aware_filtering",  # NEW
+            "data_filtering",
+            "date_aware_filtering",
             "paginated_results",
             "streaming_downloads",
             "json_input_support",
@@ -1062,6 +1345,7 @@ async def delta_health_check():
             "date_matching",
             "case_insensitive_matching",
             "numeric_tolerance_matching",
-            "auto_comparison_rules"
+            "auto_comparison_rules",
+            "ai_configuration_generation"  # NEW
         ]
     }  # Complete updated delta_routes.py with filter logic

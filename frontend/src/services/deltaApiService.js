@@ -758,6 +758,28 @@ Transformation Metrics:
         }
     },
 
+    /**
+     * Generate Delta Configuration using AI
+     * @param {string} requirements - User requirements for delta generation
+     * @param {Array} sourceFiles - Array of source files with metadata
+     * @returns {Promise<Object>} Generated delta configuration
+     */
+    async generateDeltaConfig(requirements, sourceFiles) {
+        try {
+            console.log('Generating delta configuration with AI:', { requirements, sourceFiles });
+
+            const response = await api.post('/delta/generate-config/', {
+                requirements: requirements,
+                source_files: sourceFiles
+            });
+
+            return response.data;
+        } catch (error) {
+            console.error('Error generating delta configuration:', error);
+            throw error;
+        }
+    },
+
 };
 
 

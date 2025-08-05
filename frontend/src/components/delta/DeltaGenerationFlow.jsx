@@ -13,10 +13,14 @@ import {
     Plus,
     Save,
     Upload,
+    Wand2,
     X
 } from 'lucide-react';
 import DeltaRuleSaveLoad from './DeltaRuleSaveLoad.jsx';
 import FilterDataStep from './FilterDataStep.jsx';
+import DeltaAIRequirementsStep from './DeltaAIRequirementsStep.jsx';
+import DeltaPreviewStep from './DeltaPreviewStep.jsx';
+import deltaApiService from '../../services/deltaApiService.js';
 
 const DeltaGenerationFlow = ({
                                  files,
@@ -51,15 +55,25 @@ const DeltaGenerationFlow = ({
     const [showRuleSaveLoad, setShowRuleSaveLoad] = useState(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [loadedRuleId, setLoadedRuleId] = useState(null);
+    
+    // AI Configuration state
+    const [aiRequirements, setAiRequirements] = useState('');
+    const [isGeneratingAiConfig, setIsGeneratingAiConfig] = useState(false);
+    const [generatedAiConfig, setGeneratedAiConfig] = useState(null);
+    
+    // Delta generation results state
+    const [generatedResults, setGeneratedResults] = useState(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     const steps = [
         {id: 'rule_management', title: 'Load/Save Rules', icon: Save},
-        {id: 'file_selection', title: 'File Selection', icon: FileText},
+        {id: 'ai_requirements', title: 'AI Configuration', icon: Wand2},
         {id: 'filter_data', title: 'Filter Data', icon: Filter},
         {id: 'key_rules', title: 'Key Fields (Composite)', icon: Key},
         {id: 'comparison_rules', title: 'Optional Fields', icon: GitCompare},
         {id: 'result_columns', title: 'Result Columns', icon: Columns},
-        {id: 'review', title: 'Review & Confirm', icon: Check}
+        {id: 'review', title: 'Review & Confirm', icon: Check},
+        {id: 'generate_view', title: 'Generate & View', icon: Upload}
     ];
 
     const getCurrentStepIndex = () => steps.findIndex(step => step.id === currentStep);
@@ -82,6 +96,60 @@ const DeltaGenerationFlow = ({
     const getAllAvailableColumns = (fileIndex) => {
         const file = getFileByIndex(fileIndex);
         return fileColumns[file?.file_id] || [];
+    };
+
+    // AI Configuration handlers
+    const handleGenerateAiConfig = async (requirements, sourceFiles) => {
+        setIsGeneratingAiConfig(true);
+        setGeneratedAiConfig(null);
+        
+        try {
+            // Format sourceFiles to ensure proper field names for backend API
+            const formattedSourceFiles = sourceFiles.map(file => ({
+                filename: file.filename,
+                columns: file.columns || [],
+                totalRows: file.totalRows || file.total_rows || 0,
+                label: file.label || ''
+            }));
+            
+            console.log('Generating AI config for delta:', { requirements, formattedSourceFiles });
+            const response = await deltaApiService.generateDeltaConfig(requirements, formattedSourceFiles);
+            
+            if (response.success && response.data) {
+                setGeneratedAiConfig(response);
+                console.log('Generated AI config:', response.data);
+            } else {
+                console.error('AI config generation failed:', response);
+                alert(`AI configuration generation failed: ${response.error || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error('Error generating AI config:', error);
+            alert(`Failed to generate AI configuration: ${error.response?.data?.detail || error.message}`);
+        } finally {
+            setIsGeneratingAiConfig(false);
+        }
+    };
+
+    const handleUseAiConfiguration = (config) => {
+        console.log('Using AI generated configuration:', config);
+        
+        // Apply the generated configuration
+        if (config.KeyRules) {
+            setKeyRules(config.KeyRules);
+        }
+        if (config.ComparisonRules) {
+            setComparisonRules(config.ComparisonRules);
+        }
+        if (config.selected_columns_file_a) {
+            setSelectedColumnsFileA(config.selected_columns_file_a);
+        }
+        if (config.selected_columns_file_b) {
+            setSelectedColumnsFileB(config.selected_columns_file_b);
+        }
+        
+        // Navigate to next step
+        setCurrentStep('filter_data');
+        setHasUnsavedChanges(true);
     };
 
     // Get mandatory columns that must be included (key + comparison columns)
@@ -228,15 +296,21 @@ const DeltaGenerationFlow = ({
             ComparisonRules: comparisonRules,
             selected_columns_file_a: selectedColumnsFileA,
             selected_columns_file_b: selectedColumnsFileB,
+            file_filters: fileFilters || {}, // Ensure it's always an object
             user_requirements: 'Generate delta between older and newer files using configured key and comparison rules'
         };
     };
 
-    const nextStep = () => {
+    const nextStep = async () => {
         const currentIndex = getCurrentStepIndex();
         if (currentIndex < steps.length - 1) {
             const nextStepId = steps[currentIndex + 1].id;
             setCurrentStep(nextStepId);
+            
+            // Generate results when reaching generate_view step
+            if (nextStepId === 'generate_view') {
+                await generateDeltaResults();
+            }
         }
     };
 
@@ -244,6 +318,42 @@ const DeltaGenerationFlow = ({
         const currentIndex = getCurrentStepIndex();
         if (currentIndex > 0) {
             setCurrentStep(steps[currentIndex - 1].id);
+        }
+    };
+
+    // Generate delta results
+    const generateDeltaResults = async () => {
+        setIsProcessing(true);
+        setGeneratedResults(null);
+        
+        try {
+            const baseConfig = getCurrentRuleConfig();
+            const deltaConfig = {
+                process_type: 'delta-generation',
+                process_name: 'Delta Generation',
+                user_requirements: aiRequirements || 'Generate delta between older and newer files using configured key and comparison rules',
+                files: getSelectedFilesArray().map((file, index) => ({
+                    file_id: file.file_id,
+                    role: `file_${index}`,
+                    label: index === 0 ? 'Older File' : 'Newer File'
+                })),
+                delta_config: baseConfig
+            };
+            console.log('Generating delta with config:', deltaConfig);
+            const response = await deltaApiService.processDeltaGeneration(deltaConfig);
+            
+            if (response.success) {
+                setGeneratedResults(response);
+                console.log('Delta generation successful:', response);
+            } else {
+                console.error('Delta generation failed:', response);
+                alert(`Delta generation failed: ${response.message || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error('Error generating delta:', error);
+            alert(`Failed to generate delta: ${error.response?.data?.detail || error.message}`);
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -406,44 +516,61 @@ const DeltaGenerationFlow = ({
             case 'rule_management':
                 return (
                     <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-800">Load Existing Rule or Start Fresh</h3>
+                        <h3 className="text-lg font-semibold text-gray-800">Choose Configuration Method</h3>
                         <p className="text-sm text-gray-600">
-                            You can load a previously saved delta generation rule to reuse your configuration,
-                            or start fresh with a new configuration.
+                            You can use AI to generate configuration from requirements, load a previously saved rule, 
+                            or start fresh with manual configuration.
                         </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="p-4 border border-purple-200 bg-purple-50 rounded-lg h-full flex flex-col">
+                                <div className="flex items-center space-x-2 mb-3">
+                                    <Wand2 size={20} className="text-purple-600"/>
+                                    <h4 className="text-md font-medium text-purple-800">AI Configuration</h4>
+                                </div>
+                                <p className="text-sm text-purple-700 mb-4 flex-grow">
+                                    Describe your requirements and let AI generate the delta configuration.
+                                </p>
+                                <button
+                                    onClick={() => setCurrentStep('ai_requirements')}
+                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 min-h-[40px]"
+                                >
+                                    <Wand2 size={16}/>
+                                    <span>Use AI Assistant</span>
+                                </button>
+                            </div>
+
+                            <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg h-full flex flex-col">
                                 <div className="flex items-center space-x-2 mb-3">
                                     <Upload size={20} className="text-blue-600"/>
                                     <h4 className="text-md font-medium text-blue-800">Load Existing Rule</h4>
                                 </div>
-                                <p className="text-sm text-blue-700 mb-4">
-                                    Load a previously saved delta rule template and adapt it to your current files.
+                                <p className="text-sm text-blue-700 mb-4 flex-grow">
+                                    Load a previously saved rule template and adapt it to your current files.
                                 </p>
                                 <button
                                     onClick={() => setShowRuleSaveLoad(true)}
-                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 min-h-[40px]"
                                 >
                                     <Upload size={16}/>
                                     <span>Browse Saved Rules</span>
                                 </button>
                             </div>
 
-                            <div className="p-4 border border-green-200 bg-green-50 rounded-lg">
+                            <div className="p-4 border border-green-200 bg-green-50 rounded-lg h-full flex flex-col">
                                 <div className="flex items-center space-x-2 mb-3">
                                     <FileText size={20} className="text-green-600"/>
-                                    <h4 className="text-md font-medium text-green-800">Start Fresh</h4>
+                                    <h4 className="text-md font-medium text-green-800">Start Fresh Manually</h4>
                                 </div>
-                                <p className="text-sm text-green-700 mb-4">
-                                    Create a new delta generation configuration from scratch.
+                                <p className="text-sm text-green-700 mb-4 flex-grow">
+                                    Create a new delta generation configuration manually from scratch.
                                 </p>
                                 <button
                                     onClick={() => nextStep()}
-                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 min-h-[40px]"
                                 >
                                     <FileText size={16}/>
-                                    <span>Start New Configuration</span>
+                                    <span>Start Fresh</span>
                                 </button>
                             </div>
                         </div>
@@ -454,7 +581,7 @@ const DeltaGenerationFlow = ({
                                     <div className="flex items-center space-x-2">
                                         <Check size={16} className="text-yellow-600"/>
                                         <span className="text-sm text-yellow-800">
-                                            Delta rule loaded. {hasUnsavedChanges ? 'You have unsaved changes.' : 'No changes made.'}
+                                            Rule loaded. {hasUnsavedChanges ? 'You have unsaved changes.' : 'No changes made.'}
                                         </span>
                                     </div>
                                     {hasUnsavedChanges && (
@@ -471,50 +598,20 @@ const DeltaGenerationFlow = ({
                     </div>
                 );
 
-            case 'file_selection':
+            case 'ai_requirements':
                 return (
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-800">Selected Files for Delta Generation</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            {filesArray.slice(0, 2).map((file, index) => {
-                                const colors = ['blue', 'green'];
-                                const labels = ['Older File (FileA)', 'Newer File (FileB)'];
-                                const letters = ['A', 'B'];
-
-                                return (
-                                    <div key={index}
-                                         className={`p-4 border border-${colors[index]}-200 bg-${colors[index]}-50 rounded-lg`}>
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <div
-                                                className={`w-6 h-6 bg-${colors[index]}-500 rounded-full flex items-center justify-center text-white text-sm font-bold`}>
-                                                {letters[index]}
-                                            </div>
-                                            <span
-                                                className={`font-medium text-${colors[index]}-800`}>{labels[index]}</span>
-                                        </div>
-                                        <div className={`text-sm text-${colors[index]}-700`}>
-                                            <p className="font-medium">{file?.filename}</p>
-                                            <p className="text-xs">{file?.total_rows} rows
-                                                • {file?.columns?.length} columns</p>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-                            <p>✅ Files are ready for delta generation. The system will:</p>
-                            <ul className="mt-2 ml-4 list-disc space-y-1">
-                                <li><strong>Identify Unchanged:</strong> Records with same keys and same optional fields
-                                </li>
-                                <li><strong>Identify Amended:</strong> Records with same keys but different optional
-                                    fields
-                                </li>
-                                <li><strong>Identify Deleted:</strong> Records in Older File but not in Newer File</li>
-                                <li><strong>Identify New:</strong> Records in Newer File but not in Older File</li>
-                            </ul>
-                        </div>
-                    </div>
+                    <DeltaAIRequirementsStep
+                        onGenerateConfig={handleGenerateAiConfig}
+                        onConfigGenerated={setGeneratedAiConfig}
+                        sourceFiles={filesArray}
+                        isGenerating={isGeneratingAiConfig}
+                        generatedConfig={generatedAiConfig}
+                        onUseConfiguration={handleUseAiConfiguration}
+                        requirements={aiRequirements}
+                        onRequirementsChange={setAiRequirements}
+                    />
                 );
+
 
             case 'filter_data':
                 return (
@@ -1114,6 +1211,35 @@ const DeltaGenerationFlow = ({
                     </div>
                 );
 
+            case 'generate_view':
+                return (
+                    <DeltaPreviewStep
+                        config={{
+                            ...getCurrentRuleConfig(),
+                            user_requirements: aiRequirements || 'Generate delta between older and newer files using configured key and comparison rules',
+                            files: getSelectedFilesArray().map((file, index) => ({
+                                file_id: file.file_id,
+                                role: `file_${index}`,
+                                label: index === 0 ? 'Older File' : 'Newer File'
+                            }))
+                        }}
+                        generatedResults={generatedResults}
+                        isLoading={isProcessing}
+                        onRefresh={generateDeltaResults}
+                        onViewResults={(fileId) => {
+                            if (fileId) {
+                                // Open results in new tab - using the file viewer pattern
+                                const viewerUrl = `/viewer/${fileId}`;
+                                window.open(viewerUrl, '_blank');
+                            }
+                        }}
+                        onSaveResults={() => console.log('Save results feature to be implemented')}
+                        onRetry={generateDeltaResults}
+                        onUpdateConfig={() => setCurrentStep('review')}
+                        onClose={() => onCancel && onCancel()}
+                    />
+                );
+
             default:
                 return <div>Unknown step</div>;
         }
@@ -1121,7 +1247,7 @@ const DeltaGenerationFlow = ({
 
     return (
         <>
-            <div className="bg-white border border-gray-300 rounded-lg p-6 shadow-lg max-w-4xl mx-auto">
+            <div className="bg-white border border-gray-300 rounded-lg p-6 shadow-lg max-w-6xl mx-auto">
                 {/* Step Progress */}
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-4">
@@ -1185,19 +1311,19 @@ const DeltaGenerationFlow = ({
                         {getCurrentStepIndex() < steps.length - 1 ? (
                             <button
                                 onClick={nextStep}
-                                className="flex items-center space-x-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                disabled={currentStep === 'review' && keyRules.length === 0}
+                                className="flex items-center space-x-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
-                                <span>Next</span>
+                                <span>{currentStep === 'review' ? 'Generate Results' : 'Next'}</span>
                                 <ChevronRight size={16}/>
                             </button>
                         ) : (
                             <button
-                                onClick={completeFlow}
-                                disabled={keyRules.length === 0}
-                                className="flex items-center space-x-1 px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                onClick={onCancel}
+                                className="flex items-center space-x-1 px-6 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
                             >
-                                <Check size={16}/>
-                                <span>Start Delta Generation</span>
+                                <X size={16}/>
+                                <span>Close</span>
                             </button>
                         )}
                     </div>
