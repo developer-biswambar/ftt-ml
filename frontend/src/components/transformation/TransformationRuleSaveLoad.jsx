@@ -1,20 +1,19 @@
-// src/components/DeltaRuleSaveLoad.jsx - Component for saving and loading delta generation rules
+// src/components/transformation/TransformationRuleSaveLoad.jsx - Component for saving and loading transformation rules
 import React, {useEffect, useState} from 'react';
-import {AlertCircle, Calendar, Clock, Eye, GitCompare, Save, Search, Star, Tag, Trash2, Upload, X} from 'lucide-react';
-import {apiService} from '../../services/defaultApi.js';
+import {AlertCircle, Calendar, Clock, Eye, Save, Search, Star, Tag, Trash2, Upload, X, Layers} from 'lucide-react';
+import {transformationRuleApiService} from '../../services/transformationRuleApiService.js';
 
-const DeltaRuleSaveLoad = ({
-                               selectedTemplate,
-                               currentConfig,
-                               fileColumns,
-                               loadedRuleId,
-                               hasUnsavedChanges,
-                               onRuleLoaded,
-                               onRuleSaved,
-                               onClose,
-                               defaultTab = 'load' // 'load' for beginning, 'save' for end
-                           }) => {
-    const [activeTab, setActiveTab] = useState(defaultTab);
+const TransformationRuleSaveLoad = ({
+                                        selectedTemplate,
+                                        currentConfig,
+                                        fileColumns,
+                                        loadedRuleId,
+                                        hasUnsavedChanges,
+                                        onRuleLoaded,
+                                        onRuleSaved,
+                                        onClose
+                                    }) => {
+    const [activeTab, setActiveTab] = useState('load');
     const [rules, setRules] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -25,7 +24,7 @@ const DeltaRuleSaveLoad = ({
     const [saveForm, setSaveForm] = useState({
         name: '',
         description: '',
-        category: 'delta',
+        category: 'transformation',
         tags: []
     });
     const [saveErrors, setSaveErrors] = useState([]);
@@ -35,48 +34,36 @@ const DeltaRuleSaveLoad = ({
 
     useEffect(() => {
         if (activeTab === 'load') {
-            loadRules();
+            loadTransformationRules();
         }
     }, [activeTab, selectedTemplate]);
 
     useEffect(() => {
-        // Auto-populate save form for updates, but only if we're not already in save mode
-        if (loadedRuleId && hasUnsavedChanges && defaultTab !== 'save') {
+        // Auto-populate save form for updates
+        if (loadedRuleId && hasUnsavedChanges) {
             setActiveTab('save');
             const loadedRule = rules.find(r => r.id === loadedRuleId);
             if (loadedRule) {
                 setSaveForm({
                     name: loadedRule.name,
                     description: loadedRule.description || '',
-                    category: loadedRule.category || 'delta',
-                    tags: loadedRule.tags || []
-                });
-            }
-        } else if (defaultTab === 'save' && loadedRuleId) {
-            // If we're explicitly in save mode and have a loaded rule, populate the form
-            const loadedRule = rules.find(r => r.id === loadedRuleId);
-            if (loadedRule) {
-                setSaveForm({
-                    name: loadedRule.name,
-                    description: loadedRule.description || '',
-                    category: loadedRule.category || 'delta',
+                    category: loadedRule.category || 'transformation',
                     tags: loadedRule.tags || []
                 });
             }
         }
-    }, [loadedRuleId, hasUnsavedChanges, rules, defaultTab]);
+    }, [loadedRuleId, hasUnsavedChanges, rules]);
 
-    const loadRules = async () => {
+    const loadTransformationRules = async () => {
         setLoading(true);
         try {
             const templateRules = selectedTemplate?.id
-                ? await apiService.getDeltaRulesByTemplate(selectedTemplate.id)
-                : await apiService.listDeltaRules({limit: 50});
+                ? await transformationRuleApiService.getTransformationRulesByTemplate(selectedTemplate.id)
+                : await transformationRuleApiService.listTransformationRules({limit: 50});
 
             setRules(templateRules);
         } catch (error) {
-            console.error('Error loading delta rules:', error);
-            // Fallback to empty array if API fails
+            console.error('Error loading transformation rules:', error);
             setRules([]);
         } finally {
             setLoading(false);
@@ -87,7 +74,7 @@ const DeltaRuleSaveLoad = ({
         setSaveErrors([]);
 
         // Validate form
-        const validation = apiService.validateDeltaRuleMetadata(saveForm);
+        const validation = transformationRuleApiService.validateTransformationRuleMetadata(saveForm);
         if (!validation.isValid) {
             setSaveErrors(validation.errors);
             return;
@@ -95,7 +82,7 @@ const DeltaRuleSaveLoad = ({
 
         setLoading(true);
         try {
-            const {ruleConfig, ruleMetadata} = apiService.createDeltaRuleFromConfig(
+            const {ruleConfig, ruleMetadata} = transformationRuleApiService.createTransformationRuleFromConfig(
                 currentConfig,
                 selectedTemplate,
                 saveForm
@@ -104,20 +91,17 @@ const DeltaRuleSaveLoad = ({
             let savedRule;
             if (loadedRuleId && hasUnsavedChanges) {
                 // Update existing rule
-                savedRule = await apiService.updateDeltaRule(loadedRuleId, {
-                    metadata: ruleMetadata,
-                    rule_config: ruleConfig
-                });
+                savedRule = await transformationRuleApiService.updateTransformationRule(loadedRuleId, ruleConfig, ruleMetadata);
             } else {
                 // Create new rule
-                savedRule = await apiService.saveDeltaRule(ruleConfig, ruleMetadata);
+                savedRule = await transformationRuleApiService.saveTransformationRule(ruleConfig, ruleMetadata);
             }
 
             onRuleSaved(savedRule);
             onClose();
         } catch (error) {
-            console.error('Error saving delta rule:', error);
-            setSaveErrors([error.message || 'Failed to save rule']);
+            console.error('Error saving transformation rule:', error);
+            setSaveErrors([error.message || 'Failed to save transformation rule']);
         } finally {
             setLoading(false);
         }
@@ -127,38 +111,38 @@ const DeltaRuleSaveLoad = ({
         setLoading(true);
         try {
             // Mark rule as used
-            await apiService.markDeltaRuleAsUsed(rule.id);
+            await transformationRuleApiService.markTransformationRuleAsUsed(rule.id);
 
             // Adapt rule to current files
-            const {adaptedConfig, warnings, errors} = apiService.adaptDeltaRuleToFiles(rule, fileColumns);
+            const {adaptedConfig, warnings, errors} = transformationRuleApiService.adaptTransformationRuleToFiles(rule, fileColumns);
 
             if (errors.length > 0) {
-                alert(`Cannot load rule: ${errors.join('\n')}`);
+                alert(`Cannot load transformation rule: ${errors.join('\\n')}`);
                 return;
             }
 
             onRuleLoaded(rule, adaptedConfig, warnings);
             onClose();
         } catch (error) {
-            console.error('Error loading delta rule:', error);
-            alert('Failed to load rule: ' + error.message);
+            console.error('Error loading transformation rule:', error);
+            alert('Failed to load transformation rule: ' + error.message);
         } finally {
             setLoading(false);
         }
     };
 
     const handleDeleteRule = async (ruleId) => {
-        if (!confirm('Are you sure you want to delete this delta rule? This action cannot be undone.')) {
+        if (!confirm('Are you sure you want to delete this transformation rule? This action cannot be undone.')) {
             return;
         }
 
         setLoading(true);
         try {
-            await apiService.deleteDeltaRule(ruleId);
-            await loadRules(); // Refresh list
+            await transformationRuleApiService.deleteTransformationRule(ruleId);
+            await loadTransformationRules(); // Refresh list
         } catch (error) {
-            console.error('Error deleting delta rule:', error);
-            alert('Failed to delete rule: ' + error.message);
+            console.error('Error deleting transformation rule:', error);
+            alert('Failed to delete transformation rule: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -197,9 +181,9 @@ const DeltaRuleSaveLoad = ({
                 <div className="p-4 border-b border-gray-200 bg-gray-50">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                            <GitCompare size={20} className="text-blue-600"/>
+                            <Layers size={20} className="text-purple-600"/>
                             <h2 className="text-lg font-semibold text-gray-800">
-                                {loadedRuleId && hasUnsavedChanges ? 'Update Delta Rule' : 'Delta Rule Management'}
+                                {loadedRuleId && hasUnsavedChanges ? 'Update Transformation Rule' : 'Transformation Rule Management'}
                             </h2>
                         </div>
                         <button
@@ -216,7 +200,7 @@ const DeltaRuleSaveLoad = ({
                             onClick={() => setActiveTab('load')}
                             className={`px-4 py-2 text-sm font-medium rounded-md ${
                                 activeTab === 'load'
-                                    ? 'bg-blue-500 text-white'
+                                    ? 'bg-purple-500 text-white'
                                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                             }`}
                         >
@@ -227,7 +211,7 @@ const DeltaRuleSaveLoad = ({
                             onClick={() => setActiveTab('save')}
                             className={`px-4 py-2 text-sm font-medium rounded-md ${
                                 activeTab === 'save'
-                                    ? 'bg-blue-500 text-white'
+                                    ? 'bg-purple-500 text-white'
                                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                             }`}
                         >
@@ -248,16 +232,16 @@ const DeltaRuleSaveLoad = ({
                                             className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"/>
                                     <input
                                         type="text"
-                                        placeholder="Search delta rules..."
+                                        placeholder="Search transformation rules..."
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                                     />
                                 </div>
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                                 >
                                     {categories.map(cat => (
                                         <option key={cat} value={cat}>
@@ -271,23 +255,23 @@ const DeltaRuleSaveLoad = ({
                             {loading ? (
                                 <div className="text-center py-8">
                                     <div
-                                        className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                                    <p className="text-gray-500 mt-2">Loading delta rules...</p>
+                                        className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+                                    <p className="text-gray-500 mt-2">Loading transformation rules...</p>
                                 </div>
                             ) : filteredRules.length === 0 ? (
                                 <div className="text-center py-8">
-                                    <GitCompare size={48} className="mx-auto mb-4 text-gray-400"/>
+                                    <Layers size={48} className="mx-auto mb-4 text-gray-400"/>
                                     <p className="text-gray-500">
                                         {searchTerm || selectedCategory !== 'all'
-                                            ? 'No delta rules match your filters'
-                                            : 'No saved delta rules found'
+                                            ? 'No transformation rules match your filters'
+                                            : 'No saved transformation rules found'
                                         }
                                     </p>
                                     <button
                                         onClick={() => setActiveTab('save')}
-                                        className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
+                                        className="mt-2 text-purple-600 hover:text-purple-800 text-sm"
                                     >
-                                        Save your first delta rule →
+                                        Save your first transformation rule →
                                     </button>
                                 </div>
                             ) : (
@@ -300,9 +284,9 @@ const DeltaRuleSaveLoad = ({
                                                     <div className="flex items-center space-x-2 mb-2">
                                                         <h3 className="font-medium text-gray-800">{rule.name}</h3>
                                                         <span className={`px-2 py-1 text-xs rounded-full ${
-                                                            rule.category === 'delta' ? 'bg-orange-100 text-orange-800' :
+                                                            rule.category === 'transformation' ? 'bg-purple-100 text-purple-800' :
                                                                 rule.category === 'reconciliation' ? 'bg-blue-100 text-blue-800' :
-                                                                    rule.category === 'transformation' ? 'bg-purple-100 text-purple-800' :
+                                                                    rule.category === 'delta' ? 'bg-orange-100 text-orange-800' :
                                                                         'bg-gray-100 text-gray-800'
                                                         }`}>
                                                             {rule.category}
@@ -360,7 +344,7 @@ const DeltaRuleSaveLoad = ({
                                                     </button>
                                                     <button
                                                         onClick={() => handleLoadRule(rule)}
-                                                        className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                                                        className="px-3 py-1 bg-purple-500 text-white text-sm rounded hover:bg-purple-600"
                                                         disabled={loading}
                                                     >
                                                         Load
@@ -386,7 +370,7 @@ const DeltaRuleSaveLoad = ({
                         <div className="space-y-4">
                             <div>
                                 <h3 className="text-lg font-medium text-gray-800 mb-4">
-                                    {loadedRuleId && hasUnsavedChanges ? 'Update Delta Rule Configuration' : 'Save Current Delta Configuration as Rule'}
+                                    {loadedRuleId && hasUnsavedChanges ? 'Update Transformation Rule Configuration' : 'Save Current Transformation Configuration as Rule'}
                                 </h3>
 
                                 {saveErrors.length > 0 && (
@@ -412,8 +396,8 @@ const DeltaRuleSaveLoad = ({
                                             type="text"
                                             value={saveForm.name}
                                             onChange={(e) => setSaveForm(prev => ({...prev, name: e.target.value}))}
-                                            className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="e.g., Financial Delta with Amount Comparison"
+                                            className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            placeholder="e.g., Financial Data Transformation with Calculations"
                                         />
                                     </div>
 
@@ -424,11 +408,11 @@ const DeltaRuleSaveLoad = ({
                                         <select
                                             value={saveForm.category}
                                             onChange={(e) => setSaveForm(prev => ({...prev, category: e.target.value}))}
-                                            className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                                         >
-                                            <option value="delta">Delta</option>
-                                            <option value="reconciliation">Reconciliation</option>
                                             <option value="transformation">Transformation</option>
+                                            <option value="reconciliation">Reconciliation</option>
+                                            <option value="delta">Delta</option>
                                         </select>
                                     </div>
                                 </div>
@@ -441,8 +425,8 @@ const DeltaRuleSaveLoad = ({
                                         value={saveForm.description}
                                         onChange={(e) => setSaveForm(prev => ({...prev, description: e.target.value}))}
                                         rows={3}
-                                        className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Describe what this delta rule does and when to use it..."
+                                        className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        placeholder="Describe what this transformation rule does and when to use it..."
                                     />
                                 </div>
 
@@ -453,11 +437,11 @@ const DeltaRuleSaveLoad = ({
                                     <div className="flex flex-wrap gap-2 mb-2">
                                         {saveForm.tags.map(tag => (
                                             <span key={tag}
-                                                  className="flex items-center space-x-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                                                  className="flex items-center space-x-1 px-2 py-1 bg-purple-100 text-purple-800 rounded text-sm">
                                                 <span>{tag}</span>
                                                 <button
                                                     onClick={() => removeTag(tag)}
-                                                    className="text-blue-600 hover:text-blue-800"
+                                                    className="text-purple-600 hover:text-purple-800"
                                                 >
                                                     <X size={12}/>
                                                 </button>
@@ -474,10 +458,10 @@ const DeltaRuleSaveLoad = ({
                                                     e.target.value = '';
                                                 }
                                             }}
-                                            className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                            className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                                         />
                                         <div className="flex space-x-1">
-                                            {['key-matching', 'comparison', 'tolerance'].map(suggestedTag => (
+                                            {['column-mapping', 'calculations', 'expressions'].map(suggestedTag => (
                                                 <button
                                                     key={suggestedTag}
                                                     onClick={() => addTag(suggestedTag)}
@@ -494,12 +478,10 @@ const DeltaRuleSaveLoad = ({
                                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                                     <h4 className="font-medium text-gray-800 mb-2">Configuration Summary</h4>
                                     <div className="text-sm text-gray-600 space-y-1">
-                                        <div>• Key rules: {currentConfig.KeyRules?.length || 0}</div>
-                                        <div>• Comparison rules: {currentConfig.ComparisonRules?.length || 0}</div>
-                                        <div>• Older file
-                                            columns: {currentConfig.selected_columns_file_a?.length || 0}</div>
-                                        <div>• Newer file
-                                            columns: {currentConfig.selected_columns_file_b?.length || 0}</div>
+                                        <div>• Source files: {currentConfig.source_files?.length || 0}</div>
+                                        <div>• Transformation rules: {currentConfig.row_generation_rules?.length || 0}</div>
+                                        <div>• Total output columns: {currentConfig.row_generation_rules?.reduce((total, rule) => total + (rule.output_columns?.length || 0), 0) || 0}</div>
+                                        <div>• Merge datasets: {currentConfig.merge_datasets ? 'Yes' : 'No'}</div>
                                     </div>
                                 </div>
 
@@ -513,7 +495,7 @@ const DeltaRuleSaveLoad = ({
                                     <button
                                         onClick={handleSaveRule}
                                         disabled={loading || !saveForm.name.trim()}
-                                        className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+                                        className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
                                     >
                                         {loading && <div
                                             className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
@@ -533,7 +515,7 @@ const DeltaRuleSaveLoad = ({
                             className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
                             <div className="p-4 border-b border-gray-200 bg-gray-50">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-lg font-semibold text-gray-800">Delta Rule Details</h3>
+                                    <h3 className="text-lg font-semibold text-gray-800">Transformation Rule Details</h3>
                                     <button
                                         onClick={() => setShowRuleDetails(null)}
                                         className="p-1 text-gray-400 hover:text-gray-600"
@@ -588,42 +570,22 @@ const DeltaRuleSaveLoad = ({
                                     <div>
                                         <h5 className="font-medium text-gray-700 mb-2">Configuration Summary:</h5>
                                         <div className="bg-gray-50 p-3 rounded text-sm">
-                                            <div>• Key Rules: {showRuleDetails.rule_config.KeyRules?.length || 0}</div>
-                                            <div>• Comparison
-                                                Rules: {showRuleDetails.rule_config.ComparisonRules?.length || 0}</div>
-                                            <div>• Result Columns Selected: {
-                                                (showRuleDetails.rule_config.selected_columns_file_a?.length || 0) +
-                                                (showRuleDetails.rule_config.selected_columns_file_b?.length || 0)
-                                            }</div>
+                                            <div>• Source Files: {showRuleDetails.rule_config.source_files?.length || 0}</div>
+                                            <div>• Transformation Rules: {showRuleDetails.rule_config.row_generation_rules?.length || 0}</div>
+                                            <div>• Total Output Columns: {showRuleDetails.rule_config.row_generation_rules?.reduce((total, rule) => total + (rule.output_columns?.length || 0), 0) || 0}</div>
+                                            <div>• Merge Datasets: {showRuleDetails.rule_config.merge_datasets ? 'Yes' : 'No'}</div>
                                         </div>
                                     </div>
 
-                                    {showRuleDetails.rule_config.KeyRules && showRuleDetails.rule_config.KeyRules.length > 0 && (
+                                    {showRuleDetails.rule_config.row_generation_rules && showRuleDetails.rule_config.row_generation_rules.length > 0 && (
                                         <div>
-                                            <h5 className="font-medium text-gray-700 mb-2">Key Rules:</h5>
+                                            <h5 className="font-medium text-gray-700 mb-2">Transformation Rules:</h5>
                                             <div className="space-y-2">
-                                                {showRuleDetails.rule_config.KeyRules.map((rule, index) => (
-                                                    <div key={index} className="bg-blue-50 p-2 rounded text-sm">
-                                                        <div>Key {index + 1}: "{rule.LeftFileColumn}" matches
-                                                            "{rule.RightFileColumn}"
-                                                        </div>
-                                                        <div>Type: {rule.MatchType} {rule.ToleranceValue ? `(tolerance: ${rule.ToleranceValue}%)` : ''}</div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {showRuleDetails.rule_config.ComparisonRules && showRuleDetails.rule_config.ComparisonRules.length > 0 && (
-                                        <div>
-                                            <h5 className="font-medium text-gray-700 mb-2">Comparison Rules:</h5>
-                                            <div className="space-y-2">
-                                                {showRuleDetails.rule_config.ComparisonRules.map((rule, index) => (
-                                                    <div key={index} className="bg-green-50 p-2 rounded text-sm">
-                                                        <div>Compare "{rule.LeftFileColumn}" with
-                                                            "{rule.RightFileColumn}"
-                                                        </div>
-                                                        <div>Type: {rule.MatchType} {rule.ToleranceValue ? `(tolerance: ${rule.ToleranceValue}%)` : ''}</div>
+                                                {showRuleDetails.rule_config.row_generation_rules.map((rule, index) => (
+                                                    <div key={index} className="bg-purple-50 p-2 rounded text-sm">
+                                                        <div className="font-medium">Rule {index + 1}: {rule.name}</div>
+                                                        <div>Output Columns: {rule.output_columns?.length || 0}</div>
+                                                        <div>Enabled: {rule.enabled ? 'Yes' : 'No'}</div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -645,7 +607,7 @@ const DeltaRuleSaveLoad = ({
                                             setShowRuleDetails(null);
                                             handleLoadRule(showRuleDetails);
                                         }}
-                                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                                        className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600"
                                         disabled={loading}
                                     >
                                         Load This Rule
@@ -660,4 +622,4 @@ const DeltaRuleSaveLoad = ({
     );
 };
 
-export default DeltaRuleSaveLoad;
+export default TransformationRuleSaveLoad;

@@ -28,7 +28,10 @@ const ReconciliationPreviewStep = ({
     onSaveResults,
     onRetry,
     onUpdateConfig,
-    onClose
+    onClose,
+    loadedRuleId,
+    hasUnsavedChanges,
+    onShowRuleModal
 }) => {
     // Remove viewMode state since we're combining into single view
 
@@ -369,6 +372,52 @@ const ReconciliationPreviewStep = ({
                     <h4 className="text-md font-semibold text-gray-800 mb-4">Reconciliation Results</h4>
                     {renderResults()}
                 </div>
+
+                {/* Rule Management Section */}
+                {generatedResults && generatedResults.success && (
+                    <div className="border border-gray-200 rounded-lg p-6">
+                        <h4 className="text-md font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+                            <Save size={18} className="text-blue-600" />
+                            <span>Rule Management</span>
+                        </h4>
+                        
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="font-medium text-blue-800">
+                                        {loadedRuleId && hasUnsavedChanges 
+                                            ? 'Update Reconciliation Rule' 
+                                            : 'Save Reconciliation Rule'
+                                        }
+                                    </p>
+                                    <p className="text-sm text-blue-700 mt-1">
+                                        {loadedRuleId && hasUnsavedChanges
+                                            ? 'You have made changes to the loaded rule. Save your updates to preserve them.'
+                                            : 'Save this reconciliation configuration as a reusable rule for future use.'
+                                        }
+                                    </p>
+                                    {loadedRuleId && (
+                                        <p className="text-xs text-blue-600 mt-1">
+                                            Currently using saved rule • {hasUnsavedChanges ? 'Modified' : 'Unchanged'}
+                                        </p>
+                                    )}
+                                </div>
+                                
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={() => onShowRuleModal && onShowRuleModal()}
+                                        className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                                    >
+                                        <Save size={16} />
+                                        <span>
+                                            {loadedRuleId && hasUnsavedChanges ? 'Update Rule' : 'Save Rule'}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

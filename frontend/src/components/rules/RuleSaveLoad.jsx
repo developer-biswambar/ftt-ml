@@ -30,7 +30,7 @@ const RuleSaveLoad = ({
     const [saveErrors, setSaveErrors] = useState([]);
 
     // Categories and filters
-    const [categories, setCategories] = useState(['all', 'reconciliation', 'financial', 'trading', 'general']);
+    const [categories, setCategories] = useState(['all', 'reconciliation', 'transformation', 'delta']);
 
     useEffect(() => {
         if (activeTab === 'load') {
@@ -283,8 +283,8 @@ const RuleSaveLoad = ({
                                                         <h3 className="font-medium text-gray-800">{rule.name}</h3>
                                                         <span className={`px-2 py-1 text-xs rounded-full ${
                                                             rule.category === 'reconciliation' ? 'bg-blue-100 text-blue-800' :
-                                                                rule.category === 'financial' ? 'bg-green-100 text-green-800' :
-                                                                    rule.category === 'trading' ? 'bg-purple-100 text-purple-800' :
+                                                                rule.category === 'transformation' ? 'bg-purple-100 text-purple-800' :
+                                                                    rule.category === 'delta' ? 'bg-orange-100 text-orange-800' :
                                                                         'bg-gray-100 text-gray-800'
                                                         }`}>
                                                             {rule.category}
@@ -409,10 +409,8 @@ const RuleSaveLoad = ({
                                             className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         >
                                             <option value="reconciliation">Reconciliation</option>
-                                            <option value="financial">Financial</option>
-                                            <option value="trading">Trading</option>
-                                            <option value="general">General</option>
-                                            <option value="custom">Custom</option>
+                                            <option value="transformation">Transformation</option>
+                                            <option value="delta">Delta</option>
                                         </select>
                                     </div>
                                 </div>

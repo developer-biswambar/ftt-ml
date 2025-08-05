@@ -53,8 +53,10 @@ const DeltaGenerationFlow = ({
 
     // Rule Management State
     const [showRuleSaveLoad, setShowRuleSaveLoad] = useState(false);
+    const [ruleModalTab, setRuleModalTab] = useState('load'); // Track which tab to show
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [loadedRuleId, setLoadedRuleId] = useState(null);
+    const [configMethod, setConfigMethod] = useState(null); // Track: 'ai', 'load', or 'manual'
     
     // AI Configuration state
     const [aiRequirements, setAiRequirements] = useState('');
@@ -84,6 +86,17 @@ const DeltaGenerationFlow = ({
             .sort()
             .map(key => selectedFiles[key])
             .filter(file => file !== null && file !== undefined);
+    };
+
+    // Helper functions to open rule modal with correct tab
+    const openRuleModalForLoading = () => {
+        setRuleModalTab('load');
+        setShowRuleSaveLoad(true);
+    };
+
+    const openRuleModalForSaving = () => {
+        setRuleModalTab('save');
+        setShowRuleSaveLoad(true);
     };
 
     // Helper function to get file by index
@@ -279,7 +292,7 @@ const DeltaGenerationFlow = ({
         }
 
         setTimeout(() => {
-            setCurrentStep('file_selection');
+            setCurrentStep('filter_data');
         }, 1000);
     };
 
@@ -304,7 +317,15 @@ const DeltaGenerationFlow = ({
     const nextStep = async () => {
         const currentIndex = getCurrentStepIndex();
         if (currentIndex < steps.length - 1) {
-            const nextStepId = steps[currentIndex + 1].id;
+            let nextStepId = steps[currentIndex + 1].id;
+            
+            // Skip AI Configuration step if we're coming from rule_management 
+            // and user chose "Load Rule" or "Start Fresh" (not AI Assistant)
+            if (currentStep === 'rule_management' && nextStepId === 'ai_requirements' && configMethod !== 'ai') {
+                // Skip ai_requirements and go directly to filter_data
+                nextStepId = 'filter_data';
+            }
+            
             setCurrentStep(nextStepId);
             
             // Generate results when reaching generate_view step
@@ -317,7 +338,21 @@ const DeltaGenerationFlow = ({
     const prevStep = () => {
         const currentIndex = getCurrentStepIndex();
         if (currentIndex > 0) {
-            setCurrentStep(steps[currentIndex - 1].id);
+            let prevStepId = steps[currentIndex - 1].id;
+            
+            // Skip AI Configuration step when going back from filter_data
+            // if we skipped it during forward navigation (non-AI methods)
+            if (currentStep === 'filter_data' && prevStepId === 'ai_requirements' && configMethod !== 'ai') {
+                // Skip ai_requirements and go directly back to rule_management
+                prevStepId = 'rule_management';
+            }
+            
+            // When going back from ai_requirements, go to rule_management
+            if (currentStep === 'ai_requirements') {
+                prevStepId = 'rule_management';
+            }
+            
+            setCurrentStep(prevStepId);
         }
     };
 
@@ -532,7 +567,10 @@ const DeltaGenerationFlow = ({
                                     Describe your requirements and let AI generate the delta configuration.
                                 </p>
                                 <button
-                                    onClick={() => setCurrentStep('ai_requirements')}
+                                    onClick={() => {
+                                        setConfigMethod('ai');
+                                        setCurrentStep('ai_requirements');
+                                    }}
                                     className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 min-h-[40px]"
                                 >
                                     <Wand2 size={16}/>
@@ -549,7 +587,10 @@ const DeltaGenerationFlow = ({
                                     Load a previously saved rule template and adapt it to your current files.
                                 </p>
                                 <button
-                                    onClick={() => setShowRuleSaveLoad(true)}
+                                    onClick={() => {
+                                        setConfigMethod('load');
+                                        openRuleModalForLoading();
+                                    }}
                                     className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 min-h-[40px]"
                                 >
                                     <Upload size={16}/>
@@ -566,7 +607,10 @@ const DeltaGenerationFlow = ({
                                     Create a new delta generation configuration manually from scratch.
                                 </p>
                                 <button
-                                    onClick={() => nextStep()}
+                                    onClick={() => {
+                                        setConfigMethod('manual');
+                                        nextStep();
+                                    }}
                                     className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 min-h-[40px]"
                                 >
                                     <FileText size={16}/>
@@ -586,7 +630,7 @@ const DeltaGenerationFlow = ({
                                     </div>
                                     {hasUnsavedChanges && (
                                         <button
-                                            onClick={() => setShowRuleSaveLoad(true)}
+                                            onClick={() => openRuleModalForSaving()}
                                             className="text-xs px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
                                         >
                                             Save Changes
@@ -1195,7 +1239,7 @@ const DeltaGenerationFlow = ({
                             <div className="flex items-center justify-between mb-2">
                                 <h4 className="font-medium text-blue-800">Save This Configuration</h4>
                                 <button
-                                    onClick={() => setShowRuleSaveLoad(true)}
+                                    onClick={() => openRuleModalForSaving()}
                                     disabled={keyRules.length === 0}
                                     className="flex items-center space-x-1 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
                                 >
@@ -1237,6 +1281,9 @@ const DeltaGenerationFlow = ({
                         onRetry={generateDeltaResults}
                         onUpdateConfig={() => setCurrentStep('review')}
                         onClose={() => onCancel && onCancel()}
+                        loadedRuleId={loadedRuleId}
+                        hasUnsavedChanges={hasUnsavedChanges}
+                        onShowRuleModal={() => openRuleModalForSaving()}
                     />
                 );
 
@@ -1254,6 +1301,7 @@ const DeltaGenerationFlow = ({
                         {steps.map((step, index) => {
                             const isActive = step.id === currentStep;
                             const isCompleted = getCurrentStepIndex() > index;
+                            const isSkipped = step.id === 'ai_requirements' && configMethod !== 'ai' && configMethod !== null;
                             const StepIcon = step.icon;
 
                             return (
@@ -1261,17 +1309,19 @@ const DeltaGenerationFlow = ({
                                     <div
                                         className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all duration-300 ${
                                             isActive ? 'bg-blue-500 border-blue-500 text-white' :
+                                                isSkipped ? 'bg-gray-200 border-gray-400 text-gray-400' :
                                                 isCompleted ? 'bg-green-500 border-green-500 text-white' :
                                                     'bg-gray-100 border-gray-300 text-gray-500'
                                         }`}>
-                                        {isCompleted ? <Check size={16}/> : <StepIcon size={16}/>}
+                                        {isSkipped ? <X size={16}/> : isCompleted ? <Check size={16}/> : <StepIcon size={16}/>}
                                     </div>
                                     <span className={`ml-2 text-sm font-medium ${
                                         isActive ? 'text-blue-600' :
+                                            isSkipped ? 'text-gray-400' :
                                             isCompleted ? 'text-green-600' :
                                                 'text-gray-500'
                                     }`}>
-                                        {step.title}
+                                        {step.title}{isSkipped ? ' (Skipped)' : ''}
                                     </span>
                                     {index < steps.length - 1 && (
                                         <ChevronRight size={16} className="mx-2 text-gray-400"/>
@@ -1341,6 +1391,7 @@ const DeltaGenerationFlow = ({
                     onRuleLoaded={handleRuleLoaded}
                     onRuleSaved={handleRuleSaved}
                     onClose={() => setShowRuleSaveLoad(false)}
+                    defaultTab={ruleModalTab}
                 />
             )}
         </>

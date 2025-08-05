@@ -27,7 +27,10 @@ const PreviewStep = ({
                          onSaveResults,
                          onRetry,
                          onUpdateConfig,
-                         onClose // Add onClose prop for closing the popup
+                         onClose, // Add onClose prop for closing the popup
+                         loadedRuleId,
+                         hasUnsavedChanges,
+                         onShowRuleModal
                      }) => {
     const [viewMode, setViewMode] = useState('summary'); // summary, results
 
@@ -385,6 +388,52 @@ const PreviewStep = ({
                     )}
                 </div>
             </div>
+
+            {/* Rule Management Section */}
+            {generatedResults && generatedResults.success && (
+                <div className="border-t border-gray-200 pt-6">
+                    <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center space-x-2">
+                        <Save size={18} className="text-purple-600" />
+                        <span>Rule Management</span>
+                    </h4>
+                    
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="font-medium text-purple-800">
+                                    {loadedRuleId && hasUnsavedChanges 
+                                        ? 'Update Transformation Rule' 
+                                        : 'Save Transformation Rule'
+                                    }
+                                </p>
+                                <p className="text-sm text-purple-700 mt-1">
+                                    {loadedRuleId && hasUnsavedChanges
+                                        ? 'You have made changes to the loaded rule. Save your updates to preserve them.'
+                                        : 'Save this transformation configuration as a reusable rule for future use.'
+                                    }
+                                </p>
+                                {loadedRuleId && (
+                                    <p className="text-xs text-purple-600 mt-1">
+                                        Currently using saved rule • {hasUnsavedChanges ? 'Modified' : 'Unchanged'}
+                                    </p>
+                                )}
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={() => onShowRuleModal && onShowRuleModal()}
+                                    className="flex items-center space-x-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                                >
+                                    <Save size={16} />
+                                    <span>
+                                        {loadedRuleId && hasUnsavedChanges ? 'Update Rule' : 'Save Rule'}
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Actions */}
             <div className="flex items-center justify-between pt-4 border-t border-gray-200">

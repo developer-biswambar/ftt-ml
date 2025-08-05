@@ -1180,6 +1180,9 @@ const ReconciliationFlow = ({
                         onRetry={() => setCurrentStep('review')}
                         onUpdateConfig={() => setCurrentStep('review')}
                         onClose={onCancel}
+                        loadedRuleId={loadedRuleId}
+                        hasUnsavedChanges={hasUnsavedChanges}
+                        onShowRuleModal={() => setShowRuleSaveLoad(true)}
                     />
                 );
 

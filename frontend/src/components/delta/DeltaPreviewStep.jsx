@@ -31,7 +31,10 @@ const DeltaPreviewStep = ({
     onSaveResults,
     onRetry,
     onUpdateConfig,
-    onClose
+    onClose,
+    loadedRuleId,
+    hasUnsavedChanges,
+    onShowRuleModal
 }) => {
     const renderConfigSummary = () => {
         const sourceFileCount = config.files ? config.files.length : 2;
@@ -312,6 +315,52 @@ const DeltaPreviewStep = ({
                     <h4 className="text-md font-semibold text-gray-800 mb-4">Delta Analysis Results</h4>
                     {renderResults()}
                 </div>
+
+                {/* Rule Management Section */}
+                {generatedResults && generatedResults.success && (
+                    <div className="border border-gray-200 rounded-lg p-6">
+                        <h4 className="text-md font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+                            <Save size={18} className="text-orange-600" />
+                            <span>Rule Management</span>
+                        </h4>
+                        
+                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="font-medium text-orange-800">
+                                        {loadedRuleId && hasUnsavedChanges 
+                                            ? 'Update Delta Rule' 
+                                            : 'Save Delta Rule'
+                                        }
+                                    </p>
+                                    <p className="text-sm text-orange-700 mt-1">
+                                        {loadedRuleId && hasUnsavedChanges
+                                            ? 'You have made changes to the loaded rule. Save your updates to preserve them.'
+                                            : 'Save this delta configuration as a reusable rule for future use.'
+                                        }
+                                    </p>
+                                    {loadedRuleId && (
+                                        <p className="text-xs text-orange-600 mt-1">
+                                            Currently using saved rule • {hasUnsavedChanges ? 'Modified' : 'Unchanged'}
+                                        </p>
+                                    )}
+                                </div>
+                                
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={() => onShowRuleModal && onShowRuleModal()}
+                                        className="flex items-center space-x-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                                    >
+                                        <Save size={16} />
+                                        <span>
+                                            {loadedRuleId && hasUnsavedChanges ? 'Update Rule' : 'Save Rule'}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
