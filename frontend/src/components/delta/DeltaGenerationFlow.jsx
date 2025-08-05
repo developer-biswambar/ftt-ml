@@ -160,6 +160,13 @@ const DeltaGenerationFlow = ({
             setSelectedColumnsFileB(config.selected_columns_file_b);
         }
         
+        // Update the main config object as well
+        setConfig(prev => ({
+            ...prev,
+            KeyRules: config.KeyRules || prev.KeyRules,
+            ComparisonRules: config.ComparisonRules || prev.ComparisonRules
+        }));
+        
         // Navigate to next step
         setCurrentStep('filter_data');
         setHasUnsavedChanges(true);
@@ -269,7 +276,7 @@ const DeltaGenerationFlow = ({
         if (loadedRuleId) {
             setHasUnsavedChanges(true);
         }
-    }, [keyRules, comparisonRules, selectedColumnsFileA, selectedColumnsFileB]);
+    }, [keyRules, comparisonRules, selectedColumnsFileA, selectedColumnsFileB, fileFilters]);
 
     // Rule management handlers
     const handleRuleLoaded = (rule, adaptedConfig, warnings) => {
@@ -282,6 +289,18 @@ const DeltaGenerationFlow = ({
         setComparisonRules(adaptedConfig.ComparisonRules || []);
         setSelectedColumnsFileA(adaptedConfig.selected_columns_file_a || []);
         setSelectedColumnsFileB(adaptedConfig.selected_columns_file_b || []);
+        
+        // Load filters from the adapted config
+        if (adaptedConfig.file_filters) {
+            setFileFilters(adaptedConfig.file_filters);
+        } else {
+            // Initialize empty filters if not present
+            setFileFilters({
+                file_0: [],
+                file_1: []
+            });
+        }
+        
         setLoadedRuleId(rule.id);
         setHasUnsavedChanges(false);
 
@@ -431,7 +450,13 @@ const DeltaGenerationFlow = ({
             ToleranceValue: null,
             IsKey: true
         };
-        setKeyRules([...keyRules, newRule]);
+        const updatedRules = [...keyRules, newRule];
+        setKeyRules(updatedRules);
+        // Also update the config object
+        setConfig(prev => ({
+            ...prev,
+            KeyRules: updatedRules
+        }));
     };
 
     const updateKeyRule = (ruleIndex, field, value) => {
@@ -442,11 +467,21 @@ const DeltaGenerationFlow = ({
             updatedRules[ruleIndex][field] = value;
         }
         setKeyRules(updatedRules);
+        // Also update the config object
+        setConfig(prev => ({
+            ...prev,
+            KeyRules: updatedRules
+        }));
     };
 
     const removeKeyRule = (ruleIndex) => {
         const updatedRules = keyRules.filter((_, index) => index !== ruleIndex);
         setKeyRules(updatedRules);
+        // Also update the config object
+        setConfig(prev => ({
+            ...prev,
+            KeyRules: updatedRules
+        }));
     };
 
     // Comparison rules management
@@ -458,7 +493,13 @@ const DeltaGenerationFlow = ({
             ToleranceValue: null,
             IsKey: false
         };
-        setComparisonRules([...comparisonRules, newRule]);
+        const updatedRules = [...comparisonRules, newRule];
+        setComparisonRules(updatedRules);
+        // Also update the config object
+        setConfig(prev => ({
+            ...prev,
+            ComparisonRules: updatedRules
+        }));
     };
 
     const updateComparisonRule = (ruleIndex, field, value) => {
@@ -469,11 +510,21 @@ const DeltaGenerationFlow = ({
             updatedRules[ruleIndex][field] = value;
         }
         setComparisonRules(updatedRules);
+        // Also update the config object
+        setConfig(prev => ({
+            ...prev,
+            ComparisonRules: updatedRules
+        }));
     };
 
     const removeComparisonRule = (ruleIndex) => {
         const updatedRules = comparisonRules.filter((_, index) => index !== ruleIndex);
         setComparisonRules(updatedRules);
+        // Also update the config object
+        setConfig(prev => ({
+            ...prev,
+            ComparisonRules: updatedRules
+        }));
     };
 
     // Filter management functions
@@ -482,25 +533,61 @@ const DeltaGenerationFlow = ({
             column: '',
             values: []
         };
-        setFileFilters(prev => ({
+        const updatedFileFilters = {
+            ...fileFilters,
+            [fileKey]: [...fileFilters[fileKey], newFilter]
+        };
+        setFileFilters(updatedFileFilters);
+        
+        // Also update the config.Files array
+        const fileIndex = fileKey === 'file_0' ? 0 : 1;
+        setConfig(prev => ({
             ...prev,
-            [fileKey]: [...prev[fileKey], newFilter]
+            Files: prev.Files.map((file, index) => 
+                index === fileIndex 
+                    ? { ...file, Filter: updatedFileFilters[fileKey] }
+                    : file
+            )
         }));
     };
 
     const updateFilter = (fileKey, filterIndex, field, value) => {
-        setFileFilters(prev => ({
-            ...prev,
-            [fileKey]: prev[fileKey].map((filter, index) =>
+        const updatedFileFilters = {
+            ...fileFilters,
+            [fileKey]: fileFilters[fileKey].map((filter, index) =>
                 index === filterIndex ? {...filter, [field]: value} : filter
+            )
+        };
+        setFileFilters(updatedFileFilters);
+        
+        // Also update the config.Files array
+        const fileIndex = fileKey === 'file_0' ? 0 : 1;
+        setConfig(prev => ({
+            ...prev,
+            Files: prev.Files.map((file, index) => 
+                index === fileIndex 
+                    ? { ...file, Filter: updatedFileFilters[fileKey] }
+                    : file
             )
         }));
     };
 
     const removeFilter = (fileKey, filterIndex) => {
-        setFileFilters(prev => ({
+        const updatedFileFilters = {
+            ...fileFilters,
+            [fileKey]: fileFilters[fileKey].filter((_, index) => index !== filterIndex)
+        };
+        setFileFilters(updatedFileFilters);
+        
+        // Also update the config.Files array
+        const fileIndex = fileKey === 'file_0' ? 0 : 1;
+        setConfig(prev => ({
             ...prev,
-            [fileKey]: prev[fileKey].filter((_, index) => index !== filterIndex)
+            Files: prev.Files.map((file, index) => 
+                index === fileIndex 
+                    ? { ...file, Filter: updatedFileFilters[fileKey] }
+                    : file
+            )
         }));
     };
 

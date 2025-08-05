@@ -200,13 +200,131 @@ const ReconciliationPreviewStep = ({
         }
 
         // Success case - use the corrected field names
-        const matchedCount = generatedResults.matched_count || 0;
-        const unmatchedACount = generatedResults.unmatched_file_a_count || 0;
-        const unmatchedBCount = generatedResults.unmatched_file_b_count || 0;
-        const totalFileA = generatedResults.total_records_file_a || 0;
-        const totalFileB = generatedResults.total_records_file_b || 0;
-        const processingTime = generatedResults.processing_time || 0;
-        const matchPercentage = generatedResults.match_percentage || 0;
+        const matchedCount = generatedResults.summary?.matched_records || 0;
+        const unmatchedACount = generatedResults.summary?.unmatched_file_a || 0;
+        const unmatchedBCount = generatedResults.summary?.unmatched_file_b || 0;
+        const totalFileA = generatedResults.summary?.total_records_file_a || 0;
+        const totalFileB = generatedResults.summary?.total_records_file_b || 0;
+        const processingTime = generatedResults.summary?.processing_time_seconds || 0;
+        const matchPercentage = generatedResults.summary?.match_percentage || 0;
+
+        // Check if this is a "no matches" scenario
+        const hasNoMatches = matchedCount === 0 && (totalFileA > 0 || totalFileB > 0);
+
+        if (hasNoMatches) {
+            return (
+                <div className="space-y-6">
+                    <div className="flex items-center space-x-2 text-blue-600 mb-4">
+                        <AlertCircle size={20} />
+                        <h3 className="text-lg font-medium">Reconciliation Complete - No Matches Found</h3>
+                    </div>
+
+                    {/* No Matches Info Panel */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                        <div className="flex items-start space-x-3">
+                            <AlertCircle size={24} className="text-blue-600 mt-1 flex-shrink-0" />
+                            <div className="flex-grow">
+                                <h4 className="font-medium text-blue-800 mb-2">No matching records were found</h4>
+                                <p className="text-blue-700 text-sm mb-4">
+                                    The reconciliation process completed successfully, but no records from File A matched any records from File B using your current matching rules.
+                                </p>
+                                <div className="bg-blue-100 rounded p-3 text-sm">
+                                    <p className="font-medium text-blue-800 mb-2">This could happen when:</p>
+                                    <ul className="text-blue-700 space-y-1 list-disc list-inside">
+                                        <li>The files contain completely different datasets</li>
+                                        <li>Matching rules are too strict (try adjusting tolerance values)</li>
+                                        <li>Column names or data formats don't align between files</li>
+                                        <li>Date formats or case sensitivity cause mismatches</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Processing Summary */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                            <div className="flex items-center space-x-2 mb-2">
+                                <FileText size={20} className="text-gray-600" />
+                                <span className="text-sm font-medium text-gray-800">File A Records</span>
+                            </div>
+                            <p className="text-2xl font-semibold text-gray-900">{totalFileA}</p>
+                            <p className="text-xs text-gray-600">all unmatched</p>
+                        </div>
+
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                            <div className="flex items-center space-x-2 mb-2">
+                                <FileText size={20} className="text-gray-600" />
+                                <span className="text-sm font-medium text-gray-800">File B Records</span>
+                            </div>
+                            <p className="text-2xl font-semibold text-gray-900">{totalFileB}</p>
+                            <p className="text-xs text-gray-600">all unmatched</p>
+                        </div>
+
+                        <div className="bg-red-50 p-4 rounded-lg">
+                            <div className="flex items-center space-x-2 mb-2">
+                                <AlertCircle size={20} className="text-red-600" />
+                                <span className="text-sm font-medium text-red-800">Matches Found</span>
+                            </div>
+                            <p className="text-2xl font-semibold text-red-900">0</p>
+                            <p className="text-xs text-red-600">0% match rate</p>
+                        </div>
+
+                        <div className="bg-blue-50 p-4 rounded-lg">
+                            <div className="flex items-center space-x-2 mb-2">
+                                <Clock size={20} className="text-blue-600" />
+                                <span className="text-sm font-medium text-blue-800">Processing</span>
+                            </div>
+                            <p className="text-2xl font-semibold text-blue-900">{processingTime.toFixed(2)}s</p>
+                            <p className="text-xs text-blue-600">processing time</p>
+                        </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap gap-3">
+                        <button
+                            onClick={onRetry}
+                            className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                            <ArrowLeft size={16} />
+                            <span>Adjust Matching Rules</span>
+                        </button>
+
+                        <button
+                            onClick={onRefresh}
+                            className="flex items-center space-x-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                        >
+                            <RefreshCw size={16} />
+                            <span>Retry Reconciliation</span>
+                        </button>
+
+                        {/* Still show view buttons for unmatched data */}
+                        {(unmatchedACount > 0 || unmatchedBCount > 0) && (
+                            <button
+                                onClick={() => onViewResults(generatedResults.reconciliation_id+'_all')}
+                                className="flex items-center space-x-2 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+                            >
+                                <Eye size={16} />
+                                <span>View Unmatched Records</span>
+                                <ExternalLink size={14} />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Warnings */}
+                    {generatedResults.warnings && generatedResults.warnings.length > 0 && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <h4 className="font-medium text-yellow-800 mb-2">Warnings:</h4>
+                            <ul className="text-sm text-yellow-700 space-y-1">
+                                {generatedResults.warnings.map((warning, index) => (
+                                    <li key={index}>• {warning}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+            );
+        }
 
         return (
             <div className="space-y-6">
@@ -296,17 +414,32 @@ const ReconciliationPreviewStep = ({
 
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-3">
+                    {/* Disable "View Matched Results" if there are no matches */}
                     <button
-                        onClick={() => onViewResults(generatedResults.reconciliation_id)}
-                        className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        onClick={matchedCount > 0 ? () => onViewResults(generatedResults.reconciliation_id) : undefined}
+                        disabled={matchedCount === 0}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded ${
+                            matchedCount > 0 
+                                ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
+                        title={matchedCount === 0 ? 'No matched records available to view' : 'View matched records'}
                     >
                         <Eye size={16} />
                         <span>View Matched Results</span>
                         <ExternalLink size={14} />
                     </button>
+                    
+                    {/* Disable "View All Results" if there's no data */}
                     <button
-                        onClick={() => onViewResults(generatedResults.reconciliation_id+'_all')}
-                        className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        onClick={(matchedCount > 0 || unmatchedACount > 0 || unmatchedBCount > 0) ? () => onViewResults(generatedResults.reconciliation_id+'_all') : undefined}
+                        disabled={matchedCount === 0 && unmatchedACount === 0 && unmatchedBCount === 0}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded ${
+                            (matchedCount > 0 || unmatchedACount > 0 || unmatchedBCount > 0)
+                                ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
+                        title={(matchedCount === 0 && unmatchedACount === 0 && unmatchedBCount === 0) ? 'No records available to view' : 'View all reconciliation results'}
                     >
                         <Eye size={16} />
                         <span>View All Results</span>

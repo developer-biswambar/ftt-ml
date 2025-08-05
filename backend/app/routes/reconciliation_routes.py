@@ -286,33 +286,48 @@ async def _process_reconciliation_core(
 
     print(f"Reconciliation completed in {processing_time:.2f}s - {matched} matches found")
 
+    # Only save results if there's data to save
     from app.routes.save_results_routes import SaveResultsRequest
     from app.routes.save_results_routes import save_results_to_server
-
-    save_request_matched = SaveResultsRequest(
-        result_id=recon_id,
-        file_id=recon_id,
-        result_type="matched",
-        process_type="reconciliation",
-        file_format="csv",
-        description="Matched records from reconciliation job"  # optional
-    )
-
-    save_request_all = SaveResultsRequest(
-        result_id=recon_id,
-        file_id=recon_id+'_all',
-        result_type="all",
-        process_type="reconciliation",
-        file_format="csv",
-        description="Matched records from reconciliation job"  # optional
-    )
-
-    save_result_res_matched = await save_results_to_server(save_request_matched)
-
-    save_result_all  = await save_results_to_server(save_request_all)
-
-    print(save_result_res_matched)
-    print(save_result_all)
+    
+    # Check if we have meaningful data to save
+    has_matched = len(reconciliation_results['matched']) > 0
+    
+    # Only save results if we have matches - no point saving when everything is unmatched
+    if has_matched:
+        # Save "all" results (matched + unmatched) when we have matches
+        try:
+            save_request_all = SaveResultsRequest(
+                result_id=recon_id,
+                file_id=recon_id+'_all',
+                result_type="all",
+                process_type="reconciliation",
+                file_format="csv",
+                description="All reconciliation results (matched and unmatched)"
+            )
+            save_result_all = await save_results_to_server(save_request_all)
+            print(f"✓ Saved all results: {save_result_all}")
+        except Exception as e:
+            print(f"⚠️ Could not save all results: {str(e)}")
+            # Continue execution - saving is optional
+        
+        # Save "matched" results 
+        try:
+            save_request_matched = SaveResultsRequest(
+                result_id=recon_id,
+                file_id=recon_id,
+                result_type="matched",
+                process_type="reconciliation",
+                file_format="csv",
+                description="Matched records from reconciliation"
+            )
+            save_result_res_matched = await save_results_to_server(save_request_matched)
+            print(f"✓ Saved matched results: {save_result_res_matched}")
+        except Exception as e:
+            print(f"⚠️ Could not save matched results: {str(e)}")
+            # Continue execution - saving is optional
+    else:
+        print("ℹ️ No matches found - not saving any results files. Use 'View Unmatched Records' to see why records didn't match.")
 
     return ReconciliationResponse(
         success=True,
