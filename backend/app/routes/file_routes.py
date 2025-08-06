@@ -41,6 +41,97 @@ class UpdateSheetRequest(BaseModel):
     sheet_name: str
 
 
+def normalize_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalize datetime columns to consistent YYYY-MM-DD string format.
+    Uses the comprehensive date parsing from shared date utilities.
+
+    Args:
+        df: Input DataFrame
+
+    Returns:
+        DataFrame with normalized date columns
+    """
+    try:
+        from app.utils.date_utils import normalize_date_value
+        
+        # Aggressive date detection - check ALL columns for date content
+        all_columns = list(df.columns)
+        datetime_columns_detected = df.select_dtypes(include=['datetime64[ns]']).columns
+        converted_date_columns = []
+        
+        logger.info(f"🔍 Checking all {len(all_columns)} columns for date content...")
+        if len(datetime_columns_detected) > 0:
+            logger.info(f"  - Pandas auto-detected {len(datetime_columns_detected)} datetime columns: {list(datetime_columns_detected)}")
+
+        for col in all_columns:
+            # Sample some non-null values to check if they look like dates
+            non_null_values = df[col].dropna()
+            if len(non_null_values) == 0:
+                logger.debug(f"  - Skipping empty column '{col}'")
+                continue
+
+            # Test a sample of values using the robust date parser
+            sample_size = min(20, len(non_null_values))  # Check up to 20 values
+            sample_values = non_null_values.head(sample_size).tolist()
+
+            date_like_count = 0
+            for value in sample_values:
+                # Test all types of values (strings, numbers, datetime objects)
+                parsed_date_str = normalize_date_value(value)
+                if parsed_date_str is not None:
+                    date_like_count += 1
+
+            # Use 70% threshold for conservative date detection
+            # This prevents false positives on mixed numeric/ID columns
+            detection_threshold = 0.7
+            if date_like_count >= sample_size * detection_threshold:
+                try:
+                    original_dtype = str(df[col].dtype)
+                    logger.info(f"📅 Converting column '{col}' to normalized dates ({date_like_count}/{sample_size} samples are date-like, type: {original_dtype})")
+
+                    # Apply the robust date parser to the entire column
+                    def convert_to_date_string(value):
+                        if pd.isna(value):
+                            return None
+                        parsed_date_str = normalize_date_value(value)
+                        if parsed_date_str is not None:
+                            return parsed_date_str  # Already in YYYY-MM-DD format
+                        return str(value)  # Convert to string if not parseable as date
+                    
+                    df[col] = df[col].apply(convert_to_date_string)
+                    converted_date_columns.append(col)
+                    logger.info(f"  ✅ Successfully converted '{col}' from {original_dtype} to YYYY-MM-DD strings")
+
+                except Exception as e:
+                    logger.warning(f"  ❌ Failed to convert column '{col}' to dates: {str(e)}")
+            else:
+                logger.debug(f"  - Skipping '{col}': only {date_like_count}/{sample_size} samples are date-like ({date_like_count/sample_size*100:.1f}%)")
+
+        if converted_date_columns:
+            logger.info(f"🎉 Successfully normalized {len(converted_date_columns)} columns to YYYY-MM-DD format: {converted_date_columns}")
+        else:
+            logger.info("ℹ️  No date columns detected for normalization")
+        
+        # Final validation - check if any datetime columns still exist
+        remaining_datetime_cols = df.select_dtypes(include=['datetime64[ns]']).columns
+        if len(remaining_datetime_cols) > 0:
+            logger.warning(f"⚠️  WARNING: {len(remaining_datetime_cols)} datetime columns still exist after normalization: {list(remaining_datetime_cols)}")
+            # Force convert any remaining datetime columns
+            for col in remaining_datetime_cols:
+                df[col] = df[col].apply(lambda x: normalize_date_value(x) if pd.notna(x) else None)
+                logger.info(f"  🔧 Force-converted remaining datetime column: {col}")
+        else:
+            logger.info("✅ SUCCESS: All datetime objects converted to YYYY-MM-DD strings")
+
+        return df
+
+    except Exception as e:
+        logger.error(f"Error normalizing datetime columns: {str(e)}")
+        # Return original DataFrame if normalization fails
+        return df
+
+
 def extract_excel_sheet_info(content: bytes, filename: str) -> List[SheetInfo]:
     """Extract information about all sheets in an Excel file"""
     try:
@@ -198,10 +289,8 @@ async def upload_file(
                         # if file.filename.lower().endswith('.xlsx') else 'xlrd'
                     )
 
-            # Remove time from datetime columns (normalize to date strings for JSON compatibility)
-            for col in df.select_dtypes(include=['datetime64[ns]']).columns:
-                # Handle nulls explicitly and convert to date strings
-                df[col] = df[col].dt.strftime('%Y-%m-%d').where(df[col].notna(), None)
+            # Normalize datetime columns using the extracted function
+            df = normalize_datetime_columns(df)
 
         except Exception as e:
             logger.error(f"Error reading file {file.filename}: {str(e)}")

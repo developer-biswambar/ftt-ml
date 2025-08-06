@@ -560,9 +560,28 @@ class TransformationEngine:
 
             elif col_def.type == 'date' and col_def.format:
                 try:
-                    df[col_def.name] = pd.to_datetime(df[col_def.id]).dt.strftime(col_def.format)
-                except:
-                    pass
+                    from app.utils.date_utils import normalize_date_value
+                    
+                    # Use shared date utilities for consistent date handling
+                    def normalize_and_format_date(value):
+                        if pd.isna(value):
+                            return None
+                        # First normalize using shared utilities
+                        normalized_date_str = normalize_date_value(value)
+                        if normalized_date_str is not None:
+                            # Parse normalized date and format according to col_def.format
+                            parsed_date = pd.to_datetime(normalized_date_str)
+                            return parsed_date.strftime(col_def.format)
+                        return None
+                    
+                    df[col_def.name] = df[col_def.id].apply(normalize_and_format_date)
+                except Exception as e:
+                    logger.warning(f"Date formatting failed for column {col_def.name}: {str(e)}")
+                    # Fallback to original logic if shared utilities fail
+                    try:
+                        df[col_def.name] = pd.to_datetime(df[col_def.id]).dt.strftime(col_def.format)
+                    except:
+                        pass
 
             else:
                 df[col_def.name] = df[col_def.id].astype(str)

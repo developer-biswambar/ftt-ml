@@ -111,7 +111,6 @@ class DeltaProcessor:
     def __init__(self):
         self.errors = []
         self.warnings = []
-        self._date_cache = {}  # Cache parsed dates for performance
 
     def read_file_from_storage(self, file_id: str):
         """Read file from storage service"""
@@ -186,142 +185,25 @@ class DeltaProcessor:
 
     def _normalize_date_value(self, value):
         """
-        Normalize date value to datetime object, handling all Excel date formats.
-        Returns only the date part (ignoring time components).
+        Normalize date value using shared date utilities.
+        Returns date string in universal YYYY-MM-DD format or None.
         """
-        if pd.isna(value) or value is None:
-            return None
-
-        # Convert to string for caching key
-        cache_key = str(value)
-        if cache_key in self._date_cache:
-            return self._date_cache[cache_key]
-
-        parsed_date = None
-
-        try:
-            # Handle different input types
-            if isinstance(value, (datetime, pd.Timestamp)):
-                # Already a datetime, just extract date part
-                parsed_date = value.replace(hour=0, minute=0, second=0, microsecond=0)
-            elif isinstance(value, (int, float)):
-                # Handle Excel serial date numbers
-                if 1 <= value <= 2958465:  # Valid Excel date range (1900-01-01 to 9999-12-31)
-                    # Excel serial date (days since 1900-01-01, accounting for Excel's leap year bug)
-                    if value >= 60:  # After Feb 28, 1900
-                        excel_epoch = datetime(1899, 12, 30)  # Account for Excel's 1900 leap year bug
-                    else:
-                        excel_epoch = datetime(1899, 12, 31)
-                    parsed_date = excel_epoch + pd.Timedelta(days=value)
-                    parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
-            else:
-                # String parsing with comprehensive format support
-                value_str = str(value).strip()
-
-                # Try pandas date parsing first (handles most formats automatically)
-                try:
-                    parsed_date = pd.to_datetime(value_str, dayfirst=False, errors='raise')
-                    if isinstance(parsed_date, pd.Timestamp):
-                        parsed_date = parsed_date.to_pydatetime()
-                    parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
-                except:
-                    # Try with dayfirst=True for DD/MM/YYYY formats
-                    try:
-                        parsed_date = pd.to_datetime(value_str, dayfirst=True, errors='raise')
-                        if isinstance(parsed_date, pd.Timestamp):
-                            parsed_date = parsed_date.to_pydatetime()
-                        parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
-                    except:
-                        # Manual parsing for specific Excel formats
-                        date_formats = [
-                            # Standard numeric formats
-                            '%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d', '%Y/%m/%d',
-                            '%d-%m-%Y', '%m-%d-%Y', '%d.%m.%Y', '%m.%d.%Y',
-
-                            # Month name formats (covers "10-Jul-2025" style)
-                            '%d %b %Y', '%d %B %Y', '%b %d, %Y', '%B %d, %Y',
-                            '%d-%b-%Y', '%d-%B-%Y', '%b-%d-%Y', '%B-%d-%Y',
-                            '%d.%b.%Y', '%d.%B.%Y', '%b.%d.%Y', '%B.%d.%Y',
-                            '%d/%b/%Y', '%d/%B/%Y', '%b/%d/%Y', '%B/%d/%Y',
-
-                            # Additional month name variations
-                            '%b %d %Y', '%B %d %Y', '%d %b, %Y', '%d %B, %Y',
-                            '%b-%d-%Y', '%B-%d-%Y', '%b.%d.%Y', '%B.%d.%Y',
-                            '%b/%d/%Y', '%B/%d/%Y',
-
-                            # Compact formats
-                            '%Y%m%d', '%d%m%Y', '%m%d%Y',
-
-                            # 2-digit year formats
-                            '%d/%m/%y', '%m/%d/%y', '%y-%m-%d', '%y/%m/%d',
-                            '%d-%m-%y', '%m-%d-%y', '%d.%m.%y', '%m.%d.%y',
-                            '%d-%b-%y', '%d-%B-%y', '%b-%d-%y', '%B-%d-%y',
-
-                            # With time components (will be ignored)
-                            '%d/%m/%Y %H:%M:%S', '%m/%d/%Y %H:%M:%S',
-                            '%Y-%m-%d %H:%M:%S', '%Y/%m/%d %H:%M:%S',
-                            '%d-%m-%Y %H:%M:%S', '%m-%d-%Y %H:%M:%S',
-                            '%d-%b-%Y %H:%M:%S', '%d-%B-%Y %H:%M:%S',
-                            '%b-%d-%Y %H:%M:%S', '%B-%d-%Y %H:%M:%S',
-                            '%d/%m/%Y %H:%M', '%m/%d/%Y %H:%M',
-                            '%Y-%m-%d %H:%M', '%Y/%m/%d %H:%M',
-                            '%d-%m-%Y %H:%M', '%m-%d-%Y %H:%M',
-                            '%d-%b-%Y %H:%M', '%d-%B-%Y %H:%M',
-                            '%b-%d-%Y %H:%M', '%B-%d-%Y %H:%M',
-                        ]
-
-                        for fmt in date_formats:
-                            try:
-                                parsed_date = datetime.strptime(value_str, fmt)
-                                # Always set time to 00:00:00 for date-only comparison
-                                parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
-                                break
-                            except ValueError:
-                                continue
-
-        except Exception as e:
-            # If all parsing fails, return None
-            self.warnings.append(f"Could not parse date value: {value} - {str(e)}")
-            parsed_date = None
-
-        # Cache the result
-        self._date_cache[cache_key] = parsed_date
-        return parsed_date
+        from app.utils.date_utils import normalize_date_value
+        return normalize_date_value(value)
 
     def _check_date_equals_match(self, val_a, val_b) -> bool:
-        """Check if two values match as dates (exact date comparison, ignoring time)"""
-        date_a = self._normalize_date_value(val_a)
-        date_b = self._normalize_date_value(val_b)
-
-        # Both must be valid dates or both None/NaN
-        if date_a is None and date_b is None:
-            return True
-        if date_a is None or date_b is None:
-            return False
-
-        # Compare only the date parts
-        return date_a.date() == date_b.date()
+        """Check if two values match as dates using shared date utilities"""
+        from app.utils.date_utils import check_date_equals_match
+        return check_date_equals_match(val_a, val_b)
 
     def parse_excel_date(self, value):
         """Legacy method - redirects to comprehensive date parsing"""
         return self._normalize_date_value(value)
 
     def compare_dates(self, date_a, date_b):
-        """Compare two dates for exact match using comprehensive date parsing"""
-        parsed_a = self._normalize_date_value(date_a)
-        parsed_b = self._normalize_date_value(date_b)
-
-        if parsed_a is None and parsed_b is None:
-            return True
-        if parsed_a is None or parsed_b is None:
-            return False
-
-        # Convert to date only for comparison (ignore time)
-        date_a_only = parsed_a.date() if hasattr(parsed_a, 'date') else parsed_a
-        date_b_only = parsed_b.date() if hasattr(parsed_b, 'date') else parsed_b
-
-        # Exact date match only
-        return date_a_only == date_b_only
+        """Compare two dates for exact match using shared date utilities"""
+        from app.utils.date_utils import check_date_equals_match
+        return check_date_equals_match(date_a, date_b)
 
     def apply_filters(self, df: pd.DataFrame, filters: List[Dict[str, Any]], file_label: str) -> pd.DataFrame:
         """Apply filters to a DataFrame based on filter configuration"""
@@ -377,29 +259,27 @@ class DeltaProcessor:
         return string_mask
 
     def create_date_mask(self, series: pd.Series, target_date_str: str) -> pd.Series:
-        """Create a boolean mask for date matching with format flexibility"""
+        """Create a boolean mask for date matching using shared date utilities"""
         try:
-            # Parse the target date
-            target_date = pd.to_datetime(target_date_str, errors='coerce')
-            if pd.isna(target_date):
+            from app.utils.date_utils import normalize_date_value
+            
+            # Parse the target date using shared utilities
+            target_date_normalized = normalize_date_value(target_date_str)
+            if target_date_normalized is None:
                 return pd.Series([False] * len(series), index=series.index)
 
-            # Convert target to date only (no time)
-            target_date_only = target_date.date()
-
-            # Create mask by parsing each value in the series
+            # Create mask by comparing normalized date strings
             mask = pd.Series([False] * len(series), index=series.index)
 
             for idx, value in series.items():
                 if pd.isna(value):
                     continue
 
-                # Try to parse the value as a date using comprehensive parsing
-                parsed_date = self._normalize_date_value(value)
-                if parsed_date is not None:
-                    # Convert to date only for comparison
-                    value_date_only = parsed_date.date() if hasattr(parsed_date, 'date') else parsed_date
-                    mask.iloc[mask.index.get_loc(idx)] = (value_date_only == target_date_only)
+                # Parse the value as a date using shared utilities
+                parsed_date_str = normalize_date_value(value)
+                if parsed_date_str is not None:
+                    # Compare normalized date strings directly
+                    mask.iloc[mask.index.get_loc(idx)] = (parsed_date_str == target_date_normalized)
 
             return mask
 

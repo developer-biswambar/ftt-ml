@@ -44,157 +44,21 @@ class OptimizedFileProcessor:
 
     def _normalize_date_value(self, value) -> Optional[datetime]:
         """
-        Normalize date value to datetime object, handling all Excel date formats.
+        Normalize date value to datetime object, using shared date utilities.
         Returns only the date part (ignoring time components).
         """
-        if pd.isna(value) or value is None:
-            return None
-
-        # Convert to string for caching key
-        cache_key = str(value)
-        if cache_key in self._date_cache:
-            return self._date_cache[cache_key]
-
-        parsed_date = None
-
-        try:
-            # Handle different input types
-            if isinstance(value, (datetime, pd.Timestamp)):
-                # Already a datetime, just extract date part
-                parsed_date = value.replace(hour=0, minute=0, second=0, microsecond=0)
-            elif isinstance(value, (int, float)):
-                # Handle Excel serial date numbers
-                if 1 <= value <= 2958465:  # Valid Excel date range (1900-01-01 to 9999-12-31)
-                    # Excel serial date (days since 1900-01-01, accounting for Excel's leap year bug)
-                    if value >= 60:  # After Feb 28, 1900
-                        excel_epoch = datetime(1899, 12, 30)  # Account for Excel's 1900 leap year bug
-                    else:
-                        excel_epoch = datetime(1899, 12, 31)
-                    parsed_date = excel_epoch + pd.Timedelta(days=value)
-                    parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
-            else:
-                # String parsing with comprehensive format support
-                value_str = str(value).strip()
-
-                # Try pandas date parsing first (handles most formats automatically)
-                try:
-                    parsed_date = pd.to_datetime(value_str, dayfirst=False, errors='raise')
-                    if isinstance(parsed_date, pd.Timestamp):
-                        parsed_date = parsed_date.to_pydatetime()
-                    parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
-                except:
-                    # Try with dayfirst=True for DD/MM/YYYY formats
-                    try:
-                        parsed_date = pd.to_datetime(value_str, dayfirst=True, errors='raise')
-                        if isinstance(parsed_date, pd.Timestamp):
-                            parsed_date = parsed_date.to_pydatetime()
-                        parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
-                    except:
-                        # Manual parsing for specific Excel formats
-                        date_formats = [
-                            # Standard numeric formats
-                            '%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d', '%Y/%m/%d',
-                            '%d-%m-%Y', '%m-%d-%Y', '%d.%m.%Y', '%m.%d.%Y',
-
-                            # Month name formats (covers "10-Jul-2025" style)
-                            '%d %b %Y', '%d %B %Y', '%b %d, %Y', '%B %d, %Y',
-                            '%d-%b-%Y', '%d-%B-%Y', '%b-%d-%Y', '%B-%d-%Y',
-                            '%d.%b.%Y', '%d.%B.%Y', '%b.%d.%Y', '%B.%d.%Y',
-                            '%d/%b/%Y', '%d/%B/%Y', '%b/%d/%Y', '%B/%d/%Y',
-
-                            # Additional month name variations
-                            '%b %d %Y', '%B %d %Y', '%d %b, %Y', '%d %B, %Y',
-                            '%b-%d-%Y', '%B-%d-%Y', '%b.%d.%Y', '%B.%d.%Y',
-                            '%b/%d/%Y', '%B/%d/%Y',
-
-                            # Compact formats
-                            '%Y%m%d', '%d%m%Y', '%m%d%Y',
-
-                            # 2-digit year formats
-                            '%d/%m/%y', '%m/%d/%y', '%y-%m-%d', '%y/%m/%d',
-                            '%d-%m-%y', '%m-%d-%y', '%d.%m.%y', '%m.%d.%y',
-                            '%d-%b-%y', '%d-%B-%y', '%b-%d-%y', '%B-%d-%y',
-
-                            # With time components (will be ignored)
-                            '%d/%m/%Y %H:%M:%S', '%m/%d/%Y %H:%M:%S',
-                            '%Y-%m-%d %H:%M:%S', '%Y/%m/%d %H:%M:%S',
-                            '%d-%m-%Y %H:%M:%S', '%m-%d-%Y %H:%M:%S',
-                            '%d-%b-%Y %H:%M:%S', '%d-%B-%Y %H:%M:%S',
-                            '%b-%d-%Y %H:%M:%S', '%B-%d-%Y %H:%M:%S',
-                            '%d/%m/%Y %H:%M', '%m/%d/%Y %H:%M',
-                            '%Y-%m-%d %H:%M', '%Y/%m/%d %H:%M',
-                            '%d-%m-%Y %H:%M', '%m-%d-%Y %H:%M',
-                            '%d-%b-%Y %H:%M', '%d-%B-%Y %H:%M',
-                            '%b-%d-%Y %H:%M', '%B-%d-%Y %H:%M',
-                        ]
-
-                        for fmt in date_formats:
-                            try:
-                                parsed_date = datetime.strptime(value_str, fmt)
-                                # Always set time to 00:00:00 for date-only comparison
-                                parsed_date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
-                                break
-                            except ValueError:
-                                continue
-
-        except Exception as e:
-            # If all parsing fails, return None
-            self.warnings.append(f"Could not parse date value: {value} - {str(e)}")
-            parsed_date = None
-
-        # Cache the result
-        self._date_cache[cache_key] = parsed_date
-        return parsed_date
+        from app.utils.date_utils import normalize_date_value
+        return normalize_date_value(value)
 
     def _is_date_value(self, value) -> bool:
-        """Check if a value appears to be a date"""
-        if pd.isna(value) or value is None:
-            return False
-
-        # Quick check for obvious date types
-        if isinstance(value, (datetime, pd.Timestamp)):
-            return True
-
-        # Check if it's an Excel serial date number
-        if isinstance(value, (int, float)):
-            return 1 <= value <= 2958465  # Valid Excel date range
-
-        # Check string patterns
-        value_str = str(value).strip()
-
-        # Common date patterns
-        date_patterns = [
-            r'^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$',  # DD/MM/YYYY or MM/DD/YYYY
-            r'^\d{4}[/-]\d{1,2}[/-]\d{1,2}$',  # YYYY-MM-DD or YYYY/MM/DD
-            r'^\d{1,2}\.\d{1,2}\.\d{2,4}$',  # DD.MM.YYYY
-            r'^\d{8}$',  # YYYYMMDD
-            r'^\d{1,2}\s+\w+\s+\d{2,4}$',  # DD Month YYYY
-            r'^\w+\s+\d{1,2},?\s+\d{2,4}$',  # Month DD, YYYY
-            r'^\d{1,2}[-/\.]\w+[-/\.]\d{2,4}$',  # DD-MMM-YYYY (like "10-Jul-2025")
-            r'^\w+[-/\.]\d{1,2}[-/\.]\d{2,4}$',  # MMM-DD-YYYY (like "Jul-10-2025")
-            r'^\d{1,2}\s+\w+,?\s+\d{2,4}$',  # DD MMM YYYY (like "10 Jul 2025")
-            r'^\w+\s+\d{1,2}[,\s]+\d{2,4}$',  # MMM DD, YYYY (like "Jul 10, 2025")
-        ]
-
-        for pattern in date_patterns:
-            if re.match(pattern, value_str):
-                return True
-
-        return False
+        """Check if a value appears to be a date using shared date utilities"""
+        from app.utils.date_utils import is_date_value
+        return is_date_value(value)
 
     def _check_date_equals_match(self, val_a, val_b) -> bool:
-        """Check if two values match as dates (exact date comparison, ignoring time)"""
-        date_a = self._normalize_date_value(val_a)
-        date_b = self._normalize_date_value(val_b)
-
-        # Both must be valid dates or both None/NaN
-        if date_a is None and date_b is None:
-            return True
-        if date_a is None or date_b is None:
-            return False
-
-        # Compare only the date parts
-        return date_a.date() == date_b.date()
+        """Check if two values match as dates using shared date utilities"""
+        from app.utils.date_utils import check_date_equals_match
+        return check_date_equals_match(val_a, val_b)
 
     def _check_equals_with_auto_date_detection(self, val_a, val_b) -> bool:
         """Check equality with automatic date detection"""
