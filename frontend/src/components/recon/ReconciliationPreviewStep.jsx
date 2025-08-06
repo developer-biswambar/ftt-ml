@@ -199,14 +199,14 @@ const ReconciliationPreviewStep = ({
             );
         }
 
-        // Success case - use the corrected field names
-        const matchedCount = generatedResults.summary?.matched_records || 0;
-        const unmatchedACount = generatedResults.summary?.unmatched_file_a || 0;
-        const unmatchedBCount = generatedResults.summary?.unmatched_file_b || 0;
-        const totalFileA = generatedResults.summary?.total_records_file_a || 0;
-        const totalFileB = generatedResults.summary?.total_records_file_b || 0;
-        const processingTime = generatedResults.summary?.processing_time_seconds || 0;
-        const matchPercentage = generatedResults.summary?.match_percentage || 0;
+        // Success case - handle actual API response structure (data is directly on root, no summary wrapper)
+        const matchedCount = generatedResults.matched_count || 0;
+        const unmatchedACount = generatedResults.unmatched_file_a_count || 0;
+        const unmatchedBCount = generatedResults.unmatched_file_b_count || 0;
+        const totalFileA = generatedResults.total_records_file_a || 0;
+        const totalFileB = generatedResults.total_records_file_b || 0;
+        const processingTime = generatedResults.processing_time || 0;
+        const matchPercentage = generatedResults.match_percentage || 0;
 
         // Check if this is a "no matches" scenario
         const hasNoMatches = matchedCount === 0 && (totalFileA > 0 || totalFileB > 0);

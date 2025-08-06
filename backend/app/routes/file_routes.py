@@ -614,15 +614,15 @@ async def get_column_unique_values(
                 "sample_values": []
             }
 
-        # Check if this might be a date column by sampling some values
-        processor = DeltaProcessor()
+        # Check if this might be a date column by sampling some values using shared date utilities
+        from app.utils.date_utils import normalize_date_value
         sample_size = min(50, len(column_data))
         sample_values = column_data.sample(n=sample_size).tolist()
 
-        # Test if this looks like a date column
+        # Test if this looks like a date column using updated date utilities
         parsed_dates = 0
         for value in sample_values[:10]:  # Test first 10 samples
-            if processor.parse_excel_date(value) is not None:
+            if normalize_date_value(value) is not None:
                 parsed_dates += 1
 
         is_date_column = parsed_dates >= 5  # If 5+ out of 10 samples parse as dates
@@ -642,15 +642,14 @@ async def get_column_unique_values(
                 continue
 
             if is_date_column:
-                # Try to parse as date
-                parsed_date = processor.parse_excel_date(value)
-                if parsed_date is not None:
-                    # Format date consistently
-                    formatted_date = parsed_date.strftime('%Y-%m-%d')
+                # Try to parse as date using shared date utilities
+                parsed_date_str = normalize_date_value(value)
+                if parsed_date_str is not None:
+                    # Already in YYYY-MM-DD format from shared utilities
                     processed_values.append({
                         "original_value": value,
-                        "display_value": formatted_date,
-                        "sort_value": formatted_date,
+                        "display_value": parsed_date_str,
+                        "sort_value": parsed_date_str,
                         "is_date": True
                     })
                 else:

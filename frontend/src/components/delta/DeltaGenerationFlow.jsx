@@ -552,25 +552,39 @@ const DeltaGenerationFlow = ({
     };
 
     const updateFilter = (fileKey, filterIndex, field, value) => {
-        const updatedFileFilters = {
-            ...fileFilters,
-            [fileKey]: fileFilters[fileKey].map((filter, index) =>
-                index === filterIndex ? {...filter, [field]: value} : filter
-            )
-        };
-        setFileFilters(updatedFileFilters);
+        setFileFilters(prev => {
+            const currentFilters = [...(prev[fileKey] || [])];  // Safe array copy with fallback
+            
+            if (field === 'column') {
+                // Clear values when column changes
+                currentFilters[filterIndex] = {column: value, values: []};
+            } else {
+                // Update other fields
+                currentFilters[filterIndex] = {...currentFilters[filterIndex], [field]: value};
+            }
+            
+            const updatedFileFilters = {...prev, [fileKey]: currentFilters};
+            return updatedFileFilters;
+        });
         
-        // Also update the config.Files array
+        // Also update the config.Files array (will use updated state in next render)
         const fileIndex = fileKey === 'file_0' ? 0 : 1;
+        // Note: We'll update the config in a useEffect to ensure we have the latest fileFilters state
+    };
+
+    // Sync fileFilters with config whenever fileFilters changes
+    useEffect(() => {
         setConfig(prev => ({
             ...prev,
-            Files: prev.Files.map((file, index) => 
-                index === fileIndex 
-                    ? { ...file, Filter: updatedFileFilters[fileKey] }
-                    : file
-            )
+            Files: prev.Files.map((file, index) => {
+                const fileKey = `file_${index}`;
+                return {
+                    ...file, 
+                    Filter: fileFilters[fileKey] || []
+                };
+            })
         }));
-    };
+    }, [fileFilters]);
 
     const removeFilter = (fileKey, filterIndex) => {
         const updatedFileFilters = {

@@ -14,6 +14,7 @@ const FilterDataStep = ({
     const [loadingValues, setLoadingValues] = useState({});
     const [expandedFilters, setExpandedFilters] = useState({});
 
+
     // Fetch unique values for a column
     const fetchUniqueValues = async (fileId, columnName, filterKey) => {
         const cacheKey = `${fileId}_${columnName}`;

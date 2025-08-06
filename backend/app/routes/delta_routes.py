@@ -1009,24 +1009,37 @@ async def process_delta_generation(request: JSONDeltaRequest):
             description="Unchanged records from delta generation job"
         )
 
-        # Execute save operations
-        try:
-            save_result_all = await save_results_to_server(save_request_all)
-            save_result_amended = await save_results_to_server(save_request_amended)
-            save_result_deleted = await save_results_to_server(save_request_deleted)
-            save_result_added = await save_results_to_server(save_request_added)
-            save_result_unchanged = await save_results_to_server(save_request_unchanged)
-            
-            print("Delta results saved successfully:")
-            print(f"All: {save_result_all}")
-            print(f"Amended: {save_result_amended}")
-            print(f"Deleted: {save_result_deleted}")
-            print(f"Added: {save_result_added}")
-            print(f"Unchanged: {save_result_unchanged}")
-        except Exception as e:
-            print(f"Error saving delta results to server: {str(e)}")
-            # Don't fail the main process if saving fails, just log the error
-            processor.warnings.append(f"Failed to save results to server: {str(e)}")
+        # Execute save operations independently - continue even if individual saves fail
+        save_results = {}
+        save_operations = [
+            ("all", save_request_all),
+            ("amended", save_request_amended), 
+            ("deleted", save_request_deleted),
+            ("added", save_request_added),
+            ("unchanged", save_request_unchanged)
+        ]
+        
+        successful_saves = []
+        failed_saves = []
+        
+        for save_name, save_request in save_operations:
+            try:
+                save_result = await save_results_to_server(save_request)
+                save_results[save_name] = save_result
+                successful_saves.append(save_name)
+                print(f"✅ {save_name.capitalize()} results saved successfully: {save_result}")
+            except Exception as e:
+                error_msg = f"Failed to save {save_name} results: {str(e)}"
+                print(f"❌ {error_msg}")
+                failed_saves.append(save_name)
+                processor.warnings.append(error_msg)
+        
+        # Log summary of save operations
+        if successful_saves:
+            print(f"✅ Successfully saved {len(successful_saves)}/{len(save_operations)} result types: {', '.join(successful_saves)}")
+        if failed_saves:
+            print(f"❌ Failed to save {len(failed_saves)}/{len(save_operations)} result types: {', '.join(failed_saves)}")
+            processor.warnings.append(f"Some result saves failed: {', '.join(failed_saves)}")
 
         return DeltaResponse(
             success=True,
