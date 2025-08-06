@@ -198,9 +198,15 @@ async def upload_file(
                         # if file.filename.lower().endswith('.xlsx') else 'xlrd'
                     )
 
+            # Remove time from datetime columns (normalize to date strings for JSON compatibility)
+            for col in df.select_dtypes(include=['datetime64[ns]']).columns:
+                # Handle nulls explicitly and convert to date strings
+                df[col] = df[col].dt.strftime('%Y-%m-%d').where(df[col].notna(), None)
+
         except Exception as e:
             logger.error(f"Error reading file {file.filename}: {str(e)}")
             raise HTTPException(400, f"Error reading file: {str(e)}")
+
 
         # Log processing results
         total_rows = len(df)
