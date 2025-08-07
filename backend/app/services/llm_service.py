@@ -252,10 +252,7 @@ class JPMCLLMService(LLMServiceInterface):
             
             if response.status_code == 200:
                 result = response.json()
-                
-                # Log the full response details for debugging
-                logger.info(f"JPMC LLM full response: {result}")
-                
+
                 # Extract AI response from "Message" field
                 raw_content = result.get("Message", "").strip()
                 

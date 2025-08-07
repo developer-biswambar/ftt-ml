@@ -40,6 +40,10 @@ const DataViewer = ({fileId, onClose}) => {
     const [historyIndex, setHistoryIndex] = useState(-1);
     const [showAddColumn, setShowAddColumn] = useState(false);
     const [newColumnName, setNewColumnName] = useState('');
+    const [selectedColumns, setSelectedColumns] = useState(new Set());
+    const [showDeleteColumnsModal, setShowDeleteColumnsModal] = useState(false);
+    const [selectedRows, setSelectedRows] = useState(new Set());
+    const [showDeleteRowsModal, setShowDeleteRowsModal] = useState(false);
 
     // UI Configuration state
     const [uiConfig, setUiConfig] = useState({
@@ -335,6 +339,85 @@ const DataViewer = ({fileId, onClose}) => {
         return filtered;
     }, [data, searchTerm, filterConfig]);
 
+    // Generate Excel-style column names (A, B, C, ..., Z, AA, AB, ...)
+    const getExcelColumnName = (columnIndex) => {
+        let result = '';
+        let index = columnIndex;
+        
+        while (index >= 0) {
+            result = String.fromCharCode(65 + (index % 26)) + result;
+            index = Math.floor(index / 26) - 1;
+        }
+        
+        return result;
+    };
+
+    // Handle column selection (Excel-style)
+    const handleColumnSelect = (columnIndex) => {
+        const newSelection = new Set(selectedColumns);
+        if (newSelection.has(columnIndex)) {
+            newSelection.delete(columnIndex);
+        } else {
+            newSelection.add(columnIndex);
+        }
+        setSelectedColumns(newSelection);
+    };
+
+    // Delete multiple selected columns
+    const deleteSelectedColumns = () => {
+        if (selectedColumns.size === 0) return;
+        
+        const sortedColumnIndexes = Array.from(selectedColumns).sort((a, b) => b - a); // Sort in descending order
+        let newColumns = [...columns];
+        let newData = [...data];
+        
+        // Remove columns from highest index to lowest to maintain correct indexing
+        sortedColumnIndexes.forEach(columnIndex => {
+            const columnToDelete = newColumns[columnIndex];
+            newColumns.splice(columnIndex, 1);
+            newData = newData.map(row => {
+                const newRow = {...row};
+                delete newRow[columnToDelete];
+                return newRow;
+            });
+        });
+        
+        setColumns(newColumns);
+        setData(newData);
+        addToHistory(newData, newColumns);
+        setSelectedColumns(new Set()); // Clear selection
+        setShowDeleteColumnsModal(false);
+    };
+
+    // Handle row selection
+    const handleRowSelect = (rowIndex) => {
+        const newSelection = new Set(selectedRows);
+        if (newSelection.has(rowIndex)) {
+            newSelection.delete(rowIndex);
+        } else {
+            newSelection.add(rowIndex);
+        }
+        setSelectedRows(newSelection);
+    };
+
+    // Delete multiple selected rows
+    const deleteSelectedRows = () => {
+        if (selectedRows.size === 0) return;
+        
+        const sortedRowIndexes = Array.from(selectedRows).sort((a, b) => b - a); // Sort in descending order
+        let newData = [...data];
+        
+        // Remove rows from highest index to lowest to maintain correct indexing
+        sortedRowIndexes.forEach(rowIndex => {
+            newData.splice(rowIndex, 1);
+        });
+        
+        setData(newData);
+        addToHistory(newData, columns);
+        setSelectedRows(new Set()); // Clear selection
+        setShowDeleteRowsModal(false);
+    };
+
     // Get CSS classes based on UI configuration
     const getCellClasses = () => {
         const padding = {
@@ -408,51 +491,83 @@ const DataViewer = ({fileId, onClose}) => {
 
     return (
         <div className="h-screen flex flex-col bg-gray-50">
-            {/* Header with prominent filename */}
+            {/* Compact Header */}
             <div className="bg-white border-b border-gray-200 shadow-sm">
-                {/* Top section with filename prominently displayed */}
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 px-6 py-1 border-b border-gray-100">
-                    <div className="text-center">
-                        <div className="flex items-center justify-center space-x-3 mb-2">
-                            <div
-                                className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                                <FileText className="text-white" size={18}/>
-                            </div>
-                            <h1 className="text-2xl font-bold text-gray-900">
-                                {fileName || `File ID: ${fileId}`}
-                            </h1>
-                        </div>
-                        {fileStats && (
-                            <p className="text-sm text-gray-600">
-                                {fileStats.total_rows?.toLocaleString()} rows • {fileStats.columns} columns
-                                {fileStats.file_size && ` • ${(fileStats.file_size / 1024 / 1024).toFixed(2)} MB`}
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                {/* Controls section */}
+                {/* Single row with filename and all controls */}
                 <div className="px-4 py-2">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            <div className="flex items-center space-x-2">
-                                <span className="text-sm font-medium text-gray-700">📊 Data Viewer</span>
-                                {hasChanges && (
-                                    <span
-                                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                        <Edit3 size={12} className="mr-1"/>
-                                        Unsaved Changes
-                                    </span>
-                                )}
+                        {/* Left side: File info and status */}
+                        <div className="flex items-start space-x-4">
+                            <div className="flex items-start space-x-3">
+                                <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center mt-1">
+                                    <FileText className="text-white" size={16}/>
+                                </div>
+                                <div className="flex flex-col">
+                                    <h1 className="text-lg font-semibold text-gray-900 leading-tight max-w-md">
+                                        {fileName || `File ID: ${fileId}`}
+                                    </h1>
+                                    {fileStats && (
+                                        <span className="text-sm text-gray-500 mt-1">
+                                            {fileStats.total_rows?.toLocaleString()} rows • {fileStats.columns} cols
+                                        </span>
+                                    )}
+                                </div>
                             </div>
+                            {hasChanges && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 mt-1">
+                                    <Edit3 size={10} className="mr-1"/>
+                                    Unsaved
+                                </span>
+                            )}
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex items-center space-x-1">
+                        {/* Right side: All action buttons on same level */}
+                        <div className="flex items-center space-x-3">
+                            {/* Search bar */}
+                            <div className="relative">
+                                <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"/>
+                                <input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-40 pl-8 pr-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            {/* Add buttons */}
+                            <button
+                                onClick={addRow}
+                                className="flex items-center px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                                title="Add Row"
+                            >
+                                <Plus size={14} className="mr-1"/>
+                                Row
+                            </button>
+
+                            <button
+                                onClick={() => setShowAddColumn(true)}
+                                className="flex items-center px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
+                                title="Add Column"
+                            >
+                                <Plus size={14} className="mr-1"/>
+                                Column
+                            </button>
+
+                            {/* Settings */}
+                            <button
+                                onClick={() => setShowConfigPanel(!showConfigPanel)}
+                                className="p-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded"
+                                title="Settings"
+                            >
+                                <Settings size={16}/>
+                            </button>
+
+                            {/* Undo/Redo */}
                             <button
                                 onClick={undo}
                                 disabled={historyIndex <= 0}
-                                className="p-1.5 text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                className="p-2 text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed border border-gray-300 rounded"
                                 title="Undo"
                             >
                                 <Undo size={16}/>
@@ -460,86 +575,89 @@ const DataViewer = ({fileId, onClose}) => {
                             <button
                                 onClick={redo}
                                 disabled={historyIndex >= history.length - 1}
-                                className="p-1.5 text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                className="p-2 text-gray-600 hover:text-gray-800 disabled:text-gray-400 disabled:cursor-not-allowed border border-gray-300 rounded"
                                 title="Redo"
                             >
                                 <Redo size={16}/>
                             </button>
 
-                            <div className="border-l border-gray-300 h-6 mx-1"></div>
-
-                            <button
-                                onClick={() => setShowConfigPanel(!showConfigPanel)}
-                                className="p-1.5 text-gray-600 hover:text-gray-800"
-                                title="Display Settings"
-                            >
-                                <Settings size={16}/>
-                            </button>
-
+                            {/* Save */}
                             <button
                                 onClick={saveChanges}
                                 disabled={!hasChanges || saving}
-                                className="flex items-center px-2 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
+                                className="flex items-center px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
                             >
                                 <Save size={14} className="mr-1"/>
                                 {saving ? 'Saving...' : 'Save'}
                             </button>
 
+                            {/* Download */}
                             <div className="relative">
                                 <select
                                     onChange={(e) => downloadFile(e.target.value)}
-                                    className="appearance-none bg-green-600 text-white px-2 py-1.5 rounded hover:bg-green-700 cursor-pointer pr-6 text-sm"
+                                    className="appearance-none bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 cursor-pointer pr-8 text-sm"
                                     defaultValue=""
                                 >
                                     <option value="" disabled>Download</option>
                                     <option value="csv">CSV</option>
                                     <option value="xlsx">Excel</option>
                                 </select>
-                                <Download size={14}
-                                          className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white pointer-events-none"/>
+                                <Download size={14} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white pointer-events-none"/>
                             </div>
 
+                            {/* Column Selection Indicator */}
+                            {selectedColumns.size > 0 && (
+                                <div className="flex items-center space-x-2 px-3 py-2 bg-blue-100 border border-blue-300 rounded text-sm">
+                                    <span className="text-blue-800 font-medium">{selectedColumns.size} col{selectedColumns.size !== 1 ? 's' : ''} selected</span>
+                                    <button
+                                        onClick={() => setShowDeleteColumnsModal(true)}
+                                        className="flex items-center space-x-1 px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
+                                        title="Delete selected columns"
+                                    >
+                                        <Minus size={12}/>
+                                        <span>Delete</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedColumns(new Set())}
+                                        className="text-blue-600 hover:text-blue-800"
+                                        title="Clear selection"
+                                    >
+                                        <X size={14}/>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Row Selection Indicator */}
+                            {selectedRows.size > 0 && (
+                                <div className="flex items-center space-x-2 px-3 py-2 bg-green-100 border border-green-300 rounded text-sm">
+                                    <span className="text-green-800 font-medium">{selectedRows.size} row{selectedRows.size !== 1 ? 's' : ''} selected</span>
+                                    <button
+                                        onClick={() => setShowDeleteRowsModal(true)}
+                                        className="flex items-center space-x-1 px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
+                                        title="Delete selected rows"
+                                    >
+                                        <Minus size={12}/>
+                                        <span>Delete</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedRows(new Set())}
+                                        className="text-green-600 hover:text-green-800"
+                                        title="Clear selection"
+                                    >
+                                        <X size={14}/>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Close */}
                             <button
                                 onClick={() => window.close()}
-                                className="p-1.5 text-gray-600 hover:text-red-600"
+                                className="p-2 text-gray-600 hover:text-red-600 border border-gray-300 rounded"
                                 title="Close"
                             >
                                 <X size={16}/>
                             </button>
                         </div>
-                    </div>
-
-                    {/* Search and Filter Bar */}
-                    <div className="flex items-center space-x-3 mt-2">
-                        <div className="relative flex-1 max-w-sm">
-                            <Search size={14}
-                                    className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400"/>
-                            <input
-                                type="text"
-                                placeholder="Search data..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-7 pr-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                        </div>
-
-                        <button
-                            onClick={addRow}
-                            className="flex items-center px-2 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
-                            title="Add Row"
-                        >
-                            <Plus size={14} className="mr-1"/>
-                            Row
-                        </button>
-
-                        <button
-                            onClick={() => setShowAddColumn(true)}
-                            className="flex items-center px-2 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
-                            title="Add Column"
-                        >
-                            <Plus size={14} className="mr-1"/>
-                            Column
-                        </button>
                     </div>
 
                     {/* Configuration Panel */}
@@ -643,19 +761,143 @@ const DataViewer = ({fileId, onClose}) => {
                 </div>
             )}
 
+            {/* Delete Columns Confirmation Modal */}
+            {showDeleteColumnsModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-96">
+                        <div className="flex items-center space-x-3 mb-4">
+                            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                <AlertCircle size={20} className="text-red-600"/>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900">Delete Columns</h3>
+                                <p className="text-sm text-gray-600">This action cannot be undone</p>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-6">
+                            <p className="text-gray-700 mb-3">
+                                Are you sure you want to delete <strong>{selectedColumns.size} column{selectedColumns.size !== 1 ? 's' : ''}</strong>?
+                            </p>
+                            <div className="bg-gray-50 rounded p-3 max-h-32 overflow-y-auto">
+                                <p className="text-sm text-gray-600 mb-2">Columns to be deleted:</p>
+                                <div className="flex flex-wrap gap-1">
+                                    {Array.from(selectedColumns).sort((a, b) => a - b).map(columnIndex => (
+                                        <span 
+                                            key={columnIndex}
+                                            className="inline-flex items-center px-2 py-1 bg-red-100 text-red-800 text-xs rounded"
+                                        >
+                                            {getExcelColumnName(columnIndex)} ({columns[columnIndex]})
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="flex justify-end space-x-2">
+                            <button
+                                onClick={() => setShowDeleteColumnsModal(false)}
+                                className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={deleteSelectedColumns}
+                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                            >
+                                Delete {selectedColumns.size} Column{selectedColumns.size !== 1 ? 's' : ''}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Rows Confirmation Modal */}
+            {showDeleteRowsModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-96">
+                        <div className="flex items-center space-x-3 mb-4">
+                            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                <AlertCircle size={20} className="text-red-600"/>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900">Delete Rows</h3>
+                                <p className="text-sm text-gray-600">This action cannot be undone</p>
+                            </div>
+                        </div>
+                        
+                        <div className="mb-6">
+                            <p className="text-gray-700 mb-3">
+                                Are you sure you want to delete <strong>{selectedRows.size} row{selectedRows.size !== 1 ? 's' : ''}</strong>?
+                            </p>
+                            <div className="bg-gray-50 rounded p-3 max-h-32 overflow-y-auto">
+                                <p className="text-sm text-gray-600 mb-2">Rows to be deleted:</p>
+                                <div className="flex flex-wrap gap-1">
+                                    {Array.from(selectedRows).sort((a, b) => a - b).map(rowIndex => (
+                                        <span 
+                                            key={rowIndex}
+                                            className="inline-flex items-center px-2 py-1 bg-red-100 text-red-800 text-xs rounded"
+                                        >
+                                            Row {startIndex + rowIndex + 1}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="flex justify-end space-x-2">
+                            <button
+                                onClick={() => setShowDeleteRowsModal(false)}
+                                className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={deleteSelectedRows}
+                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                            >
+                                Delete {selectedRows.size} Row{selectedRows.size !== 1 ? 's' : ''}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Data Table */}
             <div className="flex-1 overflow-auto">
                 <div className="min-w-full">
                     <table className={`w-full bg-white ${uiConfig.autoSizeColumns ? 'table-auto' : 'table-fixed'}`}>
                         <thead className="bg-gray-50 sticky top-0">
+                        {/* Excel-style column letters (A, B, C...) */}
+                        <tr className="bg-gray-100">
+                            <th className={`w-12 px-1 py-1 text-xs font-medium text-gray-500 text-center bg-gray-100 ${uiConfig.showGridLines ? 'border border-gray-200' : 'border-transparent'}`}>
+                                
+                            </th>
+                            {columns.map((column, columnIndex) => (
+                                <th
+                                    key={`letter-${columnIndex}`}
+                                    className={`px-2 py-1 text-xs font-bold text-center cursor-pointer select-none transition-colors ${uiConfig.showGridLines ? 'border border-gray-200' : 'border-transparent'} ${
+                                        selectedColumns.has(columnIndex) 
+                                            ? 'bg-blue-500 text-white border-blue-600' 
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                                    style={uiConfig.autoSizeColumns ? {} : {width: `${100 / columns.length}%`}}
+                                    onClick={() => handleColumnSelect(columnIndex)}
+                                    title={`Click to select column ${getExcelColumnName(columnIndex)} (${column})`}
+                                >
+                                    {getExcelColumnName(columnIndex)}
+                                </th>
+                            ))}
+                        </tr>
+                        {/* Original column headers */}
                         <tr>
-                            <th className="w-12 px-1 py-1 text-xs font-medium text-gray-500 text-center border border-gray-200">
+                            <th className={`w-12 px-1 py-1 text-xs font-medium text-gray-500 text-center ${uiConfig.showGridLines ? 'border border-gray-200' : 'border-transparent'}`}>
                                 #
                             </th>
                             {columns.map((column, columnIndex) => (
                                 <th
                                     key={column}
-                                    className={getHeaderClasses()}
+                                    className={`${getHeaderClasses()} ${selectedColumns.has(columnIndex) ? 'bg-blue-100 border-blue-300' : ''}`}
                                     style={uiConfig.autoSizeColumns ? {} : {width: `${100 / columns.length}%`}}
                                 >
                                     <div className="flex items-center justify-between">
@@ -698,12 +940,23 @@ const DataViewer = ({fileId, onClose}) => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                         {displayedData.map((row, rowIndex) => (
-                            <tr key={rowIndex} className={getRowClasses()}>
-                                <td className="w-12 px-1 py-1 text-xs text-gray-500 text-center border border-gray-200 bg-gray-50">
+                            <tr key={rowIndex} className={`${getRowClasses()} ${selectedRows.has(rowIndex) ? 'bg-green-100' : ''}`}>
+                                <td 
+                                    className={`w-12 px-1 py-1 text-xs text-center cursor-pointer select-none transition-colors ${uiConfig.showGridLines ? 'border border-gray-200' : 'border-transparent'} ${
+                                        selectedRows.has(rowIndex) 
+                                            ? 'bg-green-500 text-white border-green-600' 
+                                            : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                                    }`}
+                                    onClick={() => handleRowSelect(rowIndex)}
+                                    title={`Click to select row ${startIndex + rowIndex + 1}`}
+                                >
                                     <div className="flex items-center justify-center space-x-1">
-                                        <span className="text-xs">{startIndex + rowIndex + 1}</span>
+                                        <span className="text-xs font-medium">{startIndex + rowIndex + 1}</span>
                                         <button
-                                            onClick={() => deleteRow(rowIndex)}
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Prevent row selection when clicking delete
+                                                deleteRow(rowIndex);
+                                            }}
                                             className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700"
                                             title="Delete Row"
                                         >
@@ -714,7 +967,7 @@ const DataViewer = ({fileId, onClose}) => {
                                 {columns.map((column, columnIndex) => (
                                     <td
                                         key={`${rowIndex}-${columnIndex}`}
-                                        className={getCellClasses()}
+                                        className={`${getCellClasses()} ${selectedColumns.has(columnIndex) ? 'bg-blue-50 border-blue-200' : ''} ${selectedRows.has(rowIndex) ? 'bg-green-100' : ''}`}
                                         onClick={() => startEditing(rowIndex, columnIndex)}
                                     >
                                         {editingCell?.row === rowIndex && editingCell?.col === columnIndex ? (
