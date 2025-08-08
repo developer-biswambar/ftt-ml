@@ -116,11 +116,11 @@ OPENAI_API_KEY=your-openai-api-key-here
 ### Comprehensive Testing Suite
 The **[testing/](./testing/)** directory provides organized testing resources:
 
-- **[Reconciliation Testing](./testing/reconciliation/)** - Financial data matching scenarios
-- **[Transformation Testing](./testing/transformation/)** - Data transformation workflows  
-- **[Delta Generation Testing](./testing/delta/)** - File comparison and change detection
+- **[Reconciliation Testing](../test_docs/reconciliation/)** - Financial data matching scenarios
+- **[Transformation Testing](../test_docs/transformation/)** - Data transformation workflows  
+- **[Delta Generation Testing](../test_docs/delta/)** - File comparison and change detection
 - **[AI Features Testing](./testing/ai-features/)** - AI-powered automation testing
-- **[File Processing Testing](./testing/file-processing/)** - Upload and processing validation
+- **[File Processing Testing](../test_docs/file-processing/)** - Upload and processing validation
 
 Each testing folder includes:
 - ✅ Comprehensive test scenarios and expected results
