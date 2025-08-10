@@ -21,26 +21,42 @@ class OptimizedFileProcessor:
         self._date_cache = {}  # Cache parsed dates for performance
 
     def read_file(self, file: UploadFile, sheet_name: Optional[str] = None) -> pd.DataFrame:
-        """Read CSV or Excel file into DataFrame with optimized settings"""
+        """Read CSV or Excel file into DataFrame with leading zero preservation and optimized settings"""
         try:
             content = file.file.read()
             file.file.seek(0)
+
+            # Import the leading zero detection from file_routes
+            from app.routes.file_routes import detect_leading_zero_columns
+            
+            # Step 1: Detect columns with leading zeros first
+            dtype_mapping = detect_leading_zero_columns(content, file.filename, sheet_name)
 
             if file.filename.endswith('.csv'):
                 df = pd.read_csv(
                     io.BytesIO(content),
                     low_memory=False,
-                    engine='c'  # Use C engine for better performance
+                    engine='c',  # Use C engine for better performance
+                    dtype=dtype_mapping if dtype_mapping else None  # Preserve leading zero columns as strings
                 )
             elif file.filename.endswith(('.xlsx', '.xls')):
                 if sheet_name:
-                    df = pd.read_excel(io.BytesIO(content), sheet_name=sheet_name, engine='openpyxl')
+                    df = pd.read_excel(
+                        io.BytesIO(content), 
+                        sheet_name=sheet_name, 
+                        engine='openpyxl',
+                        dtype=dtype_mapping if dtype_mapping else None  # Preserve leading zero columns as strings
+                    )
                 else:
-                    df = pd.read_excel(io.BytesIO(content), engine='openpyxl')
+                    df = pd.read_excel(
+                        io.BytesIO(content), 
+                        engine='openpyxl',
+                        dtype=dtype_mapping if dtype_mapping else None  # Preserve leading zero columns as strings
+                    )
             else:
                 raise ValueError(f"Unsupported file format: {file.filename}")
             
-            # Fix: Preserve integer types to prevent 15 -> 15.0 conversion
+            # Fix: Preserve integer types to prevent 15 -> 15.0 conversion (only for non-string columns)
             df = self._preserve_integer_types(df)
             return df
             
@@ -51,9 +67,14 @@ class OptimizedFileProcessor:
         """
         Convert float columns back to integers where all values are whole numbers.
         This prevents 15 from being displayed as 15.0 in reconciliation results.
+        IMPORTANT: Skip string columns that contain preserved leading zeros.
         """
         try:
             for col in df.columns:
+                # Skip string/object columns (these may contain preserved leading zeros like '01')
+                if df[col].dtype == 'object':
+                    continue
+                    
                 if df[col].dtype == 'float64':
                     # Check if all non-null values are whole numbers
                     non_null_values = df[col].dropna()
