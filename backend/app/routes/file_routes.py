@@ -41,6 +41,78 @@ class UpdateSheetRequest(BaseModel):
     sheet_name: str
 
 
+def detect_leading_zero_columns(content: bytes, filename: str, sheet_name: Optional[str] = None) -> dict:
+    """
+    Detect columns that contain leading zeros by reading a sample of the file as strings.
+    This preserves values like '01', '007', '09' that should stay as strings.
+    
+    Args:
+        content: File content as bytes
+        filename: Name of the file
+        sheet_name: Sheet name for Excel files
+        
+    Returns:
+        Dictionary mapping column names to dtype ('str' for columns with leading zeros)
+    """
+    try:
+        logger.info("🔍 Detecting columns with leading zeros...")
+        
+        # Read a small sample as all strings to detect leading zeros
+        if filename.lower().endswith('.csv'):
+            sample_df = pd.read_csv(
+                io.BytesIO(content), 
+                dtype=str,  # Read everything as strings
+                nrows=100,  # Sample first 100 rows
+                encoding='utf-8'
+            )
+        else:
+            sample_df = pd.read_excel(
+                io.BytesIO(content),
+                sheet_name=sheet_name,
+                dtype=str,  # Read everything as strings
+                nrows=100,  # Sample first 100 rows
+                engine='openpyxl'
+            )
+        
+        dtype_mapping = {}
+        leading_zero_columns = []
+        
+        for col in sample_df.columns:
+            has_leading_zeros = False
+            
+            # Check if any non-null values have leading zeros
+            non_null_values = sample_df[col].dropna()
+            
+            for value in non_null_values.head(20):  # Check first 20 values
+                if isinstance(value, str) and value.strip():
+                    # Check if it's a numeric string with leading zeros
+                    stripped_val = value.strip()
+                    
+                    # Skip if it contains non-digit characters (except decimal point)
+                    if not stripped_val.replace('.', '').replace('-', '').isdigit():
+                        continue
+                    
+                    # Check for leading zeros: starts with 0 and has more than 1 digit
+                    if (stripped_val.startswith('0') and 
+                        len(stripped_val) > 1 and 
+                        stripped_val != '0' and
+                        '.' not in stripped_val):  # Don't treat '0.123' as leading zero
+                        has_leading_zeros = True
+                        break
+            
+            if has_leading_zeros:
+                dtype_mapping[col] = str
+                leading_zero_columns.append(col)
+                logger.info(f"   📌 Column '{col}' contains leading zeros - will preserve as strings")
+        
+        logger.info(f"✅ Found {len(leading_zero_columns)} columns with leading zeros: {leading_zero_columns}")
+        return dtype_mapping
+        
+    except Exception as e:
+        logger.warning(f"⚠️ Could not detect leading zero columns: {e}")
+        return {}
+
+
 def clean_column_names(df: pd.DataFrame) -> pd.DataFrame:
     """
     Clean column names by stripping leading/trailing spaces and handling duplicates.
@@ -433,8 +505,9 @@ def extract_excel_sheet_info(content: bytes, filename: str) -> List[SheetInfo]:
 
         for sheet_name in excel_file.sheet_names:
             try:
-                # Read each sheet to get metadata
-                df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                # Read each sheet to get metadata (preserve leading zeros)
+                dtype_mapping = detect_leading_zero_columns(content, file.filename, sheet_name)
+                df = pd.read_excel(excel_file, sheet_name=sheet_name, dtype=dtype_mapping if dtype_mapping else None)
                 # Clean column names to ensure consistency with upload process
                 df = clean_column_names(df)
                 sheet_info.append(SheetInfo(
@@ -557,29 +630,35 @@ async def upload_file(
         is_excel = file.filename.lower().endswith(('.xlsx', '.xls'))
         df = None
 
-        # Process file with optimized pandas settings
+        # Process file with leading zero preservation
         try:
+            # Step 1: Detect columns with leading zeros first
+            dtype_mapping = detect_leading_zero_columns(content, file.filename, sheet_name)
+            
             if file.filename.lower().endswith('.csv'):
-                # Use optimized CSV reading for large files
+                # Use optimized CSV reading with leading zero preservation
                 df = pd.read_csv(
                     io.BytesIO(content),
                     low_memory=False,  # Don't infer dtypes chunk by chunk
-                    encoding='utf-8'
+                    encoding='utf-8',
+                    dtype=dtype_mapping if dtype_mapping else None  # Preserve leading zero columns as strings
                 )
             else:
-                # For Excel files, use specified sheet or default
+                # For Excel files, use specified sheet or default with leading zero preservation
                 if sheet_name:
                     df = pd.read_excel(
                         io.BytesIO(content),
                         sheet_name=sheet_name,
-                        engine='openpyxl'
+                        engine='openpyxl',
+                        dtype=dtype_mapping if dtype_mapping else None  # Preserve leading zero columns as strings
                         # if file.filename.lower().endswith('.xlsx') else 'xlrd'
                     )
                 else:
                     # Use first sheet if no sheet specified
                     df = pd.read_excel(
                         io.BytesIO(content),
-                        engine='openpyxl'
+                        engine='openpyxl',
+                        dtype=dtype_mapping if dtype_mapping else None  # Preserve leading zero columns as strings
                         # if file.filename.lower().endswith('.xlsx') else 'xlrd'
                     )
 
@@ -824,12 +903,14 @@ async def select_sheet(file_id: str, request: UpdateSheetRequest):
         raise HTTPException(400, f"Sheet '{request.sheet_name}' not found. Available sheets: {available_sheets}")
 
     try:
-        # Load the new sheet
+        # Load the new sheet with leading zero preservation
         raw_content = file_data["raw_content"]
+        dtype_mapping = detect_leading_zero_columns(raw_content, file_info["filename"], request.sheet_name)
         df = pd.read_excel(
             io.BytesIO(raw_content),
             sheet_name=request.sheet_name,
-            engine='openpyxl' if file_info["filename"].lower().endswith('.xlsx') else 'xlrd'
+            engine='openpyxl' if file_info["filename"].lower().endswith('.xlsx') else 'xlrd',
+            dtype=dtype_mapping if dtype_mapping else None
         )
 
         # Apply the same cleaning pipeline as file upload
