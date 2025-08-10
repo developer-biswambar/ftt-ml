@@ -497,27 +497,50 @@ def normalize_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def extract_excel_sheet_info(content: bytes, filename: str) -> List[SheetInfo]:
-    """Extract information about all sheets in an Excel file"""
+    """Extract basic information about all sheets in an Excel file (lightweight operation)"""
     try:
-        # Read the Excel file to get all sheet names
+        # Read the Excel file to get all sheet names (no data processing)
         excel_file = pd.ExcelFile(io.BytesIO(content))
         sheet_info = []
 
         for sheet_name in excel_file.sheet_names:
             try:
-                # Read each sheet to get metadata (preserve leading zeros)
-                dtype_mapping = detect_leading_zero_columns(content, filename, sheet_name)
-                df = pd.read_excel(excel_file, sheet_name=sheet_name, dtype=dtype_mapping if dtype_mapping else None)
-                # Clean column names to ensure consistency with upload process
-                df = clean_column_names(df)
+                # Read only the first few rows to get basic metadata (fast operation)
+                df_sample = pd.read_excel(
+                    excel_file, 
+                    sheet_name=sheet_name, 
+                    nrows=0  # Read only headers, no data rows
+                )
+                
+                # Get total row count without reading all data (if possible)
+                try:
+                    # Try to get sheet dimensions from openpyxl for better performance
+                    from openpyxl import load_workbook
+                    wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+                    ws = wb[sheet_name]
+                    row_count = ws.max_row - 1  # Subtract header row
+                    wb.close()
+                except:
+                    # Fallback: read all data to get row count (slower)
+                    df_full = pd.read_excel(excel_file, sheet_name=sheet_name)
+                    row_count = len(df_full)
+                
                 sheet_info.append(SheetInfo(
                     sheet_name=sheet_name,
-                    row_count=len(df),
-                    column_count=len(df.columns),
-                    columns=df.columns.tolist()
+                    row_count=max(0, row_count),  # Ensure non-negative
+                    column_count=len(df_sample.columns),
+                    columns=df_sample.columns.tolist()
                 ))
+                
             except Exception as e:
                 logger.warning(f"Could not read sheet '{sheet_name}' in {filename}: {str(e)}")
+                # Add sheet with minimal info if we can't read it
+                sheet_info.append(SheetInfo(
+                    sheet_name=sheet_name,
+                    row_count=0,
+                    column_count=0,
+                    columns=[]
+                ))
 
         return sheet_info
     except Exception as e:

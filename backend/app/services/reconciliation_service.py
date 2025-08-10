@@ -90,42 +90,33 @@ class OptimizedFileProcessor:
             self.warnings.append(f"Warning: Could not preserve integer types: {str(e)}")
             return df
 
-    def _normalize_date_value(self, value) -> Optional[datetime]:
-        """
-        Normalize date value to datetime object, using shared date utilities.
-        Returns only the date part (ignoring time components).
-        """
-        from app.utils.date_utils import normalize_date_value
-        return normalize_date_value(value)
-
-    def _is_date_value(self, value) -> bool:
-        """Check if a value appears to be a date using shared date utilities"""
-        from app.utils.date_utils import is_date_value
-        return is_date_value(value)
-
-    def _check_date_equals_match(self, val_a, val_b) -> bool:
-        """Check if two values match as dates using shared date utilities"""
-        from app.utils.date_utils import check_date_equals_match
-        return check_date_equals_match(val_a, val_b)
-
-    def _check_equals_with_auto_date_detection(self, val_a, val_b) -> bool:
-        """Check equality with automatic date detection (STRICT string matching)"""
-        # First try regular equality
+    def _check_equals_match(self, val_a, val_b) -> bool:
+        """Check equality with STRICT string matching (no auto date detection)"""
+        # Handle null values
         if pd.isna(val_a) and pd.isna(val_b):
             return True
         if pd.isna(val_a) or pd.isna(val_b):
             return False
 
-        # Try exact match first
+        # Try exact match first (fastest path)
         if val_a == val_b:
             return True
 
-        # If both values look like dates, try date comparison
-        if self._is_date_value(val_a) and self._is_date_value(val_b):
-            return self._check_date_equals_match(val_a, val_b)
+        # Convert to strings and strip whitespace
+        str_a = str(val_a).strip()
+        str_b = str(val_b).strip()
+        
+        # Don't match empty strings (they should be explicit matches)
+        if not str_a or not str_b:
+            return False
 
-        # Convert to strings and compare (case insensitive) - NO automatic numeric normalization
-        return str(val_a).strip().lower() == str(val_b).strip().lower()
+        # Case-insensitive string comparison (preserves leading zeros)
+        return str_a.lower() == str_b.lower()
+
+    def _check_date_equals_match(self, val_a, val_b) -> bool:
+        """Check if two values match as dates using shared date utilities (for explicit date_equals match type)"""
+        from app.utils.date_utils import check_date_equals_match
+        return check_date_equals_match(val_a, val_b)
 
     def _check_numeric_equals(self, val_a, val_b) -> bool:
         """
@@ -476,8 +467,8 @@ class OptimizedFileProcessor:
                             val_b = row_b[rule.RightFileColumn]
 
                             if rule.MatchType.lower() == "equals":
-                                # Use auto-detection for equals
-                                if not self._check_equals_with_auto_date_detection(val_a, val_b):
+                                # Use strict string matching for equals
+                                if not self._check_equals_match(val_a, val_b):
                                     all_rules_match = False
                                     break
                             elif rule.MatchType.lower() == "date_equals":
