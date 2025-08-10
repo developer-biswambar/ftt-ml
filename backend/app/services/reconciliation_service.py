@@ -88,7 +88,7 @@ class OptimizedFileProcessor:
         return check_date_equals_match(val_a, val_b)
 
     def _check_equals_with_auto_date_detection(self, val_a, val_b) -> bool:
-        """Check equality with automatic date detection"""
+        """Check equality with automatic date detection and numeric normalization"""
         # First try regular equality
         if pd.isna(val_a) and pd.isna(val_b):
             return True
@@ -103,8 +103,51 @@ class OptimizedFileProcessor:
         if self._is_date_value(val_a) and self._is_date_value(val_b):
             return self._check_date_equals_match(val_a, val_b)
 
+        # Try numeric normalization for cases like "07" vs "7"
+        if self._check_numeric_equals(val_a, val_b):
+            return True
+
         # Convert to strings and compare (case insensitive)
         return str(val_a).strip().lower() == str(val_b).strip().lower()
+
+    def _check_numeric_equals(self, val_a, val_b) -> bool:
+        """
+        Check if two values are numerically equal, handling cases like:
+        - "01" vs "1" → True
+        - "09" vs "9" → True  
+        - "007" vs "7" → True
+        Only for non-date values.
+        """
+        try:
+            # Convert both values to strings first
+            str_a = str(val_a).strip()
+            str_b = str(val_b).strip()
+            
+            # Skip if either value is empty
+            if not str_a or not str_b:
+                return False
+            
+            # Try to convert both to numbers
+            # This handles integers, floats, and numeric strings
+            try:
+                num_a = float(str_a)
+                num_b = float(str_b)
+                
+                # Check if both are integers (no decimal part)
+                if num_a.is_integer() and num_b.is_integer():
+                    # Compare as integers: "01" (1.0) == "1" (1.0) → True
+                    return int(num_a) == int(num_b)
+                else:
+                    # For decimals, use float comparison
+                    return num_a == num_b
+                    
+            except (ValueError, TypeError):
+                # If either value can't be converted to number, not a numeric match
+                return False
+                
+        except Exception:
+            # If anything goes wrong, not a numeric match
+            return False
 
     def validate_rules_against_columns(self, df: pd.DataFrame, file_rule: FileRule) -> List[str]:
         """Validate that all columns mentioned in rules exist in the DataFrame"""
