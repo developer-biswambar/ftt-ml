@@ -88,7 +88,7 @@ class OptimizedFileProcessor:
         return check_date_equals_match(val_a, val_b)
 
     def _check_equals_with_auto_date_detection(self, val_a, val_b) -> bool:
-        """Check equality with automatic date detection and numeric normalization"""
+        """Check equality with automatic date detection (STRICT string matching)"""
         # First try regular equality
         if pd.isna(val_a) and pd.isna(val_b):
             return True
@@ -103,11 +103,7 @@ class OptimizedFileProcessor:
         if self._is_date_value(val_a) and self._is_date_value(val_b):
             return self._check_date_equals_match(val_a, val_b)
 
-        # Try numeric normalization for cases like "07" vs "7"
-        if self._check_numeric_equals(val_a, val_b):
-            return True
-
-        # Convert to strings and compare (case insensitive)
+        # Convert to strings and compare (case insensitive) - NO automatic numeric normalization
         return str(val_a).strip().lower() == str(val_b).strip().lower()
 
     def _check_numeric_equals(self, val_a, val_b) -> bool:
