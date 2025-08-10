@@ -75,7 +75,26 @@ class ParallelDataCleaner:
         cleaned_values_count = self._clean_data_values_parallel(df)
         self.stats['timing']['data_values'] = time.time() - step_start
         
+        # Step 5: Parallel date normalization (new!)
+        step_start = time.time()
+        date_columns = self._normalize_date_columns_parallel(df)
+        self.stats['timing']['date_normalization'] = time.time() - step_start
+        
         total_time = time.time() - start_time
+        
+        # Calculate comprehensive performance metrics
+        total_cells_processed = original_shape[0] * original_shape[1]
+        cells_per_second = int(total_cells_processed / total_time) if total_time > 0 else 0
+        
+        # Add performance metadata to stats
+        self.stats['performance'] = {
+            'max_workers': self.max_workers,
+            'total_cells_processed': total_cells_processed,
+            'cells_per_second': cells_per_second,
+            'megacells_per_second': round(cells_per_second / 1000000, 2),
+            'processing_method': 'parallel_multi_threaded',
+            'optimization_level': 'high_performance'
+        }
         
         # Compile cleanup statistics
         cleanup_stats = {
@@ -87,6 +106,7 @@ class ParallelDataCleaner:
             'final_rows': int(len(df)),
             'final_columns': int(len(df.columns)),
             'cleaned_values': int(cleaned_values_count),
+            'normalized_date_columns': list(date_columns),
             'processing_time_seconds': round(total_time, 2),
             'performance_stats': self.stats
         }
@@ -258,6 +278,36 @@ class ParallelDataCleaner:
                 total_cleaned += sum(results)
         
         return total_cleaned
+    
+    def _normalize_date_columns_parallel(self, df: pd.DataFrame) -> List[str]:
+        """
+        Normalize date columns using parallel processing
+        Integrates with the parallel date utils for maximum performance
+        """
+        try:
+            from app.utils.parallel_date_utils import normalize_datetime_columns_fast
+            
+            # Use parallel date normalization
+            df_normalized, converted_columns = normalize_datetime_columns_fast(df, max_workers=self.max_workers)
+            
+            # Update the original dataframe in place
+            for col in converted_columns:
+                df[col] = df_normalized[col]
+            
+            if converted_columns:
+                logger.info(f"  📅 Normalized {len(converted_columns)} date columns in parallel: {converted_columns}")
+            else:
+                logger.debug("  ℹ️  No date columns detected for normalization")
+                
+            return converted_columns
+            
+        except ImportError:
+            # Fallback to standard date normalization if parallel utils not available
+            logger.warning("  ⚠️  Parallel date utils not available, skipping date normalization")
+            return []
+        except Exception as e:
+            logger.error(f"  ❌ Error in parallel date normalization: {e}")
+            return []
 
 
 def clean_dataframe_fast(df: pd.DataFrame, max_workers: int = None) -> Tuple[pd.DataFrame, Dict]:

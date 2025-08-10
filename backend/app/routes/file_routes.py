@@ -668,23 +668,68 @@ async def upload_file(
             for warning in cleanup_warnings:
                 logger.warning(f"File quality issue in {final_filename}: {warning}")
 
+        # Build comprehensive cleanup_performed response with parallel processing stats
+        cleanup_response = {
+            "empty_content_removed": removed_rows > 0 or removed_columns > 0,
+            "parallel_processing_used": use_parallel_cleaning,
+            "statistics": {
+                "original_size": f"{original_rows:,} rows × {original_columns} columns",
+                "final_size": f"{total_rows:,} rows × {total_cols} columns",
+                "removed_rows": int(removed_rows),
+                "removed_columns": int(removed_columns),
+                "empty_row_percentage": float(round(empty_row_percentage, 1)),
+                "empty_column_percentage": float(round(empty_col_percentage, 1))
+            },
+            "warnings": cleanup_warnings,
+            "details": cleanup_details
+        }
+        
+        # Add parallel processing performance stats if available
+        if hasattr(cleanup_stats, 'performance_stats') and cleanup_stats.get('performance_stats'):
+            perf_stats = cleanup_stats['performance_stats']
+            
+            # Add processing time breakdown
+            if 'timing' in perf_stats:
+                cleanup_response["performance"] = {
+                    "total_processing_time": cleanup_stats.get('processing_time_seconds', 0),
+                    "timing_breakdown": perf_stats['timing'],
+                    "processing_method": "parallel_multi_threaded" if use_parallel_cleaning else "standard_sequential"
+                }
+                
+                # Calculate performance metrics
+                total_cells = original_rows * original_columns
+                processing_time = cleanup_stats.get('processing_time_seconds', 0)
+                
+                if processing_time > 0:
+                    cells_per_second = int(total_cells / processing_time)
+                    cleanup_response["performance"]["cells_per_second"] = cells_per_second
+                    cleanup_response["performance"]["megacells_per_second"] = round(cells_per_second / 1000000, 2)
+                    
+            # Add additional parallel-specific stats
+            if use_parallel_cleaning:
+                cleanup_response["parallel_stats"] = {
+                    "max_workers": cleanup_stats.get('performance_stats', {}).get('max_workers', 'auto'),
+                    "cleaned_values": cleanup_stats.get('cleaned_values', 0),
+                    "normalized_date_columns": cleanup_stats.get('normalized_date_columns', [])
+                }
+        else:
+            # Standard processing stats
+            if use_parallel_cleaning:
+                cleanup_response["performance"] = {
+                    "processing_method": "parallel_multi_threaded",
+                    "note": "Parallel processing used for improved performance"
+                }
+            else:
+                cleanup_response["performance"] = {
+                    "processing_method": "standard_sequential",
+                    "note": "Standard processing used for smaller dataset"
+                }
+
         return {
             "success": True,
             "message": response_message,
             "data": file_info,
-            "cleanup_performed": {
-                "empty_content_removed": removed_rows > 0 or removed_columns > 0,
-                "statistics": {
-                    "original_size": f"{original_rows:,} rows × {original_columns} columns",
-                    "final_size": f"{total_rows:,} rows × {total_cols} columns",
-                    "removed_rows": int(removed_rows),
-                    "removed_columns": int(removed_columns),
-                    "empty_row_percentage": float(round(empty_row_percentage, 1)),
-                    "empty_column_percentage": float(round(empty_col_percentage, 1))
-                },
-                "warnings": cleanup_warnings,
-                "details": cleanup_details
-            }
+            "cleanup_performed": cleanup_response
         }
 
     except HTTPException:
