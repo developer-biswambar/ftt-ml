@@ -75,7 +75,12 @@ class ParallelDataCleaner:
         cleaned_values_count = self._clean_data_values_parallel(df)
         self.stats['timing']['data_values'] = time.time() - step_start
         
-        # Step 5: Parallel date normalization (new!)
+        # Step 5: Preserve integer types (prevent 15 -> 15.0)
+        step_start = time.time()
+        converted_int_columns = self._preserve_integer_types_parallel(df)
+        self.stats['timing']['integer_preservation'] = time.time() - step_start
+        
+        # Step 6: Parallel date normalization
         step_start = time.time()
         date_columns = self._normalize_date_columns_parallel(df)
         self.stats['timing']['date_normalization'] = time.time() - step_start
@@ -106,6 +111,7 @@ class ParallelDataCleaner:
             'final_rows': int(len(df)),
             'final_columns': int(len(df.columns)),
             'cleaned_values': int(cleaned_values_count),
+            'preserved_integer_columns': list(converted_int_columns),
             'normalized_date_columns': list(date_columns),
             'processing_time_seconds': round(total_time, 2),
             'performance_stats': self.stats
@@ -308,6 +314,58 @@ class ParallelDataCleaner:
         except Exception as e:
             logger.error(f"  ❌ Error in parallel date normalization: {e}")
             return []
+    
+    def _preserve_integer_types_parallel(self, df: pd.DataFrame) -> List[str]:
+        """
+        Preserve integer types in parallel processing
+        Prevents 15 -> 15.0 conversion for better data integrity
+        """
+        def check_and_convert_column(col_info):
+            """Check if a column should be converted from float to integer"""
+            col_name, dtype = col_info
+            
+            if dtype != 'float64':
+                return None
+                
+            try:
+                # Check if all non-null values are whole numbers
+                non_null_values = df[col_name].dropna()
+                if len(non_null_values) == 0:
+                    return None
+                
+                # Vectorized check for integer values
+                is_integer_column = all(
+                    float(val).is_integer() for val in non_null_values 
+                    if pd.notna(val) and isinstance(val, (int, float))
+                )
+                
+                if is_integer_column:
+                    # Convert to Int64 (pandas nullable integer type)
+                    df[col_name] = df[col_name].astype('Int64')
+                    return col_name
+                    
+                return None
+                
+            except (ValueError, TypeError):
+                return None
+        
+        logger.info(f"🔢 Preserving integer types in parallel across {len(df.columns)} columns...")
+        
+        # Get column info for parallel processing
+        column_info = [(col, str(df[col].dtype)) for col in df.columns]
+        
+        # Process columns in parallel
+        converted_columns = []
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            results = list(executor.map(check_and_convert_column, column_info))
+            converted_columns = [col for col in results if col is not None]
+        
+        if converted_columns:
+            logger.info(f"  ✅ Preserved integer types in {len(converted_columns)} columns: {converted_columns[:5]}{'...' if len(converted_columns) > 5 else ''}")
+        else:
+            logger.debug("  ℹ️  No float columns needed integer type preservation")
+            
+        return converted_columns
 
 
 def clean_dataframe_fast(df: pd.DataFrame, max_workers: int = None) -> Tuple[pd.DataFrame, Dict]:

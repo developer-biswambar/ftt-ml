@@ -292,6 +292,47 @@ def remove_empty_rows_and_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]
         }
 
 
+def preserve_integer_types(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Convert float columns back to integers where all values are whole numbers.
+    This prevents 15 from being displayed as 15.0 in reconciliation and other processes.
+    """
+    try:
+        logger.info(f"🔢 Preserving integer types in {len(df.columns)} columns...")
+        converted_columns = []
+        
+        for col in df.columns:
+            if df[col].dtype == 'float64':
+                # Check if all non-null values are whole numbers
+                non_null_values = df[col].dropna()
+                if len(non_null_values) > 0:
+                    try:
+                        # Check if all values are integers (no decimal part)
+                        is_integer_column = all(
+                            float(val).is_integer() for val in non_null_values 
+                            if pd.notna(val) and isinstance(val, (int, float))
+                        )
+                        
+                        if is_integer_column:
+                            # Convert to Int64 (pandas nullable integer type) to handle NaN values
+                            df[col] = df[col].astype('Int64')
+                            converted_columns.append(col)
+                            logger.debug(f"  - Converted column '{col}' from float64 to Int64")
+                    except (ValueError, TypeError):
+                        # Skip columns that can't be converted
+                        continue
+        
+        if converted_columns:
+            logger.info(f"✅ Preserved integer types in {len(converted_columns)} columns: {converted_columns[:5]}{'...' if len(converted_columns) > 5 else ''}")
+        else:
+            logger.info("ℹ️  No float columns needed integer type preservation")
+                        
+        return df
+    except Exception as e:
+        logger.warning(f"Warning: Could not preserve integer types: {str(e)}")
+        return df
+
+
 def normalize_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
     Normalize datetime columns to consistent YYYY-MM-DD string format.
@@ -566,7 +607,10 @@ async def upload_file(
                 # Step 3: Clean data values (strip spaces from string data)
                 df = clean_data_values(df)
             
-            # Step 4: Always normalize datetime columns (applies to both paths)
+            # Step 4: Preserve integer types (prevent 15 -> 15.0 conversion)
+            df = preserve_integer_types(df)
+            
+            # Step 5: Always normalize datetime columns (applies to both paths)
             df = normalize_datetime_columns(df)
 
         except Exception as e:

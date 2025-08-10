@@ -27,20 +27,47 @@ class OptimizedFileProcessor:
             file.file.seek(0)
 
             if file.filename.endswith('.csv'):
-                return pd.read_csv(
+                df = pd.read_csv(
                     io.BytesIO(content),
                     low_memory=False,
                     engine='c'  # Use C engine for better performance
                 )
             elif file.filename.endswith(('.xlsx', '.xls')):
                 if sheet_name:
-                    return pd.read_excel(io.BytesIO(content), sheet_name=sheet_name, engine='openpyxl')
+                    df = pd.read_excel(io.BytesIO(content), sheet_name=sheet_name, engine='openpyxl')
                 else:
-                    return pd.read_excel(io.BytesIO(content), engine='openpyxl')
+                    df = pd.read_excel(io.BytesIO(content), engine='openpyxl')
             else:
                 raise ValueError(f"Unsupported file format: {file.filename}")
+            
+            # Fix: Preserve integer types to prevent 15 -> 15.0 conversion
+            df = self._preserve_integer_types(df)
+            return df
+            
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error reading file {file.filename}: {str(e)}")
+    
+    def _preserve_integer_types(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Convert float columns back to integers where all values are whole numbers.
+        This prevents 15 from being displayed as 15.0 in reconciliation results.
+        """
+        try:
+            for col in df.columns:
+                if df[col].dtype == 'float64':
+                    # Check if all non-null values are whole numbers
+                    non_null_values = df[col].dropna()
+                    if len(non_null_values) > 0:
+                        # Check if all values are integers (no decimal part)
+                        if all(float(val).is_integer() for val in non_null_values):
+                            # Convert to Int64 (pandas nullable integer type) to handle NaN values
+                            df[col] = df[col].astype('Int64')
+                            
+            return df
+        except Exception as e:
+            # If conversion fails, return original dataframe
+            self.warnings.append(f"Warning: Could not preserve integer types: {str(e)}")
+            return df
 
     def _normalize_date_value(self, value) -> Optional[datetime]:
         """
