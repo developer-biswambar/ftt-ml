@@ -542,16 +542,31 @@ async def upload_file(
                         # if file.filename.lower().endswith('.xlsx') else 'xlrd'
                     )
 
-            # Step 1: Remove completely empty rows and columns first
-            df, cleanup_stats = remove_empty_rows_and_columns(df)
+            # Check if we should use fast parallel cleaning for large files
+            use_parallel_cleaning = len(df) > 50000 or len(df.columns) > 50
             
-            # Step 2: Clean column names (strip spaces, handle duplicates)
-            df = clean_column_names(df)
+            if use_parallel_cleaning:
+                logger.info(f"🚀 Using parallel cleaning for large dataset ({len(df):,} rows × {len(df.columns)} columns)")
+                
+                # Import the parallel cleaning module
+                from app.utils.parallel_cleaning import clean_dataframe_fast
+                
+                # Use high-performance parallel cleaning
+                df, cleanup_stats = clean_dataframe_fast(df, max_workers=None)  # Auto-detect optimal thread count
+                
+            else:
+                logger.info(f"📝 Using standard cleaning for smaller dataset ({len(df):,} rows × {len(df.columns)} columns)")
+                
+                # Step 1: Remove completely empty rows and columns first
+                df, cleanup_stats = remove_empty_rows_and_columns(df)
+                
+                # Step 2: Clean column names (strip spaces, handle duplicates)
+                df = clean_column_names(df)
+                
+                # Step 3: Clean data values (strip spaces from string data)
+                df = clean_data_values(df)
             
-            # Step 3: Clean data values (strip spaces from string data)
-            df = clean_data_values(df)
-            
-            # Step 4: Normalize datetime columns using the extracted function
+            # Step 4: Always normalize datetime columns (applies to both paths)
             df = normalize_datetime_columns(df)
 
         except Exception as e:
