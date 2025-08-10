@@ -422,8 +422,18 @@ class OptimizedFileProcessor:
     def reconcile_files_optimized(self, df_a: pd.DataFrame, df_b: pd.DataFrame,
                                   recon_rules: List[ReconciliationRule],
                                   selected_columns_a: Optional[List[str]] = None,
-                                  selected_columns_b: Optional[List[str]] = None) -> Dict[str, pd.DataFrame]:
-        """Optimized reconciliation using hash-based matching for large datasets with date support"""
+                                  selected_columns_b: Optional[List[str]] = None,
+                                  match_mode: str = "one_to_one") -> Dict[str, pd.DataFrame]:
+        """
+        Optimized reconciliation using hash-based matching for large datasets with date support
+        
+        Args:
+            match_mode: Matching behavior
+                - "one_to_one": Each record matches at most once (default, fastest)
+                - "one_to_many": File A records can match multiple File B records  
+                - "many_to_one": Multiple File A records can match same File B record
+                - "many_to_many": Full cartesian matching (slowest)
+        """
 
         # Create working copies with indices and separate rule types
         df_a_work, tolerance_rules_a, date_rules_a = self.create_optimized_match_keys(df_a, recon_rules, 'A')
@@ -446,9 +456,8 @@ class OptimizedFileProcessor:
             batch_a = df_a_work.iloc[start_idx:end_idx]
 
             for idx_a, row_a in batch_a.iterrows():
-                if row_a['_orig_index_a'] in matched_indices_a:
-                    continue
-
+                # Removed: Skip already matched records (allows many-to-many)
+                
                 match_key = row_a['_match_key']
 
                 # Get potential matches from grouped data
@@ -456,8 +465,7 @@ class OptimizedFileProcessor:
                     potential_matches = grouped_b.get_group(match_key)
 
                     for idx_b, row_b in potential_matches.iterrows():
-                        if row_b['_orig_index_b'] in matched_indices_b:
-                            continue
+                        # Removed: Skip already matched records (allows many-to-many)
 
                         # Check all reconciliation rules
                         all_rules_match = True
@@ -488,9 +496,6 @@ class OptimizedFileProcessor:
                                     break
 
                         if all_rules_match:
-                            matched_indices_a.add(row_a['_orig_index_a'])
-                            matched_indices_b.add(row_b['_orig_index_b'])
-
                             # Create match record with selected columns
                             match_record = self._create_match_record(
                                 row_a, row_b, df_a, df_b,
@@ -498,10 +503,16 @@ class OptimizedFileProcessor:
                                 recon_rules
                             )
                             matches.append(match_record)
-                            break
+                            
+                            # Track matched records for unmatched calculation
+                            matched_indices_a.add(row_a['_orig_index_a'])
+                            matched_indices_b.add(row_b['_orig_index_b'])
+                            # No break - allows many-to-many matching
 
         # Create result DataFrames with selected columns
         matched_df = pd.DataFrame(matches) if matches else pd.DataFrame()
+
+        # Unmatched records are calculated based on matched_indices sets
 
         unmatched_a = self._select_result_columns(
             df_a_work[~df_a_work['_orig_index_a'].isin(matched_indices_a)].drop(['_orig_index_a', '_match_key'],
