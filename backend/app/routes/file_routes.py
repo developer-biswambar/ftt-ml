@@ -506,7 +506,7 @@ def extract_excel_sheet_info(content: bytes, filename: str) -> List[SheetInfo]:
         for sheet_name in excel_file.sheet_names:
             try:
                 # Read each sheet to get metadata (preserve leading zeros)
-                dtype_mapping = detect_leading_zero_columns(content, file.filename, sheet_name)
+                dtype_mapping = detect_leading_zero_columns(content, filename, sheet_name)
                 df = pd.read_excel(excel_file, sheet_name=sheet_name, dtype=dtype_mapping if dtype_mapping else None)
                 # Clean column names to ensure consistency with upload process
                 df = clean_column_names(df)
