@@ -1,0 +1,9 @@
+  Account ID  , Balance ,Currency  ,   Last Updated   , Account Type ,,Branch  , Status ,EmptyCol
+  ACC001  ," 1,234.56 ", USD , 2024-01-15 ,  Savings  ,,  Main St  , Active ,
+ ACC002 ,"2,345.67",EUR,2024-01-16, Checking ,, Downtown ,Active,
+ACC003," 3,456.78 ", GBP , 2024-01-17 ,Investment,,Uptown, Closed ,
+  ACC004  ,"4,567.89",USD,2024-01-18, Savings ,,  Mall  ,Active,
+ ACC005," 5,678.90 ", EUR , 2024-01-19 , Checking ,, Airport , Pending ,
+,,,,,,,,
+,,,,,,,,
+,,,,,,,,

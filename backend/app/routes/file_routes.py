@@ -41,6 +41,257 @@ class UpdateSheetRequest(BaseModel):
     sheet_name: str
 
 
+def clean_column_names(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Clean column names by stripping leading/trailing spaces and handling duplicates.
+    
+    This is the entry point for data cleaning - ensures all column names are properly formatted.
+    
+    Args:
+        df: Input DataFrame
+        
+    Returns:
+        DataFrame with cleaned column names
+    """
+    try:
+        original_columns = list(df.columns)
+        cleaned_columns = []
+        column_mapping = {}
+        
+        logger.info(f"🧹 Cleaning column names for {len(original_columns)} columns...")
+        
+        for i, col in enumerate(original_columns):
+            if col is None:
+                # Handle None column names
+                cleaned_col = f"Unnamed_{i}"
+                logger.warning(f"  - Found None column at index {i}, renamed to '{cleaned_col}'")
+            else:
+                # Convert to string and strip spaces
+                cleaned_col = str(col).strip()
+                
+                # Handle empty column names after stripping
+                if cleaned_col == "":
+                    cleaned_col = f"Unnamed_{i}"
+                    logger.warning(f"  - Found empty column at index {i}, renamed to '{cleaned_col}'")
+                
+                # Log if column was changed
+                if str(col) != cleaned_col:
+                    logger.info(f"  - Cleaned column: '{col}' → '{cleaned_col}'")
+            
+            # Handle potential duplicates
+            original_cleaned = cleaned_col
+            counter = 1
+            while cleaned_col in cleaned_columns:
+                cleaned_col = f"{original_cleaned}_{counter}"
+                counter += 1
+                if counter > 1:  # Only log if we actually found duplicates
+                    logger.warning(f"  - Duplicate column name detected, renamed to '{cleaned_col}'")
+            
+            cleaned_columns.append(cleaned_col)
+            column_mapping[original_columns[i]] = cleaned_col
+        
+        # Apply column name changes
+        df.columns = cleaned_columns
+        
+        # Count how many columns were actually changed
+        changes_made = sum(1 for orig, clean in zip(original_columns, cleaned_columns) if str(orig) != clean)
+        
+        if changes_made > 0:
+            logger.info(f"✅ Successfully cleaned {changes_made}/{len(original_columns)} column names")
+            # Log specific changes for debugging
+            for orig, clean in zip(original_columns, cleaned_columns):
+                if str(orig) != clean:
+                    logger.info(f"   '{orig}' → '{clean}'")
+        else:
+            logger.info("ℹ️  All column names were already clean")
+        
+        return df
+        
+    except Exception as e:
+        logger.error(f"Error cleaning column names: {str(e)}")
+        # Return original DataFrame if cleaning fails
+        return df
+
+
+def clean_data_values(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Clean data values by stripping leading/trailing spaces from string columns.
+    
+    Only processes string/object columns to avoid affecting numeric data.
+    Preserves data types and handles NaN values safely.
+    
+    Args:
+        df: Input DataFrame
+        
+    Returns:
+        DataFrame with cleaned string data values
+    """
+    try:
+        logger.info(f"🧼 Cleaning data values for {len(df.columns)} columns...")
+        
+        cleaned_columns_count = 0
+        total_values_cleaned = 0
+        
+        # Process each column
+        for col in df.columns:
+            # Only process object/string columns
+            if df[col].dtype == 'object':
+                # Get non-null values to check if they contain strings
+                non_null_values = df[col].dropna()
+                if len(non_null_values) == 0:
+                    logger.debug(f"  - Skipping empty column '{col}'")
+                    continue
+                
+                # Check if this column contains string data (sample first few values)
+                sample_values = non_null_values.head(10)
+                string_count = sum(1 for val in sample_values if isinstance(val, str))
+                
+                # Only clean if at least 50% of sampled values are strings
+                if string_count >= len(sample_values) * 0.5:
+                    original_values = df[col].copy()
+                    
+                    # Apply string cleaning only to string values, preserve others
+                    def clean_string_value(value):
+                        if pd.isna(value):
+                            return value  # Keep NaN as-is
+                        elif isinstance(value, str):
+                            cleaned = value.strip()
+                            return cleaned
+                        else:
+                            return value  # Keep non-strings as-is (numbers, dates, etc.)
+                    
+                    df[col] = df[col].apply(clean_string_value)
+                    
+                    # Count how many values were actually changed
+                    changes_in_column = 0
+                    for orig, clean in zip(original_values, df[col]):
+                        if pd.notna(orig) and pd.notna(clean) and str(orig) != str(clean):
+                            changes_in_column += 1
+                    
+                    if changes_in_column > 0:
+                        cleaned_columns_count += 1
+                        total_values_cleaned += changes_in_column
+                        logger.info(f"  - Cleaned column '{col}': {changes_in_column} values trimmed")
+                        
+                        # Show example of cleaning (first changed value)
+                        for orig, clean in zip(original_values, df[col]):
+                            if pd.notna(orig) and pd.notna(clean) and str(orig) != str(clean):
+                                logger.debug(f"    Example: '{orig}' → '{clean}'")
+                                break
+                    else:
+                        logger.debug(f"  - Column '{col}' already clean (no changes needed)")
+                else:
+                    logger.debug(f"  - Skipping column '{col}': contains mostly non-string data ({string_count}/{len(sample_values)} strings)")
+            else:
+                logger.debug(f"  - Skipping numeric/datetime column '{col}' ({df[col].dtype})")
+        
+        if total_values_cleaned > 0:
+            logger.info(f"✅ Successfully cleaned {total_values_cleaned} data values across {cleaned_columns_count} columns")
+        else:
+            logger.info("ℹ️  All data values were already clean")
+        
+        return df
+        
+    except Exception as e:
+        logger.error(f"Error cleaning data values: {str(e)}")
+        # Return original DataFrame if cleaning fails
+        return df
+
+
+def remove_empty_rows_and_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """
+    Remove completely empty rows and columns from DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        
+    Returns:
+        Tuple of (cleaned_df, cleanup_stats)
+    """
+    try:
+        logger.info(f"🗑️  Checking for empty rows and columns in DataFrame ({len(df)} rows, {len(df.columns)} columns)...")
+        
+        original_shape = df.shape
+        cleanup_stats = {
+            'original_rows': int(original_shape[0]),
+            'original_columns': int(original_shape[1]),
+            'removed_rows': 0,
+            'removed_columns': 0,
+            'empty_column_names': [],
+            'final_rows': 0,
+            'final_columns': 0
+        }
+        
+        # Remove completely empty columns (all NaN or empty strings)
+        empty_columns = []
+        for col in df.columns:
+            # Check if column is completely empty (all NaN, None, or empty strings after stripping)
+            non_empty_values = df[col].dropna()  # Remove NaN/None
+            
+            if len(non_empty_values) == 0:
+                # Column has only NaN/None values
+                empty_columns.append(col)
+            else:
+                # Check if remaining values are all empty strings or whitespace
+                string_values = [str(val).strip() for val in non_empty_values if pd.notna(val)]
+                non_empty_strings = [val for val in string_values if val != '']
+                if len(non_empty_strings) == 0:
+                    empty_columns.append(col)
+        
+        if empty_columns:
+            logger.info(f"  - Found {len(empty_columns)} completely empty columns: {empty_columns}")
+            df = df.drop(columns=empty_columns)
+            cleanup_stats['removed_columns'] = int(len(empty_columns))
+            cleanup_stats['empty_column_names'] = list(empty_columns)
+        
+        # Remove completely empty rows (all NaN or empty strings)
+        # Create a mask for non-empty rows
+        def is_row_empty(row):
+            # Check if all values in the row are empty
+            for val in row:
+                if pd.notna(val) and str(val).strip() != '':
+                    return False
+            return True
+        
+        empty_row_mask = df.apply(is_row_empty, axis=1)
+        empty_row_count = empty_row_mask.sum()
+        
+        if empty_row_count > 0:
+            logger.info(f"  - Found {empty_row_count} completely empty rows")
+            df = df[~empty_row_mask]
+            cleanup_stats['removed_rows'] = int(empty_row_count)
+        
+        # Reset index after removing rows
+        df = df.reset_index(drop=True)
+        
+        # Update final stats
+        cleanup_stats['final_rows'] = int(len(df))
+        cleanup_stats['final_columns'] = int(len(df.columns))
+        
+        # Log results
+        if cleanup_stats['removed_rows'] > 0 or cleanup_stats['removed_columns'] > 0:
+            logger.info(f"✅ Cleanup completed:")
+            logger.info(f"   - Rows: {original_shape[0]} → {len(df)} (removed {cleanup_stats['removed_rows']} empty rows)")
+            logger.info(f"   - Columns: {original_shape[1]} → {len(df.columns)} (removed {cleanup_stats['removed_columns']} empty columns)")
+        else:
+            logger.info("ℹ️  No empty rows or columns found")
+        
+        return df, cleanup_stats
+        
+    except Exception as e:
+        logger.error(f"Error removing empty rows/columns: {str(e)}")
+        # Return original DataFrame and empty stats if cleaning fails
+        return df, {
+            'original_rows': int(len(df)),
+            'original_columns': int(len(df.columns)),
+            'removed_rows': 0,
+            'removed_columns': 0,
+            'empty_column_names': [],
+            'final_rows': int(len(df)),
+            'final_columns': int(len(df.columns))
+        }
+
+
 def normalize_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
     Normalize datetime columns to consistent YYYY-MM-DD string format.
@@ -143,6 +394,8 @@ def extract_excel_sheet_info(content: bytes, filename: str) -> List[SheetInfo]:
             try:
                 # Read each sheet to get metadata
                 df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                # Clean column names to ensure consistency with upload process
+                df = clean_column_names(df)
                 sheet_info.append(SheetInfo(
                     sheet_name=sheet_name,
                     row_count=len(df),
@@ -289,7 +542,16 @@ async def upload_file(
                         # if file.filename.lower().endswith('.xlsx') else 'xlrd'
                     )
 
-            # Normalize datetime columns using the extracted function
+            # Step 1: Remove completely empty rows and columns first
+            df, cleanup_stats = remove_empty_rows_and_columns(df)
+            
+            # Step 2: Clean column names (strip spaces, handle duplicates)
+            df = clean_column_names(df)
+            
+            # Step 3: Clean data values (strip spaces from string data)
+            df = clean_data_values(df)
+            
+            # Step 4: Normalize datetime columns using the extracted function
             df = normalize_datetime_columns(df)
 
         except Exception as e:
@@ -319,12 +581,13 @@ async def upload_file(
             "custom_name": custom_name.strip() if custom_name else None,  # Custom display name
             "file_type": "excel" if is_excel else "csv",
             "file_size_mb": round(file_size / (1024 * 1024), 2),
-            "total_rows": total_rows,
-            "total_columns": total_cols,
+            "total_rows": int(total_rows),
+            "total_columns": int(total_cols),
             "columns": list(df.columns),
             "upload_time": datetime.utcnow().isoformat(),
             "data_types": {col: str(dtype) for col, dtype in df.dtypes.items()},
             "sheet_name": sheet_name if sheet_name else None,  # Store selected sheet
+            "cleanup_performed": cleanup_stats,  # Include data cleaning statistics
         }
 
         # Store in memory
@@ -343,11 +606,70 @@ async def upload_file(
             response_message += f" from sheet '{sheet_name}'"
         if custom_name:
             response_message += f" with custom name '{custom_name}'"
+        
+        # Enhanced user feedback for data cleaning
+        cleanup_warnings = []
+        cleanup_details = []
+        
+        # Check for excessive empty content that might indicate file quality issues
+        # Convert numpy types to native Python types to avoid serialization issues
+        original_rows = int(cleanup_stats['original_rows'])
+        original_columns = int(cleanup_stats['original_columns'])
+        removed_rows = int(cleanup_stats['removed_rows'])
+        removed_columns = int(cleanup_stats['removed_columns'])
+        
+        # Calculate percentages of empty content
+        empty_row_percentage = (removed_rows / original_rows * 100) if original_rows > 0 else 0
+        empty_col_percentage = (removed_columns / original_columns * 100) if original_columns > 0 else 0
+        
+        # Build cleanup details
+        if removed_rows > 0:
+            cleanup_details.append(f"{removed_rows} empty rows removed")
+        if removed_columns > 0:
+            cleanup_details.append(f"{removed_columns} empty columns removed")
+            if cleanup_stats.get('empty_column_names'):
+                empty_col_names = cleanup_stats['empty_column_names'][:5]  # Show first 5 empty column names
+                if len(cleanup_stats['empty_column_names']) > 5:
+                    cleanup_details.append(f"Empty columns included: {', '.join(empty_col_names[:3])}, and {len(cleanup_stats['empty_column_names']) - 3} more")
+                else:
+                    cleanup_details.append(f"Empty columns: {', '.join(empty_col_names)}")
+        
+        # Add cleanup information to response message
+        if cleanup_details:
+            response_message += f". ⚡ Data cleanup: {', '.join(cleanup_details)}"
+        
+        # Generate warnings for excessive empty content
+        if empty_row_percentage >= 30:
+            cleanup_warnings.append(f"⚠️  High number of empty rows detected ({empty_row_percentage:.1f}% of original file)")
+        if empty_col_percentage >= 20:
+            cleanup_warnings.append(f"⚠️  High number of empty columns detected ({empty_col_percentage:.1f}% of original file)")
+        
+        # Add warnings for poor file quality
+        if removed_rows > 100 or removed_columns > 10:
+            cleanup_warnings.append("💡 Tip: Consider cleaning your Excel/CSV files before upload to improve processing speed")
+        
+        # Log warnings for monitoring
+        if cleanup_warnings:
+            for warning in cleanup_warnings:
+                logger.warning(f"File quality issue in {final_filename}: {warning}")
 
         return {
             "success": True,
             "message": response_message,
-            "data": file_info
+            "data": file_info,
+            "cleanup_performed": {
+                "empty_content_removed": removed_rows > 0 or removed_columns > 0,
+                "statistics": {
+                    "original_size": f"{original_rows:,} rows × {original_columns} columns",
+                    "final_size": f"{total_rows:,} rows × {total_cols} columns",
+                    "removed_rows": int(removed_rows),
+                    "removed_columns": int(removed_columns),
+                    "empty_row_percentage": float(round(empty_row_percentage, 1)),
+                    "empty_column_percentage": float(round(empty_col_percentage, 1))
+                },
+                "warnings": cleanup_warnings,
+                "details": cleanup_details
+            }
         }
 
     except HTTPException:
@@ -406,6 +728,19 @@ async def select_sheet(file_id: str, request: UpdateSheetRequest):
             engine='openpyxl' if file_info["filename"].lower().endswith('.xlsx') else 'xlrd'
         )
 
+        # Apply the same cleaning pipeline as file upload
+        # Step 1: Remove completely empty rows and columns
+        df, cleanup_stats = remove_empty_rows_and_columns(df)
+        
+        # Step 2: Clean column names for the new sheet
+        df = clean_column_names(df)
+        
+        # Step 3: Clean data values
+        df = clean_data_values(df)
+        
+        # Step 4: Normalize datetime columns for the new sheet
+        df = normalize_datetime_columns(df)
+        
         # Update stored data
         uploaded_files[file_id]["data"] = df
         uploaded_files[file_id]["info"]["selected_sheet"] = request.sheet_name
@@ -417,14 +752,25 @@ async def select_sheet(file_id: str, request: UpdateSheetRequest):
         logger.info(
             f"Switched to sheet '{request.sheet_name}' for file {file_info['filename']}: {len(df):,} rows, {len(df.columns)} columns")
 
+        # Create response message with cleanup information
+        response_message = f"Successfully switched to sheet '{request.sheet_name}'"
+        if cleanup_stats['removed_rows'] > 0 or cleanup_stats['removed_columns'] > 0:
+            cleanup_details = []
+            if cleanup_stats['removed_rows'] > 0:
+                cleanup_details.append(f"{cleanup_stats['removed_rows']} empty rows removed")
+            if cleanup_stats['removed_columns'] > 0:
+                cleanup_details.append(f"{cleanup_stats['removed_columns']} empty columns removed")
+            response_message += f". Data cleanup: {', '.join(cleanup_details)}"
+
         return {
             "success": True,
-            "message": f"Successfully switched to sheet '{request.sheet_name}'",
+            "message": response_message,
             "data": {
                 "selected_sheet": request.sheet_name,
                 "total_rows": len(df),
                 "total_columns": len(df.columns),
-                "columns": list(df.columns)
+                "columns": list(df.columns),
+                "cleanup_performed": cleanup_stats  # Include cleanup stats
             }
         }
 
