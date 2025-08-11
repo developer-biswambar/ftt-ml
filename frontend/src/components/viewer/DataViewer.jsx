@@ -31,6 +31,9 @@ const DataViewer = ({fileId, onClose}) => {
     const [editValue, setEditValue] = useState('');
     const [editingColumn, setEditingColumn] = useState(null);
     const [editingColumnValue, setEditingColumnValue] = useState('');
+    const [columnWidths, setColumnWidths] = useState({});
+    const [resizing, setResizing] = useState({ isResizing: false, columnIndex: -1, startX: 0, startWidth: 0 });
+    const [hoveredColumnIndex, setHoveredColumnIndex] = useState(-1);
     const [sortConfig, setSortConfig] = useState({column: null, direction: 'asc'});
     const [filterConfig, setFilterConfig] = useState({});
     const [columnFilters, setColumnFilters] = useState({});
@@ -80,6 +83,8 @@ const DataViewer = ({fileId, onClose}) => {
         loadFileData();
         loadFileName();
     }, [fileId, currentPage, pageSize, activeColumnFilter]);
+
+    // Cleanup effect - no longer needed as we handle cleanup in mouse up
 
     const loadFileName = async () => {
         try {
@@ -326,6 +331,77 @@ const DataViewer = ({fileId, onClose}) => {
             e.preventDefault();
             cancelColumnEdit();
         }
+    };
+
+    // Column resizing functions
+    const getColumnWidth = (columnIndex) => {
+        return columnWidths[columnIndex] || 150; // Default width: 150px
+    };
+
+    const startColumnResize = (e, columnIndex) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log('Starting resize for column:', columnIndex, 'at position:', e.clientX);
+        
+        const startX = e.clientX;
+        const startWidth = getColumnWidth(columnIndex);
+        
+        const newResizing = {
+            isResizing: true,
+            columnIndex,
+            startX,
+            startWidth
+        };
+        
+        setResizing(newResizing);
+        
+        // Create handlers with current state
+        const handleMouseMove = (moveEvent) => {
+            const deltaX = moveEvent.clientX - startX;
+            const newWidth = Math.max(50, startWidth + deltaX); // Minimum width: 50px
+            
+            console.log('Resizing column:', columnIndex, 'to width:', newWidth);
+            
+            setColumnWidths(prev => ({
+                ...prev,
+                [columnIndex]: newWidth
+            }));
+        };
+
+        const handleMouseUp = () => {
+            setResizing({ isResizing: false, columnIndex: -1, startX: 0, startWidth: 0 });
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+        
+        // Add global event listeners
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    };
+
+    // Auto-fit column width to content
+    const autoFitColumn = (columnIndex) => {
+        const columnName = columns[columnIndex];
+        
+        // Calculate width based on content
+        let maxWidth = columnName.length * 8 + 40; // Base width from column name
+        
+        // Check data content width (sample first 100 rows for performance)
+        const sampleData = displayedData.slice(0, 100);
+        sampleData.forEach(row => {
+            const cellValue = row[columnName]?.toString() || '';
+            const cellWidth = cellValue.length * 8 + 20; // Approximate character width
+            maxWidth = Math.max(maxWidth, cellWidth);
+        });
+        
+        // Set reasonable bounds
+        const finalWidth = Math.min(Math.max(maxWidth, 80), 400);
+        
+        setColumnWidths(prev => ({
+            ...prev,
+            [columnIndex]: finalWidth
+        }));
     };
 
     // Add/Delete rows
@@ -999,9 +1075,14 @@ const DataViewer = ({fileId, onClose}) => {
             )}
 
             {/* Data Table */}
-            <div className="flex-1 overflow-auto">
+            <div 
+                className={`flex-1 overflow-auto ${resizing.isResizing ? 'select-none' : ''}`}
+                style={{
+                    cursor: resizing.isResizing ? 'col-resize' : 'default'
+                }}
+            >
                 <div className="min-w-full">
-                    <table className={`w-full bg-white ${uiConfig.autoSizeColumns ? 'table-auto' : 'table-fixed'}`}>
+                    <table className="w-full bg-white table-fixed">
                         <thead className="bg-gray-50 sticky top-0">
                         {/* Excel-style column letters (A, B, C...) */}
                         <tr className="bg-gray-100">
@@ -1014,9 +1095,15 @@ const DataViewer = ({fileId, onClose}) => {
                                     className={`px-2 py-1 text-xs font-bold text-center cursor-pointer select-none transition-colors ${uiConfig.showGridLines ? 'border border-gray-200' : 'border-transparent'} ${
                                         selectedColumns.has(columnIndex) 
                                             ? 'bg-blue-500 text-white border-blue-600' 
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            : hoveredColumnIndex === columnIndex
+                                                ? 'bg-blue-200 text-blue-800'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                     }`}
-                                    style={uiConfig.autoSizeColumns ? {} : {width: `${100 / columns.length}%`}}
+                                    style={{
+                                        width: `${getColumnWidth(columnIndex)}px`,
+                                        minWidth: '50px',
+                                        maxWidth: '500px'
+                                    }}
                                     onClick={() => handleColumnSelect(columnIndex)}
                                     title={`Click to select column ${getExcelColumnName(columnIndex)} (${column})`}
                                 >
@@ -1032,8 +1119,13 @@ const DataViewer = ({fileId, onClose}) => {
                             {columns.map((column, columnIndex) => (
                                 <th
                                     key={column}
-                                    className={`${getHeaderClasses()} ${selectedColumns.has(columnIndex) ? 'bg-blue-100 border-blue-300' : ''}`}
-                                    style={uiConfig.autoSizeColumns ? {} : {width: `${100 / columns.length}%`}}
+                                    data-column-index={columnIndex}
+                                    className={`${getHeaderClasses()} ${selectedColumns.has(columnIndex) ? 'bg-blue-100 border-blue-300' : ''} ${hoveredColumnIndex === columnIndex ? 'bg-blue-50' : ''} relative`}
+                                    style={{
+                                        width: `${getColumnWidth(columnIndex)}px`,
+                                        minWidth: '50px',
+                                        maxWidth: '500px'
+                                    }}
                                 >
                                     {editingColumn === columnIndex ? (
                                         // Editing mode
@@ -1104,6 +1196,31 @@ const DataViewer = ({fileId, onClose}) => {
                                             />
                                         </div>
                                     )}
+
+                                    {/* Column Resize Handle */}
+                                    <div
+                                        className="absolute top-0 right-0 w-3 h-full cursor-col-resize bg-transparent transition-all z-20"
+                                        onMouseDown={(e) => startColumnResize(e, columnIndex)}
+                                        onMouseEnter={() => setHoveredColumnIndex(columnIndex)}
+                                        onMouseLeave={() => setHoveredColumnIndex(-1)}
+                                        onDoubleClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            autoFitColumn(columnIndex);
+                                        }}
+                                        title="Drag to resize • Double-click to auto-fit"
+                                        style={{
+                                            right: '-1px' // Position at the border
+                                        }}
+                                    >
+                                        {/* Visual indicator */}
+                                        <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-px h-6 bg-gray-400 transition-all ${
+                                            hoveredColumnIndex === columnIndex 
+                                                ? 'bg-blue-600 opacity-100' 
+                                                : 'opacity-0 hover:opacity-100 hover:bg-blue-600'
+                                        }`} />
+                                        
+                                    </div>
                                 </th>
                             ))}
                         </tr>
@@ -1115,7 +1232,9 @@ const DataViewer = ({fileId, onClose}) => {
                                     className={`w-12 px-1 py-1 text-xs text-center cursor-pointer select-none transition-colors ${uiConfig.showGridLines ? 'border border-gray-200' : 'border-transparent'} ${
                                         selectedRows.has(rowIndex) 
                                             ? 'bg-green-500 text-white border-green-600' 
-                                            : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                                            : hoveredColumnIndex >= 0
+                                                ? 'bg-blue-100 text-gray-600'
+                                                : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                                     }`}
                                     onClick={() => handleRowSelect(rowIndex)}
                                     title={`Click to select row ${startIndex + rowIndex + 1}`}
@@ -1125,7 +1244,12 @@ const DataViewer = ({fileId, onClose}) => {
                                 {columns.map((column, columnIndex) => (
                                     <td
                                         key={`${rowIndex}-${columnIndex}`}
-                                        className={`${getCellClasses()} ${selectedColumns.has(columnIndex) ? 'bg-blue-50 border-blue-200' : ''} ${selectedRows.has(rowIndex) ? 'bg-green-100' : ''}`}
+                                        className={`${getCellClasses()} ${selectedColumns.has(columnIndex) ? 'bg-blue-50 border-blue-200' : ''} ${selectedRows.has(rowIndex) ? 'bg-green-100' : ''} ${hoveredColumnIndex === columnIndex ? 'bg-blue-50' : ''}`}
+                                        style={{
+                                            width: `${getColumnWidth(columnIndex)}px`,
+                                            minWidth: '50px',
+                                            maxWidth: '500px'
+                                        }}
                                         onClick={() => startEditing(rowIndex, columnIndex)}
                                     >
                                         {editingCell?.row === rowIndex && editingCell?.col === columnIndex ? (

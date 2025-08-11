@@ -1,0 +1,16 @@
+Name,Department,Status,Salary,City
+John Smith,Engineering,Active,85000,New York
+Sarah Johnson,Engineering,Active,92000,San Francisco
+Mike Davis,Engineering,On Leave,78000,Seattle
+Emily Brown,Engineering,Active,105000,New York
+Robert Wilson,Sales,Active,65000,Chicago
+Lisa Garcia,Sales,Active,72000,Los Angeles
+David Martinez,Sales,Terminated,58000,Miami
+Jennifer Lee,Marketing,Active,68000,New York
+Chris Taylor,Marketing,Active,75000,San Francisco
+Amanda White,Marketing,On Leave,71000,Boston
+Mark Thompson,HR,Active,62000,Chicago
+Jessica Moore,HR,Active,59000,New York
+Kevin Anderson,Finance,Active,82000,New York
+Rachel Thomas,Finance,Active,79000,San Francisco
+Daniel Jackson,Finance,Active,88000,Seattle
