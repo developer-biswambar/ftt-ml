@@ -17,6 +17,7 @@ import {
     X
 } from 'lucide-react';
 import {apiService} from '../../services/defaultApi.js';
+import ColumnFilterDropdown from './ColumnFilterDropdown';
 
 const DataViewer = ({fileId, onClose}) => {
     // State management
@@ -28,8 +29,12 @@ const DataViewer = ({fileId, onClose}) => {
     const [error, setError] = useState(null);
     const [editingCell, setEditingCell] = useState(null);
     const [editValue, setEditValue] = useState('');
+    const [editingColumn, setEditingColumn] = useState(null);
+    const [editingColumnValue, setEditingColumnValue] = useState('');
     const [sortConfig, setSortConfig] = useState({column: null, direction: 'asc'});
     const [filterConfig, setFilterConfig] = useState({});
+    const [columnFilters, setColumnFilters] = useState({});
+    const [activeColumnFilter, setActiveColumnFilter] = useState({ column: '', values: [] });
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(50);
@@ -57,10 +62,24 @@ const DataViewer = ({fileId, onClose}) => {
     const [showConfigPanel, setShowConfigPanel] = useState(false);
 
     // Load file data and extract filename
+    // Debounced search effect
+    useEffect(() => {
+        const debounceTimer = setTimeout(() => {
+            setCurrentPage(1); // Reset to first page when searching
+            // Clear column filters when user types in search box
+            if (searchTerm.trim()) {
+                setActiveColumnFilter({ column: '', values: [] });
+            }
+            loadFileData();
+        }, 500); // 500ms debounce
+
+        return () => clearTimeout(debounceTimer);
+    }, [searchTerm]);
+
     useEffect(() => {
         loadFileData();
         loadFileName();
-    }, [fileId, currentPage, pageSize]);
+    }, [fileId, currentPage, pageSize, activeColumnFilter]);
 
     const loadFileName = async () => {
         try {
@@ -89,7 +108,14 @@ const DataViewer = ({fileId, onClose}) => {
 
             // Try to load real data first, fallback to sample if endpoint doesn't exist
             try {
-                const response = await apiService.getFileData(fileId, currentPage, pageSize);
+                const response = await apiService.getFileData(
+                    fileId, 
+                    currentPage, 
+                    pageSize, 
+                    searchTerm, 
+                    activeColumnFilter.column, 
+                    activeColumnFilter.values
+                );
                 if (response.success) {
                     setData(response.data.rows);
                     setColumns(response.data.columns);
@@ -242,6 +268,66 @@ const DataViewer = ({fileId, onClose}) => {
         setEditValue('');
     };
 
+    // Column editing functions
+    const startColumnEdit = (columnIndex, currentName) => {
+        setEditingColumn(columnIndex);
+        setEditingColumnValue(currentName);
+    };
+
+    const saveColumnEdit = async () => {
+        if (editingColumn === null || !editingColumnValue.trim()) {
+            cancelColumnEdit();
+            return;
+        }
+
+        const newColumnName = editingColumnValue.trim();
+        const oldColumnName = columns[editingColumn];
+
+        // Check if the new name already exists
+        if (columns.includes(newColumnName) && newColumnName !== oldColumnName) {
+            alert('Column name already exists. Please choose a different name.');
+            return;
+        }
+
+        // Update columns array
+        const newColumns = [...columns];
+        newColumns[editingColumn] = newColumnName;
+
+        // Update data to use new column name
+        const newData = data.map(row => {
+            const newRow = { ...row };
+            if (oldColumnName !== newColumnName && oldColumnName in newRow) {
+                newRow[newColumnName] = newRow[oldColumnName];
+                delete newRow[oldColumnName];
+            }
+            return newRow;
+        });
+
+        setColumns(newColumns);
+        setData(newData);
+        addToHistory(newData, newColumns);
+        setHasChanges(true);
+
+        // Clear editing state
+        cancelColumnEdit();
+    };
+
+    const cancelColumnEdit = () => {
+        setEditingColumn(null);
+        setEditingColumnValue('');
+    };
+
+    // Handle column edit keyboard events
+    const handleColumnEditKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveColumnEdit();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelColumnEdit();
+        }
+    };
+
     // Add/Delete rows
     const addRow = () => {
         const newRow = {};
@@ -255,6 +341,50 @@ const DataViewer = ({fileId, onClose}) => {
         const newData = data.filter((_, index) => index !== rowIndex);
         setData(newData);
         addToHistory(newData, columns);
+    };
+
+    // Column filter handlers
+    const handleColumnFilter = (columnName, selectedValues) => {
+        const newColumnFilters = { ...columnFilters, [columnName]: selectedValues };
+        setColumnFilters(newColumnFilters);
+        
+        // Set active column filter for API call
+        if (selectedValues.length > 0) {
+            setActiveColumnFilter({ column: columnName, values: selectedValues });
+            // Clear search term when using column filter
+            setSearchTerm('');
+        } else {
+            setActiveColumnFilter({ column: '', values: [] });
+        }
+        setCurrentPage(1); // Reset to first page
+    };
+
+    const handleColumnFilterClear = (columnName) => {
+        const newColumnFilters = { ...columnFilters };
+        delete newColumnFilters[columnName];
+        setColumnFilters(newColumnFilters);
+        
+        // Clear active column filter
+        setActiveColumnFilter({ column: '', values: [] });
+        setCurrentPage(1); // Reset to first page
+    };
+
+    // Clear all filters function
+    const clearAllFilters = () => {
+        setColumnFilters({});
+        setActiveColumnFilter({ column: '', values: [] });
+        setSearchTerm('');
+        setFilterConfig({});
+        setCurrentPage(1);
+    };
+
+    // Calculate active filter count
+    const getActiveFilterCount = () => {
+        let count = 0;
+        if (searchTerm) count++;
+        if (activeColumnFilter.column) count++;
+        count += Object.keys(filterConfig).filter(key => filterConfig[key]).length;
+        return count;
     };
 
     // Add/Delete columns
@@ -316,18 +446,11 @@ const DataViewer = ({fileId, onClose}) => {
         addToHistory(sortedData, columns);
     };
 
-    // Filtering and Pagination
+    // Client-side column filtering (search is now server-side)
     const filteredData = useMemo(() => {
         let filtered = [...data];
 
-        if (searchTerm) {
-            filtered = filtered.filter(row =>
-                Object.values(row).some(val =>
-                    val?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-                )
-            );
-        }
-
+        // Apply column-specific filters (client-side)
         Object.entries(filterConfig).forEach(([column, filterValue]) => {
             if (filterValue) {
                 filtered = filtered.filter(row =>
@@ -337,7 +460,7 @@ const DataViewer = ({fileId, onClose}) => {
         });
 
         return filtered;
-    }, [data, searchTerm, filterConfig]);
+    }, [data, filterConfig]); // Removed searchTerm from dependencies
 
     // Generate Excel-style column names (A, B, C, ..., Z, AA, AB, ...)
     const getExcelColumnName = (columnIndex) => {
@@ -455,11 +578,11 @@ const DataViewer = ({fileId, onClose}) => {
         return `hover:bg-gray-50 group ${height[uiConfig.rowHeight]}`;
     };
 
-    // Pagination calculations
+    // Pagination calculations (server handles search filtering, client handles column filtering)
     const totalPages = Math.ceil(totalRows / pageSize);
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
-    const displayedData = filteredData; // Show all filtered data on current page
+    const displayedData = filteredData; // Server already filtered by search, client filters by columns
 
     if (loading) {
         return (
@@ -534,6 +657,18 @@ const DataViewer = ({fileId, onClose}) => {
                                     className="w-40 pl-8 pr-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                             </div>
+
+                            {/* Clear All Filters Button */}
+                            {getActiveFilterCount() > 0 && (
+                                <button
+                                    onClick={clearAllFilters}
+                                    className="flex items-center space-x-1 px-3 py-2 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded transition-colors"
+                                    title={`Clear all ${getActiveFilterCount()} active filter(s)`}
+                                >
+                                    <X size={12} />
+                                    <span>Clear All ({getActiveFilterCount()})</span>
+                                </button>
+                            )}
 
                             {/* Add buttons */}
                             <button
@@ -900,11 +1035,25 @@ const DataViewer = ({fileId, onClose}) => {
                                     className={`${getHeaderClasses()} ${selectedColumns.has(columnIndex) ? 'bg-blue-100 border-blue-300' : ''}`}
                                     style={uiConfig.autoSizeColumns ? {} : {width: `${100 / columns.length}%`}}
                                 >
-                                    <div className="flex items-center justify-between">
+                                    {editingColumn === columnIndex ? (
+                                        // Editing mode
+                                        <input
+                                            type="text"
+                                            value={editingColumnValue}
+                                            onChange={(e) => setEditingColumnValue(e.target.value)}
+                                            onBlur={saveColumnEdit}
+                                            onKeyDown={handleColumnEditKeyDown}
+                                            className="w-full px-2 py-1 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                            autoFocus
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    ) : (
+                                        // Display mode
+                                        <div className="flex items-center justify-between w-full group">
                                             <span
-                                                className="cursor-pointer flex items-center hover:text-blue-600 truncate"
+                                                className="cursor-pointer flex items-center hover:text-blue-600 truncate flex-1"
                                                 onClick={() => handleSort(column)}
-                                                title={column}
+                                                title={`${column} (click to sort)`}
                                             >
                                                 {column}
                                                 {sortConfig.column === column && (
@@ -913,27 +1062,48 @@ const DataViewer = ({fileId, onClose}) => {
                                                         <ArrowDown size={10} className="ml-1 flex-shrink-0"/>
                                                 )}
                                             </span>
-                                        <button
-                                            onClick={() => deleteColumn(columnIndex)}
-                                            className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 ml-1 flex-shrink-0"
-                                            title="Delete Column"
-                                        >
-                                            <Minus size={10}/>
-                                        </button>
-                                    </div>
+                                            
+                                            {/* Edit button */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    startColumnEdit(columnIndex, column);
+                                                }}
+                                                className="ml-1 p-1 opacity-0 group-hover:opacity-100 hover:bg-blue-100 rounded transition-all"
+                                                title="Click to rename column"
+                                            >
+                                                <Edit3 size={12} className="text-blue-600" />
+                                            </button>
+                                        </div>
+                                    )}
 
-                                    {/* Column Filter */}
-                                    <input
-                                        type="text"
-                                        placeholder="Filter..."
-                                        value={filterConfig[column] || ''}
-                                        onChange={(e) => setFilterConfig({
-                                            ...filterConfig,
-                                            [column]: e.target.value
-                                        })}
-                                        className="w-full mt-1 px-1 py-0.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        onClick={(e) => e.stopPropagation()}
-                                    />
+                                    {/* Column Filters - Hide when editing column name */}
+                                    {editingColumn !== columnIndex && (
+                                        <div className="flex flex-col gap-1 mt-1">
+                                            {/* Dropdown Filter */}
+                                            <ColumnFilterDropdown
+                                                fileId={fileId}
+                                                columnName={column}
+                                                selectedValues={columnFilters[column] || []}
+                                                onFilterSelect={(values) => handleColumnFilter(column, values)}
+                                                onClear={() => handleColumnFilterClear(column)}
+                                            />
+                                            
+                                            {/* Text Filter */}
+                                            <input
+                                                type="text"
+                                                placeholder="Text filter..."
+                                                value={filterConfig[column] || ''}
+                                                onChange={(e) => setFilterConfig({
+                                                    ...filterConfig,
+                                                    [column]: e.target.value
+                                                })}
+                                                className="w-full px-1 py-0.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                onClick={(e) => e.stopPropagation()}
+                                                title="Filter column values (client-side)"
+                                            />
+                                        </div>
+                                    )}
                                 </th>
                             ))}
                         </tr>
@@ -950,19 +1120,7 @@ const DataViewer = ({fileId, onClose}) => {
                                     onClick={() => handleRowSelect(rowIndex)}
                                     title={`Click to select row ${startIndex + rowIndex + 1}`}
                                 >
-                                    <div className="flex items-center justify-center space-x-1">
-                                        <span className="text-xs font-medium">{startIndex + rowIndex + 1}</span>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation(); // Prevent row selection when clicking delete
-                                                deleteRow(rowIndex);
-                                            }}
-                                            className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700"
-                                            title="Delete Row"
-                                        >
-                                            <Minus size={8}/>
-                                        </button>
-                                    </div>
+                                    <span className="text-xs font-medium">{startIndex + rowIndex + 1}</span>
                                 </td>
                                 {columns.map((column, columnIndex) => (
                                     <td
@@ -1052,7 +1210,9 @@ const DataViewer = ({fileId, onClose}) => {
                 <div className="flex items-center justify-between text-sm text-gray-600">
                     <span>
                         Showing {displayedData.length} of {data.length} rows on this page
-                        {searchTerm && ` (filtered)`}
+                        {searchTerm && ` (search: "${searchTerm}")`}
+                        {activeColumnFilter.column && activeColumnFilter.values.length > 0 && 
+                            ` (filtered by ${activeColumnFilter.column}: ${activeColumnFilter.values.join(', ')})`}
                     </span>
                     <span>
                         Click cells to edit • Hover over headers/rows to delete • Undo/Redo available

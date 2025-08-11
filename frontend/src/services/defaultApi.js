@@ -121,13 +121,29 @@ export const apiService = {
     // ===========================================
     // VIEWER OPERATIONS
     // ===========================================
-    getFileData: async (fileId, page = 1, pageSize = 1000) => {
-        const response = await defaultApi.get(`/files/${fileId}/data?page=${page}&page_size=${pageSize}`);
+    getFileData: async (fileId, page = 1, pageSize = 1000, searchTerm = '', filterColumn = '', filterValues = []) => {
+        let url = `/files/${fileId}/data?page=${page}&page_size=${pageSize}`;
+        
+        if (filterColumn && filterValues.length > 0) {
+            // Column-specific filtering (from dropdown)
+            url += `&filter_column=${encodeURIComponent(filterColumn)}`;
+            url += `&filter_values=${encodeURIComponent(filterValues.join(','))}`;
+        } else if (searchTerm.trim()) {
+            // Wildcard search (from search box)
+            url += `&search=${encodeURIComponent(searchTerm.trim())}`;
+        }
+        
+        const response = await defaultApi.get(url);
         return response.data;
     },
 
     updateFileData: async (fileId, data) => {
         const response = await defaultApi.put(`/files/${fileId}/data`, {data});
+        return response.data;
+    },
+
+    getColumnUniqueValues: async (fileId, columnName, limit = 1000) => {
+        const response = await defaultApi.get(`/files/${fileId}/columns/${encodeURIComponent(columnName)}/unique-values?limit=${limit}`);
         return response.data;
     },
 
@@ -615,10 +631,13 @@ export const apiService = {
         return response.data;
     },
 
-    getFileDataWithSheet: async (fileId, sheetName = null, page = 1, pageSize = 1000) => {
+    getFileDataWithSheet: async (fileId, sheetName = null, page = 1, pageSize = 1000, searchTerm = '') => {
         let url = `/files/${fileId}/data?page=${page}&page_size=${pageSize}`;
         if (sheetName) {
             url += `&sheet=${encodeURIComponent(sheetName)}`;
+        }
+        if (searchTerm.trim()) {
+            url += `&search=${encodeURIComponent(searchTerm.trim())}`;
         }
         const response = await defaultApi.get(url);
         return response.data;

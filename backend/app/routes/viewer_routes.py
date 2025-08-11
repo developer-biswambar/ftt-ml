@@ -42,7 +42,10 @@ class UpdateFileDataRequest(BaseModel):
 async def get_file_data(
         file_id: str,
         page: int = Query(1, ge=1, description="Page number"),
-        page_size: int = Query(1000, ge=1, le=5000, description="Items per page")
+        page_size: int = Query(1000, ge=1, le=5000, description="Items per page"),
+        search: str = Query("", description="Search term to filter data across all columns"),
+        filter_column: str = Query("", description="Column name for column-specific filtering"),
+        filter_values: str = Query("", description="Comma-separated values for column-specific filtering")
 ):
     """Get paginated file data for the viewer with filename"""
     try:
@@ -53,13 +56,34 @@ async def get_file_data(
         df = file_data["data"]
         file_info = file_data["info"]
 
-        # Calculate pagination
+        # Apply filtering based on type of search
+        if filter_column.strip() and filter_values.strip():
+            # Column-specific filtering (from dropdown selection)
+            column_name = filter_column.strip()
+            values = [v.strip() for v in filter_values.split(',') if v.strip()]
+            
+            if column_name in df.columns and values:
+                # Create mask for rows where the specific column contains any of the filter values
+                mask = df[column_name].astype(str).str.lower().isin([v.lower() for v in values])
+                df = df[mask]
+            
+        elif search.strip():
+            # Wildcard search across all columns (from search box)
+            search_term = search.strip().lower()
+            
+            # Create a mask for rows that contain the search term in any column
+            mask = df.astype(str).apply(
+                lambda row: any(search_term in str(cell).lower() for cell in row), axis=1
+            )
+            df = df[mask]
+
+        # Calculate pagination on filtered data
         total_rows = len(df)
         total_pages = (total_rows + page_size - 1) // page_size
         start_idx = (page - 1) * page_size
         end_idx = min(start_idx + page_size, total_rows)
 
-        # Get paginated data
+        # Get paginated data from filtered dataset
         paginated_df = df.iloc[start_idx:end_idx]
 
         # Convert to records (list of dicts)
