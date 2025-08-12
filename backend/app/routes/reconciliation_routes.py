@@ -296,26 +296,11 @@ async def _process_reconciliation_core(
     # Only save results if we have matches - no point saving when everything is unmatched
     if has_matched:
         # Save "all" results (matched + unmatched) when we have matches
-        try:
-            save_request_all = SaveResultsRequest(
-                result_id=recon_id,
-                file_id=recon_id+'_all',
-                result_type="all",
-                process_type="reconciliation",
-                file_format="csv",
-                description="All reconciliation results (matched and unmatched)"
-            )
-            save_result_all = await save_results_to_server(save_request_all)
-            print(f"✓ Saved all results: {save_result_all}")
-        except Exception as e:
-            print(f"⚠️ Could not save all results: {str(e)}")
-            # Continue execution - saving is optional
-        
         # Save "matched" results 
         try:
             save_request_matched = SaveResultsRequest(
                 result_id=recon_id,
-                file_id=recon_id,
+                file_id=recon_id+"_matched",
                 result_type="matched",
                 process_type="reconciliation",
                 file_format="csv",
@@ -323,6 +308,34 @@ async def _process_reconciliation_core(
             )
             save_result_res_matched = await save_results_to_server(save_request_matched)
             print(f"✓ Saved matched results: {save_result_res_matched}")
+        except Exception as e:
+            print(f"⚠️ Could not save matched results: {str(e)}")
+            # Continue execution - saving is optional
+        try:
+            save_request_unmatched_a = SaveResultsRequest(
+                result_id=recon_id,
+                file_id=recon_id+"_unmatched_a",
+                result_type="unmatched_a",
+                process_type="reconciliation",
+                file_format="csv",
+                description="unmatched_a records from reconciliation"
+            )
+            save_result_res_unmatched_a = await save_results_to_server(save_request_unmatched_a)
+            print(f"✓ Saved matched results: {save_result_res_unmatched_a}")
+        except Exception as e:
+            print(f"⚠️ Could not save unmatched_a results: {str(e)}")
+            # Continue execution - saving is optional
+        try:
+            save_request_unmatched_b = SaveResultsRequest(
+                result_id=recon_id,
+                file_id=recon_id+'_unmatched_b',
+                result_type="unmatched_b",
+                process_type="reconciliation",
+                file_format="csv",
+                description="unmatched_b records from reconciliation"
+            )
+            save_result_res_unmatched_b = await save_results_to_server(save_request_unmatched_b)
+            print(f"✓ Saved matched results: {save_result_res_unmatched_b}")
         except Exception as e:
             print(f"⚠️ Could not save matched results: {str(e)}")
             # Continue execution - saving is optional

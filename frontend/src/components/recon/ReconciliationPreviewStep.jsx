@@ -416,7 +416,7 @@ const ReconciliationPreviewStep = ({
                 <div className="flex flex-wrap gap-3">
                     {/* Disable "View Matched Results" if there are no matches */}
                     <button
-                        onClick={matchedCount > 0 ? () => onViewResults(generatedResults.reconciliation_id) : undefined}
+                        onClick={matchedCount > 0 ? () => onViewResults(generatedResults.reconciliation_id+'_matched') : undefined}
                         disabled={matchedCount === 0}
                         className={`flex items-center space-x-2 px-4 py-2 rounded ${
                             matchedCount > 0 
@@ -430,19 +430,32 @@ const ReconciliationPreviewStep = ({
                         <ExternalLink size={14} />
                     </button>
                     
-                    {/* Disable "View All Results" if there's no data */}
                     <button
-                        onClick={(matchedCount > 0 || unmatchedACount > 0 || unmatchedBCount > 0) ? () => onViewResults(generatedResults.reconciliation_id+'_all') : undefined}
-                        disabled={matchedCount === 0 && unmatchedACount === 0 && unmatchedBCount === 0}
+                        onClick={unmatchedACount > 0? () => onViewResults(generatedResults.reconciliation_id+'_unmatched_a') : undefined}
+                        disabled={unmatchedACount === 0}
                         className={`flex items-center space-x-2 px-4 py-2 rounded ${
-                            (matchedCount > 0 || unmatchedACount > 0 || unmatchedBCount > 0)
+                            (unmatchedACount > 0)
                                 ? 'bg-blue-500 text-white hover:bg-blue-600' 
                                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
-                        title={(matchedCount === 0 && unmatchedACount === 0 && unmatchedBCount === 0) ? 'No records available to view' : 'View all reconciliation results'}
+                        title={unmatchedACount === 0  ? 'No records available for Unmatched A' : 'View Unmatched A results'}
                     >
                         <Eye size={16} />
-                        <span>View All Results</span>
+                        <span>View Unmatched A Results</span>
+                        <ExternalLink size={14} />
+                    </button>
+                    <button
+                        onClick={unmatchedBCount > 0? () => onViewResults(generatedResults.reconciliation_id+'_unmatched_b') : undefined}
+                        disabled={unmatchedBCount === 0}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded ${
+                            (unmatchedBCount > 0)
+                                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
+                        title={unmatchedBCount === 0  ? 'No records available for Unmatched A' : 'View Unmatched A results'}
+                    >
+                        <Eye size={16} />
+                        <span>View Unmatched B Results</span>
                         <ExternalLink size={14} />
                     </button>
 
