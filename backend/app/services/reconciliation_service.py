@@ -1097,6 +1097,7 @@ class OptimizedFileProcessor:
                         elapsed = time.time() - start_time
                         completed = len(processed_batches)
                         remaining = len(batches) - completed
+                        progress_pct = (completed / len(batches)) * 100 if len(batches) > 0 else 0
                         eta = (elapsed / completed * remaining) if completed > 0 else 0
                         
                         logger.info(f"📈 Completed batch {completed}/{len(batches)} ({progress_pct:.1f}%) | Elapsed: {elapsed:.1f}s | ETA: {eta:.1f}s")
