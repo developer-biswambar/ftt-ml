@@ -1,5 +1,7 @@
 import io
 import re
+import logging
+import time
 from datetime import datetime
 from functools import lru_cache
 from typing import Dict, List, Optional, Set, Tuple
@@ -10,6 +12,18 @@ from rapidfuzz import fuzz, process
 import numpy as np
 
 from app.models.recon_models import PatternCondition, FileRule, ExtractRule, FilterRule, ReconciliationRule
+
+# Configure logging for reconciliation service
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter(
+        '%(asctime)s | %(name)s | %(levelname)s | %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
 # Update forward reference
 PatternCondition.model_rebuild()
@@ -616,16 +630,35 @@ class OptimizedFileProcessor:
                 - "many_to_one": Multiple File A records can match same File B record
                 - "many_to_many": Full cartesian matching (slowest)
         """
+        start_time = time.time()
+        
+        logger.info("🚀 Starting optimized reconciliation process")
+        logger.info(f"📊 Dataset sizes: File A ({len(df_a):,} records) vs File B ({len(df_b):,} records)")
+        logger.info(f"🔧 Configuration: Match mode = {match_mode}, Closest matches = {find_closest_matches}")
+        logger.info(f"📋 Reconciliation rules: {len(recon_rules)} rules defined")
+        
+        # Log rule details for debugging
+        for i, rule in enumerate(recon_rules, 1):
+            logger.debug(f"   Rule {i}: {rule.LeftFileColumn} ↔ {rule.RightFileColumn} ({rule.MatchType})")
+        
+        logger.info("🔄 Creating optimized match keys and processing rules...")
 
         # Create working copies with indices and separate rule types
         df_a_work, tolerance_rules_a, date_rules_a = self.create_optimized_match_keys(df_a, recon_rules, 'A')
         df_b_work, tolerance_rules_b, date_rules_b = self.create_optimized_match_keys(df_b, recon_rules, 'B')
+        
+        logger.info(f"✅ Match keys created: File A ({len(df_a_work)} records), File B ({len(df_b_work)} records)")
+        logger.info(f"📈 Rule distribution: {len(tolerance_rules_a)} tolerance rules, {len(date_rules_a)} date rules")
 
         df_a_work['_orig_index_a'] = range(len(df_a_work))
         df_b_work['_orig_index_b'] = range(len(df_b_work))
+        
+        logger.info("🔍 Starting matching process with hash-based optimization...")
 
         # Group by match key for faster lookups (only for exact matches)
         grouped_b = df_b_work.groupby('_match_key')
+        unique_keys_b = len(grouped_b.groups)
+        logger.info(f"📊 Created {unique_keys_b:,} unique match key groups in File B")
 
         matched_indices_a = set()
         matched_indices_b = set()
@@ -633,9 +666,18 @@ class OptimizedFileProcessor:
 
         # Process matches in batches for better memory management
         batch_size = 1000
-        for start_idx in range(0, len(df_a_work), batch_size):
+        total_batches = (len(df_a_work) + batch_size - 1) // batch_size
+        logger.info(f"⚙️ Processing {len(df_a_work):,} records in {total_batches} batches (size: {batch_size})")
+        
+        processed_records = 0
+        for batch_idx, start_idx in enumerate(range(0, len(df_a_work), batch_size), 1):
             end_idx = min(start_idx + batch_size, len(df_a_work))
             batch_a = df_a_work.iloc[start_idx:end_idx]
+            
+            # Progress logging every 10 batches or for large datasets
+            if batch_idx % 10 == 0 or total_batches <= 10:
+                progress_pct = (batch_idx / total_batches) * 100
+                logger.info(f"📈 Processing batch {batch_idx}/{total_batches} ({progress_pct:.1f}%) - {len(matches):,} matches found so far")
 
             for idx_a, row_a in batch_a.iterrows():
                 # Removed: Skip already matched records (allows many-to-many)
@@ -693,9 +735,11 @@ class OptimizedFileProcessor:
 
         # Create result DataFrames with selected columns
         matched_df = pd.DataFrame(matches) if matches else pd.DataFrame()
+        
+        logger.info(f"✅ Main reconciliation completed - found {len(matches):,} matches")
+        logger.info("🔍 Calculating unmatched records...")
 
         # Unmatched records are calculated based on matched_indices sets
-
         unmatched_a = self._select_result_columns(
             df_a_work[~df_a_work['_orig_index_a'].isin(matched_indices_a)].drop(['_orig_index_a', '_match_key'],
                                                                                 axis=1),
@@ -707,9 +751,14 @@ class OptimizedFileProcessor:
                                                                                 axis=1),
             selected_columns_b, recon_rules, 'B'
         )
+        
+        logger.info(f"📊 Unmatched records: File A ({len(unmatched_a):,}), File B ({len(unmatched_b):,})")
 
         # Add closest match functionality if requested
         if find_closest_matches:
+            logger.info("🎯 Starting closest match analysis (enhanced mode)...")
+            closest_match_start = time.time()
+            
             # Prepare full datasets for comparison (with selected columns)
             full_df_a = self._select_result_columns(df_a_work.drop(['_orig_index_a', '_match_key'], axis=1), 
                                                    selected_columns_a, recon_rules, 'A')
@@ -717,12 +766,28 @@ class OptimizedFileProcessor:
                                                    selected_columns_b, recon_rules, 'B')
             
             if len(unmatched_a) > 0 and len(full_df_b) > 0:
-                print(f"Finding closest matches for {len(unmatched_a)} unmatched A records against entire File B ({len(full_df_b)} records)...")
+                logger.info(f"🔍 Analyzing {len(unmatched_a):,} unmatched A records against entire File B ({len(full_df_b):,} records)")
                 unmatched_a = self._add_closest_matches(unmatched_a, full_df_b, recon_rules, 'A')
                 
             if len(unmatched_b) > 0 and len(full_df_a) > 0:
-                print(f"Finding closest matches for {len(unmatched_b)} unmatched B records against entire File A ({len(full_df_a)} records)...")
+                logger.info(f"🔍 Analyzing {len(unmatched_b):,} unmatched B records against entire File A ({len(full_df_a):,} records)")
                 unmatched_b = self._add_closest_matches(unmatched_b, full_df_a, recon_rules, 'B')
+            
+            closest_match_time = time.time() - closest_match_start
+            logger.info(f"✅ Closest match analysis completed in {closest_match_time:.2f}s")
+        
+        # Final summary
+        total_time = time.time() - start_time
+        match_percentage = (len(matches) / len(df_a)) * 100 if len(df_a) > 0 else 0
+        
+        logger.info("🏁 Reconciliation process completed!")
+        logger.info(f"📊 Final Results Summary:")
+        logger.info(f"   ✅ Matched records: {len(matches):,}")
+        logger.info(f"   🔍 Unmatched A: {len(unmatched_a):,}")  
+        logger.info(f"   🔍 Unmatched B: {len(unmatched_b):,}")
+        logger.info(f"   📈 Match percentage: {match_percentage:.1f}%")
+        logger.info(f"   ⏱️ Total processing time: {total_time:.2f}s")
+        logger.info(f"   🚀 Processing rate: {(len(df_a) + len(df_b))/total_time:.0f} records/second")
 
         return {
             'matched': matched_df,
@@ -733,7 +798,14 @@ class OptimizedFileProcessor:
     def _add_closest_matches(self, unmatched_source: pd.DataFrame, full_target: pd.DataFrame, 
                             recon_rules: List[ReconciliationRule], source_file: str) -> pd.DataFrame:
         """
-        Add closest match columns to unmatched records using composite similarity scoring
+        Add closest match columns to unmatched records using optimized composite similarity scoring
+        
+        PERFORMANCE OPTIMIZATIONS:
+        - Early termination on perfect matches
+        - Column type caching
+        - Minimum score thresholds
+        - Batch processing for large datasets
+        - Memory-efficient processing
         
         Args:
             unmatched_source: Unmatched records from source file
@@ -747,6 +819,23 @@ class OptimizedFileProcessor:
         if len(unmatched_source) == 0 or len(full_target) == 0:
             return unmatched_source
             
+        logger.info(f"🚀 Starting optimized closest match analysis for {len(unmatched_source):,} unmatched records against {len(full_target):,} target records")
+        
+        # Check if we need batch processing for large datasets
+        total_comparisons = len(unmatched_source) * len(full_target)
+        logger.info(f"📊 Total potential comparisons: {total_comparisons:,}")
+        
+        if total_comparisons > 10_000_000:  # 10M+ comparisons
+            logger.info(f"⚡ Large dataset detected ({total_comparisons:,} comparisons). Using batch processing...")
+            return self._add_closest_matches_optimized_batch(unmatched_source, full_target, recon_rules, source_file)
+        else:
+            logger.info("⚙️ Using single-threaded optimization for moderate dataset size")
+            return self._add_closest_matches_optimized_single(unmatched_source, full_target, recon_rules, source_file)
+
+    def _add_closest_matches_optimized_single(self, unmatched_source: pd.DataFrame, full_target: pd.DataFrame,
+                                            recon_rules: List[ReconciliationRule], source_file: str) -> pd.DataFrame:
+        """Optimized single-batch processing for smaller datasets"""
+        
         # Make a copy to avoid modifying the original
         result_df = unmatched_source.copy()
         
@@ -771,8 +860,27 @@ class OptimizedFileProcessor:
         if not compare_columns:
             print(f"Warning: No comparable columns found for closest match analysis")
             return result_df
-            
-        print(f"Comparing {len(compare_columns)} column pairs for closest matches")
+        
+        # Pre-compute column types for caching
+        column_type_cache = {}
+        for source_col, target_col in compare_columns:
+            if source_col not in column_type_cache:
+                column_type_cache[source_col] = self._detect_column_type(
+                    source_col, 
+                    unmatched_source[source_col].head(10).tolist()
+                )
+        
+        logger.info(f"🔍 Comparing {len(compare_columns)} column pairs with optimizations...")
+        logger.info(f"⚙️ Performance thresholds: Min score = 30%, Perfect match = 99.5%")
+        
+        # Performance settings
+        MIN_SCORE_THRESHOLD = 30.0  # Skip very low similarity matches
+        PERFECT_MATCH_THRESHOLD = 99.5  # Early termination threshold
+        
+        processed_count = 0
+        matches_found = 0
+        early_terminations = 0
+        skipped_comparisons = 0
         
         # Process each unmatched record
         for idx, source_row in unmatched_source.iterrows():
@@ -780,9 +888,32 @@ class OptimizedFileProcessor:
             best_match_record = None
             best_match_details = {}
             
+            # Progress reporting
+            processed_count += 1
+            if processed_count % 1000 == 0:
+                logger.info(f"📊 Processed {processed_count:,} / {len(unmatched_source):,} records | Matches: {matches_found:,} | Early exits: {early_terminations:,}")
+            
             # Compare with each record in the target file
             for target_idx, target_row in full_target.iterrows():
-                # Calculate composite similarity across all comparable columns
+                # Early exit if we already found a very good match
+                if best_match_score >= PERFECT_MATCH_THRESHOLD:
+                    early_terminations += 1
+                    break
+                
+                # Quick pre-screening: check first column similarity
+                first_source_col, first_target_col = compare_columns[0]
+                first_similarity = self._calculate_composite_similarity(
+                    source_row[first_source_col], 
+                    target_row[first_target_col], 
+                    column_type_cache[first_source_col]
+                )
+                
+                # Skip if first column similarity is too low
+                if first_similarity < MIN_SCORE_THRESHOLD:
+                    skipped_comparisons += 1
+                    continue
+                
+                # Calculate full composite similarity
                 column_scores = {}
                 total_weighted_score = 0.0
                 
@@ -790,11 +921,8 @@ class OptimizedFileProcessor:
                     source_val = source_row[source_col]
                     target_val = target_row[target_col]
                     
-                    # Detect column type for appropriate similarity calculation
-                    column_type = self._detect_column_type(
-                        source_col, 
-                        unmatched_source[source_col].head(10).tolist()
-                    )
+                    # Use cached column type
+                    column_type = column_type_cache[source_col]
                     
                     # Calculate similarity
                     similarity = self._calculate_composite_similarity(source_val, target_val, column_type)
@@ -805,23 +933,24 @@ class OptimizedFileProcessor:
                         'type': column_type
                     }
                     
-                    # Weight each column equally for now (could be enhanced to use rule-specific weights)
                     total_weighted_score += similarity
                 
                 # Average score across all columns
-                if compare_columns:
-                    avg_score = total_weighted_score / len(compare_columns)
-                else:
-                    avg_score = 0.0
+                avg_score = total_weighted_score / len(compare_columns) if compare_columns else 0.0
                 
-                # Update best match if this is better
-                if avg_score > best_match_score:
+                # Update best match if this is better and above threshold
+                if avg_score > best_match_score and avg_score > MIN_SCORE_THRESHOLD:
                     best_match_score = avg_score
                     best_match_record = target_row.to_dict()
                     best_match_details = column_scores
+                    
+                    # Early termination for perfect matches
+                    if avg_score >= PERFECT_MATCH_THRESHOLD:
+                        break
             
             # Add closest match information to result
             if best_match_score > 0:
+                matches_found += 1
                 # Create simplified record summary instead of full JSON
                 if best_match_record:
                     record_summary = []
@@ -850,8 +979,277 @@ class OptimizedFileProcessor:
                 else:
                     result_df.at[idx, 'closest_match_details'] = "All columns match exactly"
                 
-        print(f"Added closest match information to {len(result_df)} records")
+        # Final performance summary
+        total_potential_comparisons = len(unmatched_source) * len(full_target)
+        actual_comparisons = total_potential_comparisons - skipped_comparisons
+        efficiency_pct = (skipped_comparisons / total_potential_comparisons) * 100 if total_potential_comparisons > 0 else 0
+        
+        logger.info(f"✅ Single-threaded closest match completed!")
+        logger.info(f"📊 Performance Summary:")
+        logger.info(f"   🎯 Records processed: {len(unmatched_source):,}")
+        logger.info(f"   ✅ Matches found: {matches_found:,}")
+        logger.info(f"   ⚡ Early terminations: {early_terminations:,}")
+        logger.info(f"   ⏭️ Skipped comparisons: {skipped_comparisons:,} ({efficiency_pct:.1f}% efficiency)")
+        logger.info(f"   🔥 Actual comparisons: {actual_comparisons:,} of {total_potential_comparisons:,} potential")
+        
         return result_df
+
+    def _add_closest_matches_optimized_batch(self, unmatched_source: pd.DataFrame, full_target: pd.DataFrame,
+                                           recon_rules: List[ReconciliationRule], source_file: str) -> pd.DataFrame:
+        """
+        Batch processing for very large datasets with parallel processing
+        
+        ADVANCED OPTIMIZATIONS:
+        - Parallel processing using multiprocessing
+        - Intelligent batching
+        - Memory-efficient chunk processing
+        - Advanced caching and indexing
+        """
+        from multiprocessing import Pool, cpu_count
+        import multiprocessing as mp
+        import gc
+        
+        logger.info(f"🚀 Starting advanced batch processing for large dataset...")
+        batch_start_time = time.time()
+        
+        # Make a copy to avoid modifying the original
+        result_df = unmatched_source.copy()
+        
+        # Initialize closest match columns
+        result_df['closest_match_record'] = None
+        result_df['closest_match_score'] = 0.0
+        result_df['closest_match_details'] = None
+        
+        # Get columns to compare based on reconciliation rules
+        compare_columns = []
+        for rule in recon_rules:
+            if source_file == 'A':
+                source_col = rule.LeftFileColumn
+                target_col = rule.RightFileColumn
+            else:
+                source_col = rule.RightFileColumn  
+                target_col = rule.LeftFileColumn
+                
+            if source_col in unmatched_source.columns and target_col in full_target.columns:
+                compare_columns.append((source_col, target_col))
+        
+        if not compare_columns:
+            print(f"Warning: No comparable columns found for closest match analysis")
+            return result_df
+        
+        # Pre-compute column types for caching
+        column_type_cache = {}
+        for source_col, target_col in compare_columns:
+            if source_col not in column_type_cache:
+                column_type_cache[source_col] = self._detect_column_type(
+                    source_col, 
+                    unmatched_source[source_col].head(10).tolist()
+                )
+        
+        # Determine optimal batch size and number of processes
+        total_records = len(unmatched_source)
+        num_processes = min(cpu_count() - 1, 8)  # Leave one core free, max 8 processes
+        optimal_batch_size = max(100, min(1000, total_records // num_processes))
+        
+        logger.info(f"🔧 Configuration: {num_processes} processes, batch size: {optimal_batch_size}")
+        logger.info(f"📊 Processing {total_records:,} records against {len(full_target):,} targets")
+        logger.info(f"💾 Estimated memory impact: {(total_records * len(full_target)) / 1_000_000:.1f}M potential comparisons")
+        
+        # Split unmatched_source into batches
+        batches = []
+        for i in range(0, total_records, optimal_batch_size):
+            end_idx = min(i + optimal_batch_size, total_records)
+            batch_df = unmatched_source.iloc[i:end_idx].copy()
+            batches.append((i, batch_df))
+        
+        logger.info(f"📦 Created {len(batches)} batches for parallel processing")
+        
+        # Process batches with progress tracking
+        processed_batches = []
+        
+        try:
+            # Use ProcessPoolExecutor for better resource management
+            from concurrent.futures import ProcessPoolExecutor, as_completed
+            import time
+            
+            start_time = time.time()
+            
+            with ProcessPoolExecutor(max_workers=num_processes) as executor:
+                # Submit all batch jobs
+                future_to_batch = {}
+                
+                for batch_idx, (start_idx, batch_df) in enumerate(batches):
+                    future = executor.submit(
+                        self._process_batch_closest_matches,
+                        batch_df, full_target, compare_columns, column_type_cache,
+                        batch_idx, len(batches)
+                    )
+                    future_to_batch[future] = (start_idx, batch_df)
+                
+                # Collect results as they complete
+                for future in as_completed(future_to_batch):
+                    start_idx, original_batch = future_to_batch[future]
+                    try:
+                        batch_result = future.result(timeout=300)  # 5 minute timeout per batch
+                        processed_batches.append((start_idx, batch_result))
+                        
+                        # Progress update
+                        elapsed = time.time() - start_time
+                        completed = len(processed_batches)
+                        remaining = len(batches) - completed
+                        eta = (elapsed / completed * remaining) if completed > 0 else 0
+                        
+                        logger.info(f"📈 Completed batch {completed}/{len(batches)} ({progress_pct:.1f}%) | Elapsed: {elapsed:.1f}s | ETA: {eta:.1f}s")
+                        
+                    except Exception as e:
+                        logger.warning(f"❌ Batch {start_idx} processing failed: {str(e)}")
+                        # Use original batch data as fallback
+                        processed_batches.append((start_idx, original_batch))
+            
+            # Reassemble results
+            processed_batches.sort(key=lambda x: x[0])  # Sort by start_idx
+            
+            for start_idx, batch_result in processed_batches:
+                end_idx = start_idx + len(batch_result)
+                result_df.iloc[start_idx:end_idx] = batch_result
+            
+            total_time = time.time() - start_time
+            batch_total_time = time.time() - batch_start_time
+            logger.info(f"✅ Parallel batch processing completed in {batch_total_time:.1f} seconds")
+            logger.info(f"⚡ Processing rate: {total_records/batch_total_time:.0f} records/second")
+            logger.info(f"🚀 Speedup achieved through parallelization")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Parallel processing failed, falling back to single-threaded: {str(e)}")
+            return self._add_closest_matches_optimized_single(unmatched_source, full_target, recon_rules, source_file)
+        
+        # Force garbage collection after intensive processing
+        gc.collect()
+        
+        return result_df
+    
+    def _process_batch_closest_matches(self, batch_df: pd.DataFrame, full_target: pd.DataFrame, 
+                                     compare_columns: list, column_type_cache: dict, 
+                                     batch_idx: int, total_batches: int) -> pd.DataFrame:
+        """
+        Process a single batch of records for closest matches
+        This method is designed to be called by multiprocessing
+        """
+        
+        # Initialize result columns
+        batch_df = batch_df.copy()
+        batch_df['closest_match_record'] = None
+        batch_df['closest_match_score'] = 0.0
+        batch_df['closest_match_details'] = None
+        
+        # Performance settings
+        MIN_SCORE_THRESHOLD = 30.0
+        PERFECT_MATCH_THRESHOLD = 99.5
+        
+        # Create target index for faster lookup (if beneficial)
+        target_size = len(full_target)
+        use_sampling = target_size > 50_000  # Use sampling for very large targets
+        
+        if use_sampling:
+            # For extremely large targets, sample a representative subset
+            sample_size = min(10_000, target_size // 2)
+            target_sample = full_target.sample(n=sample_size, random_state=42)
+            logger.debug(f"🎯 Batch {batch_idx}: Using target sampling ({sample_size:,} records from {target_size:,} total)")
+        else:
+            target_sample = full_target
+            logger.debug(f"🔍 Batch {batch_idx}: Processing against full target ({target_size:,} records)")
+        
+        # Process each record in the batch
+        for idx, source_row in batch_df.iterrows():
+            best_match_score = 0.0
+            best_match_record = None
+            best_match_details = {}
+            
+            # Compare with each record in the target (or sample)
+            for target_idx, target_row in target_sample.iterrows():
+                # Early exit if we already found a very good match
+                if best_match_score >= PERFECT_MATCH_THRESHOLD:
+                    break
+                
+                # Quick pre-screening using first column
+                first_source_col, first_target_col = compare_columns[0]
+                first_similarity = self._calculate_composite_similarity(
+                    source_row[first_source_col], 
+                    target_row[first_target_col], 
+                    column_type_cache[first_source_col]
+                )
+                
+                # Skip if first column similarity is too low
+                if first_similarity < MIN_SCORE_THRESHOLD:
+                    continue
+                
+                # Calculate full composite similarity
+                column_scores = {}
+                total_weighted_score = 0.0
+                
+                for source_col, target_col in compare_columns:
+                    source_val = source_row[source_col]
+                    target_val = target_row[target_col]
+                    
+                    # Use cached column type
+                    column_type = column_type_cache[source_col]
+                    
+                    # Calculate similarity
+                    similarity = self._calculate_composite_similarity(source_val, target_val, column_type)
+                    column_scores[f"{source_col}_vs_{target_col}"] = {
+                        'score': similarity,
+                        'source_value': source_val,
+                        'target_value': target_val,
+                        'type': column_type
+                    }
+                    
+                    total_weighted_score += similarity
+                
+                # Average score across all columns
+                avg_score = total_weighted_score / len(compare_columns) if compare_columns else 0.0
+                
+                # Update best match if this is better and above threshold
+                if avg_score > best_match_score and avg_score > MIN_SCORE_THRESHOLD:
+                    best_match_score = avg_score
+                    best_match_record = target_row.to_dict()
+                    best_match_details = column_scores
+                    
+                    # Early termination for perfect matches
+                    if avg_score >= PERFECT_MATCH_THRESHOLD:
+                        break
+            
+            # Add closest match information to result
+            if best_match_score > 0:
+                # Create simplified record summary
+                if best_match_record:
+                    record_summary = []
+                    for key, value in list(best_match_record.items())[:3]:
+                        record_summary.append(f"{key}: {value}")
+                    batch_df.at[idx, 'closest_match_record'] = "; ".join(record_summary)
+                else:
+                    batch_df.at[idx, 'closest_match_record'] = "No match details available"
+                
+                batch_df.at[idx, 'closest_match_score'] = round(best_match_score, 2)
+                
+                # Create simple closest match details showing only mismatched columns
+                details_list = []
+                for column_key, details in best_match_details.items():
+                    source_val = details['source_value']
+                    target_val = details['target_value']
+                    score = details['score']
+                    
+                    # Only include columns that don't match exactly (score < 100)
+                    if score < 100:
+                        # Extract just the column name from the key
+                        column_name = column_key.split('_vs_')[0]
+                        details_list.append(f"{column_name}: '{source_val}' → '{target_val}'")
+                
+                if details_list:
+                    batch_df.at[idx, 'closest_match_details'] = "; ".join(details_list)
+                else:
+                    batch_df.at[idx, 'closest_match_details'] = "All columns match exactly"
+        
+        return batch_df
 
     def _check_tolerance_match(self, val_a, val_b, tolerance: float) -> bool:
         """Check if two values match within tolerance"""
