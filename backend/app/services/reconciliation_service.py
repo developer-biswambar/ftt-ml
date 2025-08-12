@@ -709,10 +709,20 @@ class OptimizedFileProcessor:
         )
 
         # Add closest match functionality if requested
-        if find_closest_matches and len(unmatched_a) > 0 and len(unmatched_b) > 0:
-            print(f"Finding closest matches for {len(unmatched_a)} unmatched A records and {len(unmatched_b)} unmatched B records...")
-            unmatched_a = self._add_closest_matches(unmatched_a, unmatched_b, recon_rules, 'A')
-            unmatched_b = self._add_closest_matches(unmatched_b, unmatched_a, recon_rules, 'B')
+        if find_closest_matches:
+            # Prepare full datasets for comparison (with selected columns)
+            full_df_a = self._select_result_columns(df_a_work.drop(['_orig_index_a', '_match_key'], axis=1), 
+                                                   selected_columns_a, recon_rules, 'A')
+            full_df_b = self._select_result_columns(df_b_work.drop(['_orig_index_b', '_match_key'], axis=1), 
+                                                   selected_columns_b, recon_rules, 'B')
+            
+            if len(unmatched_a) > 0 and len(full_df_b) > 0:
+                print(f"Finding closest matches for {len(unmatched_a)} unmatched A records against entire File B ({len(full_df_b)} records)...")
+                unmatched_a = self._add_closest_matches(unmatched_a, full_df_b, recon_rules, 'A')
+                
+            if len(unmatched_b) > 0 and len(full_df_a) > 0:
+                print(f"Finding closest matches for {len(unmatched_b)} unmatched B records against entire File A ({len(full_df_a)} records)...")
+                unmatched_b = self._add_closest_matches(unmatched_b, full_df_a, recon_rules, 'B')
 
         return {
             'matched': matched_df,
@@ -720,21 +730,21 @@ class OptimizedFileProcessor:
             'unmatched_file_b': unmatched_b
         }
 
-    def _add_closest_matches(self, unmatched_source: pd.DataFrame, unmatched_target: pd.DataFrame, 
+    def _add_closest_matches(self, unmatched_source: pd.DataFrame, full_target: pd.DataFrame, 
                             recon_rules: List[ReconciliationRule], source_file: str) -> pd.DataFrame:
         """
         Add closest match columns to unmatched records using composite similarity scoring
         
         Args:
             unmatched_source: Unmatched records from source file
-            unmatched_target: Unmatched records from target file (for comparison)
+            full_target: All records from target file (both matched and unmatched for comparison)
             recon_rules: Reconciliation rules to determine which columns to compare
             source_file: 'A' or 'B' to indicate which file is the source
             
         Returns:
             DataFrame with closest match information added
         """
-        if len(unmatched_source) == 0 or len(unmatched_target) == 0:
+        if len(unmatched_source) == 0 or len(full_target) == 0:
             return unmatched_source
             
         # Make a copy to avoid modifying the original
@@ -755,7 +765,7 @@ class OptimizedFileProcessor:
                 source_col = rule.RightFileColumn  
                 target_col = rule.LeftFileColumn
                 
-            if source_col in unmatched_source.columns and target_col in unmatched_target.columns:
+            if source_col in unmatched_source.columns and target_col in full_target.columns:
                 compare_columns.append((source_col, target_col))
         
         if not compare_columns:
@@ -771,7 +781,7 @@ class OptimizedFileProcessor:
             best_match_details = {}
             
             # Compare with each record in the target file
-            for target_idx, target_row in unmatched_target.iterrows():
+            for target_idx, target_row in full_target.iterrows():
                 # Calculate composite similarity across all comparable columns
                 column_scores = {}
                 total_weighted_score = 0.0
