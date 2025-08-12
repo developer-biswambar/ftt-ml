@@ -414,13 +414,13 @@ const ReconciliationPreviewStep = ({
 
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-3">
-                    {/* Disable "View Matched Results" if there are no matches */}
+                    {/* View Matched Results - Success Green */}
                     <button
                         onClick={matchedCount > 0 ? () => onViewResults(generatedResults.reconciliation_id+'_matched') : undefined}
                         disabled={matchedCount === 0}
-                        className={`flex items-center space-x-2 px-4 py-2 rounded ${
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 shadow-sm ${
                             matchedCount > 0 
-                                ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                                ? 'bg-emerald-500 text-white hover:bg-emerald-600 hover:shadow-md transform hover:-translate-y-0.5' 
                                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
                         title={matchedCount === 0 ? 'No matched records available to view' : 'View matched records'}
@@ -430,12 +430,13 @@ const ReconciliationPreviewStep = ({
                         <ExternalLink size={14} />
                     </button>
                     
+                    {/* View Unmatched A Results - Warning Amber */}
                     <button
                         onClick={unmatchedACount > 0? () => onViewResults(generatedResults.reconciliation_id+'_unmatched_a') : undefined}
                         disabled={unmatchedACount === 0}
-                        className={`flex items-center space-x-2 px-4 py-2 rounded ${
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 shadow-sm ${
                             (unmatchedACount > 0)
-                                ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                                ? 'bg-amber-500 text-white hover:bg-amber-600 hover:shadow-md transform hover:-translate-y-0.5' 
                                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
                         title={unmatchedACount === 0  ? 'No records available for Unmatched A' : 'View Unmatched A results'}
@@ -444,32 +445,36 @@ const ReconciliationPreviewStep = ({
                         <span>View Unmatched A Results</span>
                         <ExternalLink size={14} />
                     </button>
+                    
+                    {/* View Unmatched B Results - Warning Orange */}
                     <button
                         onClick={unmatchedBCount > 0? () => onViewResults(generatedResults.reconciliation_id+'_unmatched_b') : undefined}
                         disabled={unmatchedBCount === 0}
-                        className={`flex items-center space-x-2 px-4 py-2 rounded ${
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 shadow-sm ${
                             (unmatchedBCount > 0)
-                                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                ? 'bg-orange-500 text-white hover:bg-orange-600 hover:shadow-md transform hover:-translate-y-0.5'
                                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
-                        title={unmatchedBCount === 0  ? 'No records available for Unmatched A' : 'View Unmatched A results'}
+                        title={unmatchedBCount === 0  ? 'No records available for Unmatched B' : 'View Unmatched B results'}
                     >
                         <Eye size={16} />
                         <span>View Unmatched B Results</span>
                         <ExternalLink size={14} />
                     </button>
 
+                    {/* Regenerate - Primary Blue */}
                     <button
                         onClick={onRefresh}
-                        className="flex items-center space-x-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                        className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
                     >
                         <RefreshCw size={16} />
                         <span>Regenerate</span>
                     </button>
 
+                    {/* Modify Config - Secondary Purple */}
                     <button
                         onClick={onRetry}
-                        className="flex items-center space-x-2 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+                        className="flex items-center space-x-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all duration-200 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
                     >
                         <ArrowLeft size={16} />
                         <span>Modify Config</span>
