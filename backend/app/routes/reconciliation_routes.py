@@ -6,7 +6,6 @@ from typing import Optional, List, Dict, Any
 import pandas as pd
 from fastapi import APIRouter, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
-from pyasn1_modules.rfc8018 import algid_hmacWithSHA1
 from pydantic import BaseModel
 
 from app.models.recon_models import ReconciliationResponse, ReconciliationSummary, OptimizedRulesConfig
@@ -51,6 +50,7 @@ class JSONReconciliationRequest(BaseModel):
     user_requirements: str
     files: List[FileReference]
     reconciliation_config: ReconciliationConfig
+    find_closest_matches: Optional[bool] = False  # Optional parameter for closest match functionality
 
 
 async def get_file_by_id(file_id: str) -> UploadFile:
@@ -162,7 +162,8 @@ async def process_reconciliation_json(
         columns_b = request.reconciliation_config.selected_columns_file_b
 
         return await _process_reconciliation_core(
-            processor, rules_config, fileA, fileB, columns_a, columns_b, "standard", start_time
+            processor, rules_config, fileA, fileB, columns_a, columns_b, "standard", start_time,
+            find_closest_matches=request.find_closest_matches
         )
 
     except HTTPException:
@@ -180,7 +181,8 @@ async def _process_reconciliation_core(
         columns_a: Optional[List[str]],
         columns_b: Optional[List[str]],
         output_format: str,
-        start_time: datetime
+        start_time: datetime,
+        find_closest_matches: bool = False
 ) -> ReconciliationResponse:
     """Core reconciliation processing logic shared between endpoints"""
 
@@ -251,7 +253,7 @@ async def _process_reconciliation_core(
     print("Starting optimized reconciliation...")
     reconciliation_results = processor.reconcile_files_optimized(
         df_a, df_b, rules_config.ReconciliationRules,
-        columns_a, columns_b
+        columns_a, columns_b, find_closest_matches=find_closest_matches
     )
 
     # Generate reconciliation ID

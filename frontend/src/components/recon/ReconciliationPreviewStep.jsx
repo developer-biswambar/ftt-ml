@@ -31,7 +31,9 @@ const ReconciliationPreviewStep = ({
     onClose,
     loadedRuleId,
     hasUnsavedChanges,
-    onShowRuleModal
+    onShowRuleModal,
+    findClosestMatches = false,
+    onToggleClosestMatches
 }) => {
     // Remove viewMode state since we're combining into single view
 
@@ -411,6 +413,48 @@ const ReconciliationPreviewStep = ({
                         </div>
                     </div>
                 </div>
+
+                {/* Closest Match Options */}
+                {onToggleClosestMatches && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <div>
+                                <h4 className="font-medium text-purple-800">Closest Match Analysis</h4>
+                                <p className="text-sm text-purple-700">
+                                    {findClosestMatches ? 'Adding closest match suggestions to unmatched records' : 'Enable to find potential matches for unmatched records'}
+                                </p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="sr-only peer"
+                                    checked={findClosestMatches}
+                                    onChange={(e) => onToggleClosestMatches(e.target.checked)}
+                                />
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                            </label>
+                        </div>
+                        <div className="text-sm text-purple-700">
+                            {findClosestMatches ? (
+                                <div className="space-y-1">
+                                    <div className="flex items-center space-x-2">
+                                        <CheckCircle size={16} className="text-purple-600" />
+                                        <span>✓ Will analyze similarity between unmatched records</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <CheckCircle size={16} className="text-purple-600" />
+                                        <span>✓ Adds 3 new columns: closest_match_record, closest_match_score, closest_match_details</span>
+                                    </div>
+                                    <div className="text-xs text-purple-600 mt-2">
+                                        Example: transaction_id: 'TXN002' → 'REF002'
+                                    </div>
+                                </div>
+                            ) : (
+                                <span>Toggle on to add closest match analysis to the next reconciliation run</span>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-3">

@@ -6,6 +6,8 @@ from typing import Dict, List, Optional, Set, Tuple
 
 import pandas as pd
 from fastapi import UploadFile, HTTPException
+from rapidfuzz import fuzz, process
+import numpy as np
 
 from app.models.recon_models import PatternCondition, FileRule, ExtractRule, FilterRule, ReconciliationRule
 
@@ -89,6 +91,185 @@ class OptimizedFileProcessor:
             # If conversion fails, return original dataframe
             self.warnings.append(f"Warning: Could not preserve integer types: {str(e)}")
             return df
+
+    def _calculate_composite_similarity(self, val_a, val_b, column_type: str = "text") -> float:
+        """
+        Calculate composite similarity score using multiple algorithms based on data type
+        
+        Args:
+            val_a: Value from file A
+            val_b: Value from file B  
+            column_type: Type of data - "text", "numeric", "date", "identifier"
+            
+        Returns:
+            Similarity score between 0.0 and 100.0
+        """
+        # Handle null values
+        if pd.isna(val_a) and pd.isna(val_b):
+            return 100.0
+        if pd.isna(val_a) or pd.isna(val_b):
+            return 0.0
+            
+        # Convert to strings for comparison
+        str_a = str(val_a).strip()
+        str_b = str(val_b).strip()
+        
+        # Exact match gets perfect score
+        if str_a == str_b:
+            return 100.0
+            
+        # Different algorithms based on data type
+        if column_type == "numeric":
+            return self._calculate_numeric_similarity(val_a, val_b)
+        elif column_type == "date":
+            return self._calculate_date_similarity(val_a, val_b)
+        elif column_type == "identifier":
+            return self._calculate_identifier_similarity(str_a, str_b)
+        else:  # text/default
+            return self._calculate_text_similarity(str_a, str_b)
+    
+    def _calculate_text_similarity(self, str_a: str, str_b: str) -> float:
+        """Calculate text similarity using multiple fuzzy algorithms"""
+        if not str_a or not str_b:
+            return 0.0
+            
+        # Multiple fuzzy matching algorithms with weights
+        algorithms = {
+            'ratio': fuzz.ratio(str_a, str_b) * 0.3,              # Basic similarity
+            'partial_ratio': fuzz.partial_ratio(str_a, str_b) * 0.2,  # Partial matching
+            'token_sort_ratio': fuzz.token_sort_ratio(str_a, str_b) * 0.25,  # Token order independent
+            'token_set_ratio': fuzz.token_set_ratio(str_a, str_b) * 0.25    # Token set comparison
+        }
+        
+        # Weighted composite score
+        composite_score = sum(algorithms.values())
+        return min(composite_score, 100.0)
+    
+    def _calculate_numeric_similarity(self, val_a, val_b) -> float:
+        """Calculate numeric similarity with tolerance handling"""
+        try:
+            num_a = float(val_a)
+            num_b = float(val_b)
+            
+            # Exact match
+            if num_a == num_b:
+                return 100.0
+            
+            # Calculate percentage difference
+            if num_b != 0:
+                percentage_diff = abs(num_a - num_b) / abs(num_b) * 100
+            else:
+                return 100.0 if num_a == 0 else 0.0
+            
+            # Convert to similarity score (inverse of difference)
+            # 0% difference = 100% similarity
+            # 1% difference = 99% similarity, etc.
+            similarity = max(0, 100 - percentage_diff)
+            return similarity
+            
+        except (ValueError, TypeError):
+            # Fall back to string comparison for non-numeric values
+            return self._calculate_text_similarity(str(val_a), str(val_b))
+    
+    def _calculate_date_similarity(self, val_a, val_b) -> float:
+        """Calculate date similarity with format tolerance"""
+        try:
+            # Try to parse dates in multiple formats
+            date_a = pd.to_datetime(val_a, errors='coerce')
+            date_b = pd.to_datetime(val_b, errors='coerce')
+            
+            if pd.isna(date_a) or pd.isna(date_b):
+                # Fall back to string comparison if date parsing fails
+                return self._calculate_text_similarity(str(val_a), str(val_b))
+            
+            # Exact date match
+            if date_a == date_b:
+                return 100.0
+            
+            # Calculate day difference
+            day_diff = abs((date_a - date_b).days)
+            
+            # Similarity decreases with day difference
+            # Same day = 100%, 1 day = 95%, 7 days = 65%, 30 days = 0%
+            if day_diff == 0:
+                return 100.0
+            elif day_diff <= 1:
+                return 95.0
+            elif day_diff <= 7:
+                return max(0, 95 - (day_diff - 1) * 5)  # 95, 90, 85, 80, 75, 70, 65
+            elif day_diff <= 30:
+                return max(0, 65 - (day_diff - 7) * 2.8)  # Gradual decrease to 0
+            else:
+                return 0.0
+                
+        except Exception:
+            # Fall back to string comparison
+            return self._calculate_text_similarity(str(val_a), str(val_b))
+    
+    def _calculate_identifier_similarity(self, str_a: str, str_b: str) -> float:
+        """Calculate similarity for identifiers (account numbers, transaction IDs, etc.)"""
+        if not str_a or not str_b:
+            return 0.0
+        
+        # For identifiers, we're more strict but allow for minor variations
+        algorithms = {
+            'ratio': fuzz.ratio(str_a, str_b) * 0.4,              # Basic similarity (higher weight)
+            'partial_ratio': fuzz.partial_ratio(str_a, str_b) * 0.3,  # Partial matching
+            'token_sort_ratio': fuzz.token_sort_ratio(str_a, str_b) * 0.3   # Token order independent
+        }
+        
+        composite_score = sum(algorithms.values())
+        return min(composite_score, 100.0)
+    
+    def _detect_column_type(self, column_name: str, sample_values: List) -> str:
+        """
+        Detect the most likely data type of a column based on name and sample values
+        """
+        column_name_lower = column_name.lower()
+        
+        # Date detection
+        date_keywords = ['date', 'time', 'created', 'updated', 'timestamp', 'day', 'month', 'year']
+        if any(keyword in column_name_lower for keyword in date_keywords):
+            return "date"
+        
+        # Numeric detection  
+        numeric_keywords = ['amount', 'value', 'price', 'cost', 'total', 'sum', 'balance', 'quantity', 'qty']
+        if any(keyword in column_name_lower for keyword in numeric_keywords):
+            return "numeric"
+        
+        # Identifier detection
+        id_keywords = ['id', 'ref', 'reference', 'number', 'account', 'code', 'key']
+        if any(keyword in column_name_lower for keyword in id_keywords):
+            return "identifier"
+        
+        # Analyze sample values
+        if sample_values:
+            non_null_values = [v for v in sample_values if not pd.isna(v)][:10]  # Sample first 10 non-null values
+            
+            if non_null_values:
+                # Check if most values are numeric
+                numeric_count = 0
+                for val in non_null_values:
+                    try:
+                        float(val)
+                        numeric_count += 1
+                    except (ValueError, TypeError):
+                        pass
+                
+                if numeric_count >= len(non_null_values) * 0.7:  # 70% are numeric
+                    return "numeric"
+                
+                # Check if most values look like dates
+                date_count = 0
+                for val in non_null_values:
+                    if pd.to_datetime(val, errors='coerce') is not pd.NaT:
+                        date_count += 1
+                
+                if date_count >= len(non_null_values) * 0.7:  # 70% are dates
+                    return "date"
+        
+        # Default to text
+        return "text"
 
     def _check_equals_match(self, val_a, val_b) -> bool:
         """Check equality with STRICT string matching (no auto date detection)"""
@@ -423,7 +604,8 @@ class OptimizedFileProcessor:
                                   recon_rules: List[ReconciliationRule],
                                   selected_columns_a: Optional[List[str]] = None,
                                   selected_columns_b: Optional[List[str]] = None,
-                                  match_mode: str = "one_to_one") -> Dict[str, pd.DataFrame]:
+                                  match_mode: str = "one_to_one",
+                                  find_closest_matches: bool = False) -> Dict[str, pd.DataFrame]:
         """
         Optimized reconciliation using hash-based matching for large datasets with date support
         
@@ -526,11 +708,140 @@ class OptimizedFileProcessor:
             selected_columns_b, recon_rules, 'B'
         )
 
+        # Add closest match functionality if requested
+        if find_closest_matches and len(unmatched_a) > 0 and len(unmatched_b) > 0:
+            print(f"Finding closest matches for {len(unmatched_a)} unmatched A records and {len(unmatched_b)} unmatched B records...")
+            unmatched_a = self._add_closest_matches(unmatched_a, unmatched_b, recon_rules, 'A')
+            unmatched_b = self._add_closest_matches(unmatched_b, unmatched_a, recon_rules, 'B')
+
         return {
             'matched': matched_df,
             'unmatched_file_a': unmatched_a,
             'unmatched_file_b': unmatched_b
         }
+
+    def _add_closest_matches(self, unmatched_source: pd.DataFrame, unmatched_target: pd.DataFrame, 
+                            recon_rules: List[ReconciliationRule], source_file: str) -> pd.DataFrame:
+        """
+        Add closest match columns to unmatched records using composite similarity scoring
+        
+        Args:
+            unmatched_source: Unmatched records from source file
+            unmatched_target: Unmatched records from target file (for comparison)
+            recon_rules: Reconciliation rules to determine which columns to compare
+            source_file: 'A' or 'B' to indicate which file is the source
+            
+        Returns:
+            DataFrame with closest match information added
+        """
+        if len(unmatched_source) == 0 or len(unmatched_target) == 0:
+            return unmatched_source
+            
+        # Make a copy to avoid modifying the original
+        result_df = unmatched_source.copy()
+        
+        # Initialize closest match columns
+        result_df['closest_match_record'] = None
+        result_df['closest_match_score'] = 0.0
+        result_df['closest_match_details'] = None
+        
+        # Get columns to compare based on reconciliation rules
+        compare_columns = []
+        for rule in recon_rules:
+            if source_file == 'A':
+                source_col = rule.LeftFileColumn
+                target_col = rule.RightFileColumn
+            else:
+                source_col = rule.RightFileColumn  
+                target_col = rule.LeftFileColumn
+                
+            if source_col in unmatched_source.columns and target_col in unmatched_target.columns:
+                compare_columns.append((source_col, target_col))
+        
+        if not compare_columns:
+            print(f"Warning: No comparable columns found for closest match analysis")
+            return result_df
+            
+        print(f"Comparing {len(compare_columns)} column pairs for closest matches")
+        
+        # Process each unmatched record
+        for idx, source_row in unmatched_source.iterrows():
+            best_match_score = 0.0
+            best_match_record = None
+            best_match_details = {}
+            
+            # Compare with each record in the target file
+            for target_idx, target_row in unmatched_target.iterrows():
+                # Calculate composite similarity across all comparable columns
+                column_scores = {}
+                total_weighted_score = 0.0
+                
+                for source_col, target_col in compare_columns:
+                    source_val = source_row[source_col]
+                    target_val = target_row[target_col]
+                    
+                    # Detect column type for appropriate similarity calculation
+                    column_type = self._detect_column_type(
+                        source_col, 
+                        unmatched_source[source_col].head(10).tolist()
+                    )
+                    
+                    # Calculate similarity
+                    similarity = self._calculate_composite_similarity(source_val, target_val, column_type)
+                    column_scores[f"{source_col}_vs_{target_col}"] = {
+                        'score': similarity,
+                        'source_value': source_val,
+                        'target_value': target_val,
+                        'type': column_type
+                    }
+                    
+                    # Weight each column equally for now (could be enhanced to use rule-specific weights)
+                    total_weighted_score += similarity
+                
+                # Average score across all columns
+                if compare_columns:
+                    avg_score = total_weighted_score / len(compare_columns)
+                else:
+                    avg_score = 0.0
+                
+                # Update best match if this is better
+                if avg_score > best_match_score:
+                    best_match_score = avg_score
+                    best_match_record = target_row.to_dict()
+                    best_match_details = column_scores
+            
+            # Add closest match information to result
+            if best_match_score > 0:
+                # Create simplified record summary instead of full JSON
+                if best_match_record:
+                    record_summary = []
+                    for key, value in list(best_match_record.items())[:3]:  # Show first 3 key fields
+                        record_summary.append(f"{key}: {value}")
+                    result_df.at[idx, 'closest_match_record'] = "; ".join(record_summary)
+                else:
+                    result_df.at[idx, 'closest_match_record'] = "No match details available"
+                result_df.at[idx, 'closest_match_score'] = round(best_match_score, 2)
+                
+                # Create simple closest match details showing only mismatched columns
+                details_list = []
+                for column_key, details in best_match_details.items():
+                    source_val = details['source_value']
+                    target_val = details['target_value']
+                    score = details['score']
+                    
+                    # Only include columns that don't match exactly (score < 100)
+                    if score < 100:
+                        # Extract just the column name from the key (e.g., "transaction_id_vs_ref_id" -> "transaction_id")
+                        column_name = column_key.split('_vs_')[0]
+                        details_list.append(f"{column_name}: '{source_val}' → '{target_val}'")
+                
+                if details_list:
+                    result_df.at[idx, 'closest_match_details'] = "; ".join(details_list)
+                else:
+                    result_df.at[idx, 'closest_match_details'] = "All columns match exactly"
+                
+        print(f"Added closest match information to {len(result_df)} records")
+        return result_df
 
     def _check_tolerance_match(self, val_a, val_b, tolerance: float) -> bool:
         """Check if two values match within tolerance"""
