@@ -1,6 +1,6 @@
 // src/components/RuleSaveLoad.jsx - Component for saving and loading reconciliation rules
 import React, {useEffect, useState} from 'react';
-import {AlertCircle, Calendar, Clock, Eye, Save, Search, Star, Tag, Trash2, Upload, X} from 'lucide-react';
+import {AlertCircle, Calendar, Clock, Download, Eye, Save, Search, Star, Tag, Trash2, Upload, X} from 'lucide-react';
 import {apiService} from '../../services/defaultApi.js';
 
 const RuleSaveLoad = ({
@@ -12,6 +12,7 @@ const RuleSaveLoad = ({
                           onRuleLoaded,
                           onRuleSaved,
                           onClose,
+                          onConfigUpdate, // Callback for when config is updated via import
                           defaultTab = 'load' // 'load' for beginning, 'save' for end
                       }) => {
     const [activeTab, setActiveTab] = useState(defaultTab);
@@ -177,6 +178,154 @@ const RuleSaveLoad = ({
         }));
     };
 
+    // Import/Export functionality
+    const [selectedRuleForExport, setSelectedRuleForExport] = useState(null);
+    
+    const handleExportRule = (ruleToExport = null) => {
+        try {
+            let ruleData;
+            
+            if (ruleToExport) {
+                // Export selected saved rule
+                ruleData = {
+                    metadata: {
+                        name: ruleToExport.name,
+                        description: ruleToExport.description || 'Exported saved rule',
+                        category: ruleToExport.category || 'reconciliation',
+                        created_at: ruleToExport.created_at,
+                        updated_at: ruleToExport.updated_at,
+                        usage_count: ruleToExport.usage_count || 0,
+                        tags: ruleToExport.tags || [],
+                        exported: true,
+                        export_version: '1.0',
+                        original_rule_id: ruleToExport.id
+                    },
+                    rule_config: ruleToExport.rule_config
+                };
+            } else {
+                // Export current configuration
+                ruleData = {
+                    metadata: {
+                        name: `Current Configuration - ${new Date().toLocaleDateString()}`,
+                        description: 'Exported current working configuration',
+                        category: 'reconciliation',
+                        created_at: new Date().toISOString(),
+                        exported: true,
+                        export_version: '1.0'
+                    },
+                    rule_config: currentConfig
+                };
+            }
+
+            const dataStr = JSON.stringify(ruleData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            
+            const sanitizedName = (ruleToExport?.name || 'current-config').toLowerCase().replace(/[^a-z0-9]/g, '-');
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${sanitizedName}-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error exporting rule:', error);
+            alert('Failed to export rule: ' + error.message);
+        }
+    };
+
+    const handleImportRule = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const ruleData = JSON.parse(e.target.result);
+                
+                // Validate rule structure
+                if (!ruleData.rule_config) {
+                    alert('Invalid rule file: missing rule_config');
+                    return;
+                }
+
+                // Prepare the rule for saving using existing save functionality
+                const importedRuleName = ruleData.metadata?.name || 'Imported Rule';
+                const importedRuleDescription = ruleData.metadata?.description || 'Rule imported from file';
+                const importedRuleCategory = ruleData.metadata?.category || 'reconciliation';
+                const importedRuleTags = ruleData.metadata?.tags || [];
+
+                // Set up the save form with imported rule data
+                setSaveForm({
+                    name: importedRuleName + ' (Imported)',
+                    description: importedRuleDescription,
+                    category: importedRuleCategory,
+                    tags: importedRuleTags
+                });
+
+                // Switch to save tab to show the import
+                setActiveTab('save');
+
+                // Temporarily update the current config to the imported config so it gets saved
+                const originalConfig = currentConfig;
+                
+                try {
+                    // Update config if callback is available
+                    if (onConfigUpdate) {
+                        onConfigUpdate(ruleData.rule_config);
+                    }
+
+                    setLoading(true);
+
+                    // Use the existing save rule functionality
+                    const {ruleConfig, ruleMetadata} = apiService.createRuleFromConfig(
+                        ruleData.rule_config,
+                        selectedTemplate,
+                        {
+                            name: importedRuleName + ' (Imported)',
+                            description: importedRuleDescription,
+                            category: importedRuleCategory,
+                            tags: importedRuleTags
+                        }
+                    );
+
+                    // Save the imported rule using existing API
+                    const savedRule = await apiService.saveReconciliationRule(ruleConfig, ruleMetadata);
+                    
+                    // Refresh the rules list to show the imported rule
+                    await loadRules();
+                    
+                    // Notify parent component
+                    if (onRuleSaved) {
+                        onRuleSaved(savedRule);
+                    }
+
+                    alert(`Successfully imported and saved rule: ${savedRule.name}`);
+
+                } catch (saveError) {
+                    console.error('Error saving imported rule:', saveError);
+                    alert('Failed to save imported rule: ' + (saveError.message || 'Unknown error'));
+                    
+                    // Restore original config on error
+                    if (onConfigUpdate) {
+                        onConfigUpdate(originalConfig);
+                    }
+                } finally {
+                    setLoading(false);
+                }
+
+            } catch (error) {
+                console.error('Error importing rule:', error);
+                alert('Failed to import rule: Invalid file format');
+            }
+        };
+        reader.readAsText(file);
+        
+        // Reset file input
+        event.target.value = '';
+    };
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
@@ -217,6 +366,17 @@ const RuleSaveLoad = ({
                         >
                             <Save size={16} className="inline mr-1"/>
                             {loadedRuleId && hasUnsavedChanges ? 'Update Rule' : 'Save Rule'}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('import-export')}
+                            className={`px-4 py-2 text-sm font-medium rounded-md ${
+                                activeTab === 'import-export'
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                        >
+                            <Download size={16} className="inline mr-1"/>
+                            Import/Export
                         </button>
                     </div>
                 </div>
@@ -507,6 +667,151 @@ const RuleSaveLoad = ({
                                         <Save size={16}/>
                                         <span>{loadedRuleId && hasUnsavedChanges ? 'Update Rule' : 'Save Rule'}</span>
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'import-export' && (
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-lg font-medium text-gray-800 mb-4">Import & Export Rules</h3>
+                                <p className="text-sm text-gray-600 mb-6">
+                                    Export your current rule configuration to a file or import a previously saved rule from your local computer.
+                                </p>
+                            </div>
+
+                            {/* Export Section */}
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                                <div className="flex items-start space-x-4">
+                                    <div className="flex-shrink-0">
+                                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                            <Download size={24} className="text-green-600"/>
+                                        </div>
+                                    </div>
+                                    <div className="flex-grow">
+                                        <h4 className="text-lg font-medium text-green-800 mb-2">Export Rule Configuration</h4>
+                                        <p className="text-sm text-green-700 mb-4">
+                                            Choose a rule configuration to download as a JSON file that can be shared or imported later.
+                                        </p>
+                                        
+                                        {/* Rule Selection */}
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-green-700 mb-2">
+                                                Select Configuration to Export
+                                            </label>
+                                            <select
+                                                value={selectedRuleForExport?.id || 'current'}
+                                                onChange={(e) => {
+                                                    if (e.target.value === 'current') {
+                                                        setSelectedRuleForExport(null);
+                                                    } else {
+                                                        const rule = rules.find(r => r.id === e.target.value);
+                                                        setSelectedRuleForExport(rule);
+                                                    }
+                                                }}
+                                                className="w-full p-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                            >
+                                                <option value="current">Current Working Configuration</option>
+                                                {rules.map(rule => (
+                                                    <option key={rule.id} value={rule.id}>
+                                                        {rule.name} ({rule.category})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* Configuration Preview */}
+                                        <div className="bg-green-100 p-3 rounded text-sm text-green-700 mb-4">
+                                            <div><strong>{selectedRuleForExport ? selectedRuleForExport.name : 'Current Configuration'}:</strong></div>
+                                            {selectedRuleForExport ? (
+                                                <>
+                                                    <div>• Description: {selectedRuleForExport.description || 'No description'}</div>
+                                                    <div>• Category: {selectedRuleForExport.category}</div>
+                                                    <div>• Created: {new Date(selectedRuleForExport.created_at).toLocaleDateString()}</div>
+                                                    <div>• Usage Count: {selectedRuleForExport.usage_count || 0}</div>
+                                                    <div>• Extraction Rules: {selectedRuleForExport.rule_config.Files?.reduce((total, file) => total + (file.Extract?.length || 0), 0) || 0}</div>
+                                                    <div>• Filter Rules: {selectedRuleForExport.rule_config.Files?.reduce((total, file) => total + (file.Filter?.length || 0), 0) || 0}</div>
+                                                    <div>• Reconciliation Rules: {selectedRuleForExport.rule_config.ReconciliationRules?.length || 0}</div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div>• Extraction Rules: {currentConfig.Files?.reduce((total, file) => total + (file.Extract?.length || 0), 0) || 0}</div>
+                                                    <div>• Filter Rules: {currentConfig.Files?.reduce((total, file) => total + (file.Filter?.length || 0), 0) || 0}</div>
+                                                    <div>• Reconciliation Rules: {currentConfig.ReconciliationRules?.length || 0}</div>
+                                                    <div>• Selected Columns: {(currentConfig.selected_columns_file_a?.length || 0) + (currentConfig.selected_columns_file_b?.length || 0)}</div>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        <button
+                                            onClick={() => handleExportRule(selectedRuleForExport)}
+                                            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                        >
+                                            <Download size={16}/>
+                                            <span>Export {selectedRuleForExport ? 'Selected Rule' : 'Current Configuration'}</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Import Section */}
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                                <div className="flex items-start space-x-4">
+                                    <div className="flex-shrink-0">
+                                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                            <Upload size={24} className="text-blue-600"/>
+                                        </div>
+                                    </div>
+                                    <div className="flex-grow">
+                                        <h4 className="text-lg font-medium text-blue-800 mb-2">Import & Save Rule from File</h4>
+                                        <p className="text-sm text-blue-700 mb-4">
+                                            Upload a previously exported rule configuration file to save it as a new rule in your rule library and apply its settings.
+                                        </p>
+                                        <div className="bg-blue-100 p-3 rounded text-sm text-blue-700 mb-4">
+                                            <div><strong>Import Process:</strong></div>
+                                            <div>• JSON files exported from this application</div>
+                                            <div>• Rule will be saved to your rule library automatically</div>
+                                            <div>• Configuration will be applied to your current session</div>
+                                            <div>• Imported rule name will have "(Imported)" suffix</div>
+                                        </div>
+                                        <div className="flex items-center space-x-3">
+                                            <input
+                                                type="file"
+                                                accept=".json"
+                                                onChange={handleImportRule}
+                                                className="hidden"
+                                                id="import-rule-file"
+                                            />
+                                            <label
+                                                htmlFor="import-rule-file"
+                                                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-colors"
+                                            >
+                                                <Upload size={16}/>
+                                                <span>Import & Save Rule</span>
+                                            </label>
+                                            <span className="text-sm text-gray-500">
+                                                Select a .json rule file to import and save
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tips */}
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <div className="flex items-start space-x-2">
+                                    <AlertCircle size={16} className="text-yellow-600 mt-1 flex-shrink-0"/>
+                                    <div>
+                                        <h5 className="text-sm font-medium text-yellow-800 mb-1">Tips for Import/Export</h5>
+                                        <ul className="text-sm text-yellow-700 space-y-1">
+                                            <li>• Exported files contain complete rule configurations including extraction, filter, and reconciliation rules</li>
+                                            <li>• Importing automatically saves the rule to your library and applies the configuration</li>
+                                            <li>• Configuration files are portable and can be shared between different teams and systems</li>
+                                            <li>• Imported rules are saved with "(Imported)" suffix to distinguish them from original rules</li>
+                                            <li>• Always verify imported configurations before running reconciliation processes</li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
                         </div>

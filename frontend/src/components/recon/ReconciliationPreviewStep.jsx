@@ -16,7 +16,8 @@ import {
     X,
     Clock,
     Users,
-    TrendingUp
+    TrendingUp,
+    Upload
 } from 'lucide-react';
 
 const ReconciliationPreviewStep = ({
@@ -333,136 +334,6 @@ const ReconciliationPreviewStep = ({
                     </div>
                 </div>
 
-                {/* Closest Match Options */}
-                {onToggleClosestMatches && (
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                            <div>
-                                <h4 className="font-medium text-purple-800">Closest Match Analysis</h4>
-                                <p className="text-sm text-purple-700">
-                                    {findClosestMatches ? 'Adding closest match suggestions to unmatched records' : 'Enable to find potential matches for unmatched records'}
-                                </p>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="sr-only peer"
-                                    checked={findClosestMatches}
-                                    onChange={(e) => onToggleClosestMatches(e.target.checked)}
-                                />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                            </label>
-                        </div>
-                        
-                        {findClosestMatches && (
-                            <div className="space-y-3 mt-4">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium text-purple-800">Advanced Configuration</span>
-                                    <button
-                                        onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
-                                        className="text-xs text-purple-600 hover:text-purple-800 underline"
-                                    >
-                                        {showAdvancedConfig ? 'Hide Advanced' : 'Show Advanced'}
-                                    </button>
-                                </div>
-                                
-                                {showAdvancedConfig && onClosestMatchConfigChange && closestMatchConfig && (
-                                    <div className="bg-white border border-purple-200 rounded p-3 space-y-4">
-                                        {/* Column Selection Section */}
-                                        <div>
-                                            <label className="block text-xs font-medium text-purple-700 mb-2">
-                                                Specific Columns for Comparison (Optional)
-                                            </label>
-                                            <p className="text-xs text-purple-600 mb-2">
-                                                Select specific column pairs for closest match analysis. If not specified, all reconciliation rule columns will be used.
-                                            </p>
-                                            
-                                            {/* Get available column pairs from reconciliation rules */}
-                                            {(() => {
-                                                const availableColumnPairs = config.ReconciliationRules ? 
-                                                    config.ReconciliationRules.map(rule => ({
-                                                        fileA: rule.LeftFileColumn,
-                                                        fileB: rule.RightFileColumn
-                                                    })) : [];
-                                                
-                                                const currentSpecificColumns = closestMatchConfig.specific_columns || {};
-                                                
-                                                return availableColumnPairs.length > 0 ? (
-                                                    <div className="space-y-2">
-                                                        {availableColumnPairs.map((pair, index) => (
-                                                            <div key={index} className="flex items-center space-x-2 bg-gray-50 p-2 rounded text-xs">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    id={`column-pair-${index}`}
-                                                                    checked={currentSpecificColumns[pair.fileA] === pair.fileB}
-                                                                    onChange={(e) => {
-                                                                        const newSpecificColumns = { ...currentSpecificColumns };
-                                                                        if (e.target.checked) {
-                                                                            newSpecificColumns[pair.fileA] = pair.fileB;
-                                                                        } else {
-                                                                            delete newSpecificColumns[pair.fileA];
-                                                                        }
-                                                                        onClosestMatchConfigChange({ 
-                                                                            specific_columns: Object.keys(newSpecificColumns).length > 0 ? newSpecificColumns : null
-                                                                        });
-                                                                    }}
-                                                                    className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
-                                                                />
-                                                                <label htmlFor={`column-pair-${index}`} className="text-purple-700">
-                                                                    <span className="font-medium">{pair.fileA}</span> ↔ <span className="font-medium">{pair.fileB}</span>
-                                                                </label>
-                                                            </div>
-                                                        ))}
-                                                        
-                                                        {Object.keys(currentSpecificColumns).length > 0 && (
-                                                            <div className="mt-2 p-2 bg-purple-50 rounded text-xs">
-                                                                <span className="font-medium text-purple-800">Selected pairs: </span>
-                                                                <span className="text-purple-700">
-                                                                    {Object.entries(currentSpecificColumns).map(([fileA, fileB]) => 
-                                                                        `${fileA}↔${fileB}`
-                                                                    ).join(', ')}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-xs text-gray-500 italic">No reconciliation rules configured</p>
-                                                );
-                                            })()}
-                                        </div>
-                                        
-                                    </div>
-                                )}
-                                
-                                <div className="text-sm text-purple-700">
-                                    <div className="space-y-1">
-                                        <div className="flex items-center space-x-2">
-                                            <CheckCircle size={16} className="text-purple-600" />
-                                            <span>✓ Will analyze similarity between unmatched records</span>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <CheckCircle size={16} className="text-purple-600" />
-                                            <span>✓ Adds 3 new columns: closest_match_record, closest_match_score, closest_match_details</span>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <CheckCircle size={16} className="text-purple-600" />
-                                            <span>✓ Use specific column pairs or all reconciliation rule columns</span>
-                                        </div>
-                                        <div className="text-xs text-purple-600 mt-2">
-                                            Example: transaction_id: 'TXN002' → 'REF002' (score: 85.2%)
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        
-                        {!findClosestMatches && (
-                            <div className="text-sm text-purple-700">
-                                <span>Toggle on to add closest match analysis to the next reconciliation run</span>
-                            </div>
-                        )}
-                    </div>
-                )}
 
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-3">
@@ -552,15 +423,6 @@ const ReconciliationPreviewStep = ({
         <div className="space-y-3">
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-800">Generate & View Results</h3>
-                {!isLoading && !generatedResults && (
-                    <button
-                        onClick={onRefresh}
-                        className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                        <Play size={16} />
-                        <span>Generate Results</span>
-                    </button>
-                )}
             </div>
 
             <div className="space-y-2">
@@ -570,6 +432,139 @@ const ReconciliationPreviewStep = ({
                     {renderConfigSummary()}
                 </div>
 
+                {/* Closest Match Analysis Section */}
+                {onToggleClosestMatches && (
+                    <div className="border border-gray-200 rounded-lg p-3">
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <div>
+                                    <h4 className="font-medium text-purple-800">Closest Match Analysis</h4>
+                                    <p className="text-sm text-purple-700">
+                                        {findClosestMatches ? 'Adding closest match suggestions to unmatched records' : 'Enable to find potential matches for unmatched records'}
+                                    </p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={findClosestMatches}
+                                        onChange={(e) => onToggleClosestMatches(e.target.checked)}
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                                </label>
+                            </div>
+                            
+                            {findClosestMatches && (
+                                <div className="space-y-3 mt-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-purple-800">Advanced Configuration</span>
+                                        <button
+                                            onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
+                                            className="text-xs text-purple-600 hover:text-purple-800 underline"
+                                        >
+                                            {showAdvancedConfig ? 'Hide Advanced' : 'Show Advanced'}
+                                        </button>
+                                    </div>
+                                    
+                                    {showAdvancedConfig && onClosestMatchConfigChange && closestMatchConfig && (
+                                        <div className="bg-white border border-purple-200 rounded p-3 space-y-4">
+                                            {/* Column Selection Section */}
+                                            <div>
+                                                <label className="block text-xs font-medium text-purple-700 mb-2">
+                                                    Specific Columns for Comparison (Optional)
+                                                </label>
+                                                <p className="text-xs text-purple-600 mb-2">
+                                                    Select specific column pairs for closest match analysis. If not specified, all reconciliation rule columns will be used.
+                                                </p>
+                                                
+                                                {/* Get available column pairs from reconciliation rules */}
+                                                {(() => {
+                                                    const availableColumnPairs = config.ReconciliationRules ? 
+                                                        config.ReconciliationRules.map(rule => ({
+                                                            fileA: rule.LeftFileColumn,
+                                                            fileB: rule.RightFileColumn
+                                                        })) : [];
+                                                    
+                                                    const currentSpecificColumns = closestMatchConfig.specific_columns || {};
+                                                    
+                                                    return availableColumnPairs.length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            {availableColumnPairs.map((pair, index) => (
+                                                                <div key={index} className="flex items-center space-x-2 bg-gray-50 p-2 rounded text-xs">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        id={`column-pair-${index}`}
+                                                                        checked={currentSpecificColumns[pair.fileA] === pair.fileB}
+                                                                        onChange={(e) => {
+                                                                            const newSpecificColumns = { ...currentSpecificColumns };
+                                                                            if (e.target.checked) {
+                                                                                newSpecificColumns[pair.fileA] = pair.fileB;
+                                                                            } else {
+                                                                                delete newSpecificColumns[pair.fileA];
+                                                                            }
+                                                                            onClosestMatchConfigChange({ 
+                                                                                specific_columns: Object.keys(newSpecificColumns).length > 0 ? newSpecificColumns : null
+                                                                            });
+                                                                        }}
+                                                                        className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+                                                                    />
+                                                                    <label htmlFor={`column-pair-${index}`} className="text-purple-700">
+                                                                        <span className="font-medium">{pair.fileA}</span> ↔ <span className="font-medium">{pair.fileB}</span>
+                                                                    </label>
+                                                                </div>
+                                                            ))}
+                                                            
+                                                            {Object.keys(currentSpecificColumns).length > 0 && (
+                                                                <div className="mt-2 p-2 bg-purple-50 rounded text-xs">
+                                                                    <span className="font-medium text-purple-800">Selected pairs: </span>
+                                                                    <span className="text-purple-700">
+                                                                        {Object.entries(currentSpecificColumns).map(([fileA, fileB]) => 
+                                                                            `${fileA}↔${fileB}`
+                                                                        ).join(', ')}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-xs text-gray-500 italic">No reconciliation rules configured</p>
+                                                    );
+                                                })()}
+                                            </div>
+                                            
+                                        </div>
+                                    )}
+                                    
+                                    <div className="text-sm text-purple-700">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center space-x-2">
+                                                <CheckCircle size={16} className="text-purple-600" />
+                                                <span>✓ Will analyze similarity between unmatched records</span>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <CheckCircle size={16} className="text-purple-600" />
+                                                <span>✓ Adds 3 new columns: closest_match_record, closest_match_score, closest_match_details</span>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <CheckCircle size={16} className="text-purple-600" />
+                                                <span>✓ Use specific column pairs or all reconciliation rule columns</span>
+                                            </div>
+                                            <div className="text-xs text-purple-600 mt-2">
+                                                Example: transaction_id: 'TXN002' → 'REF002' (score: 85.2%)
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {!findClosestMatches && (
+                                <div className="text-sm text-purple-700">
+                                    <span>Toggle on to add closest match analysis to the next reconciliation run</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* Results Section */}
                 <div className="border border-gray-200 rounded-lg p-3">
                     <h4 className="text-sm font-semibold text-gray-800 mb-2">Reconciliation Results</h4>
@@ -577,7 +572,7 @@ const ReconciliationPreviewStep = ({
                 </div>
 
                 {/* Rule Management Section */}
-                {generatedResults && generatedResults.success && (
+                {generatedResults && (
                     <div className="border border-gray-200 rounded-lg p-3">
                         <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center space-x-2">
                             <Save size={16} className="text-blue-600" />

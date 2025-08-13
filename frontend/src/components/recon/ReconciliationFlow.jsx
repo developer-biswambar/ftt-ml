@@ -88,6 +88,14 @@ const ReconciliationFlow = ({
         setClosestMatchConfig(prev => ({ ...prev, ...updates }));
     };
 
+    // State to track filter validation
+    const [hasIncompleteFilters, setHasIncompleteFilters] = useState(false);
+
+    // Handler for filter validation
+    const handleFilterValidation = (hasIncomplete) => {
+        setHasIncompleteFilters(hasIncomplete);
+    };
+
     // Step definitions
     const steps = [
         {id: 'rule_management', title: 'Load/Save Rules', icon: Save},
@@ -851,6 +859,7 @@ const ReconciliationFlow = ({
                         getFileByIndex={getFileByIndex}
                         fileColumns={fileColumns}
                         onSendMessage={onSendMessage}
+                        onValidationChange={handleFilterValidation}
                     />
                 );
 
@@ -1227,7 +1236,27 @@ const ReconciliationFlow = ({
                         {getCurrentStepIndex() < steps.length - 1 ? (
                             <button
                                 onClick={nextStep}
-                                disabled={currentStep === 'result_columns' && reconciliationRules.length === 0}
+                                disabled={
+                                    (currentStep === 'result_columns' && reconciliationRules.length === 0) ||
+                                    (currentStep === 'reconciliation_rules' && (
+                                        reconciliationRules.length === 0 ||
+                                        reconciliationRules.some(rule => 
+                                            !rule.LeftFileColumn || rule.LeftFileColumn.trim() === '' ||
+                                            !rule.RightFileColumn || rule.RightFileColumn.trim() === ''
+                                        )
+                                    )) ||
+                                    (currentStep === 'filter_rules' && hasIncompleteFilters) ||
+                                    (currentStep === 'extraction_rules' && (
+                                        config.Files && config.Files.some(file =>
+                                            file.Extract && file.Extract.length > 0 &&
+                                            file.Extract.some(extractRule =>
+                                                !extractRule.ResultColumnName || extractRule.ResultColumnName.trim() === '' ||
+                                                !extractRule.SourceColumn || extractRule.SourceColumn.trim() === '' ||
+                                                (extractRule.MatchType === 'regex' && (!extractRule.Patterns || extractRule.Patterns.length === 0 || !extractRule.Patterns[0] || extractRule.Patterns[0].trim() === ''))
+                                            )
+                                        )
+                                    ))
+                                }
                                 className="flex items-center space-x-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
                                 <span>Next</span>

@@ -7,7 +7,8 @@ const IntegratedFilterDataStep = ({
                                       setConfig,
                                       getFileByIndex,
                                       fileColumns,
-                                      onSendMessage
+                                      onSendMessage,
+                                      onValidationChange
                                   }) => {
     const [fileFilters, setFileFilters] = useState({});
     const [uniqueValueCache, setUniqueValueCache] = useState({});
@@ -58,7 +59,21 @@ const IntegratedFilterDataStep = ({
         });
 
         setConfig(updatedConfig);
-    }, [fileFilters]);
+
+        // Check if there are incomplete filters and notify parent
+        if (onValidationChange) {
+            const hasIncompleteFilters = Object.values(fileFilters).some(filters =>
+                filters && filters.some(filter => {
+                    const hasColumn = filter.column && filter.column.trim() !== '';
+                    const hasValues = filter.values && filter.values.length > 0;
+                    // Filter is incomplete if it has a column but no values, or has values but no column
+                    // OR if it's completely empty (was just added)
+                    return (!hasColumn && !hasValues) || (hasColumn && !hasValues) || (!hasColumn && hasValues);
+                })
+            );
+            onValidationChange(hasIncompleteFilters);
+        }
+    }, [fileFilters, onValidationChange]);
 
     // Helper function to check if a column is extracted
     const isExtractedColumn = (fileIndex, columnName) => {
