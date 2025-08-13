@@ -27,6 +27,13 @@ const DataViewer = ({fileId, onClose}) => {
     const [fileStats, setFileStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    
+    // Track changes for intelligent saving - patch-based approach
+    const [cellChanges, setCellChanges] = useState(new Map()); // Map of 'rowIndex:columnName' -> newValue
+    const [addedRows, setAddedRows] = useState([]); // Array of new row objects
+    const [deletedRowIndices, setDeletedRowIndices] = useState(new Set()); // Set of absolute row indices that were deleted
+    const [columnOperations, setColumnOperations] = useState([]); // Array of column operations (add/delete/rename)
+    const [totalRowsInDataset, setTotalRowsInDataset] = useState(0); // Track total rows for absolute indexing
     const [editingCell, setEditingCell] = useState(null);
     const [editValue, setEditValue] = useState('');
     const [editingColumn, setEditingColumn] = useState(null);
@@ -125,6 +132,7 @@ const DataViewer = ({fileId, onClose}) => {
                     setData(response.data.rows);
                     setColumns(response.data.columns);
                     setTotalRows(response.data.total_rows);
+                    setTotalRowsInDataset(response.data.total_rows); // Track for absolute indexing
 
                     if (history.length === 0) {
                         setHistory([{data: response.data.rows, columns: response.data.columns}]);
@@ -160,19 +168,49 @@ const DataViewer = ({fileId, onClose}) => {
         setHasChanges(true);
     }, [history, historyIndex]);
 
-    // Save changes
+    // Save changes using patch-based approach
     const saveChanges = async () => {
         try {
             setSaving(true);
+            
+            // Prepare patch data with only the changes
+            const patchData = {
+                cell_changes: Array.from(cellChanges.entries()).map(([key, value]) => {
+                    const [rowIndex, columnName] = key.split(':');
+                    return {
+                        row_index: parseInt(rowIndex),
+                        column_name: columnName,
+                        new_value: value
+                    };
+                }),
+                added_rows: addedRows,
+                deleted_row_indices: Array.from(deletedRowIndices),
+                column_operations: columnOperations
+            };
+            
+            console.log('Sending patch data:', patchData);
+            
             try {
-                await apiService.updateFileData(fileId, {rows: data, columns});
+                await apiService.patchFileData(fileId, patchData);
+                
+                // Clear all pending changes after successful save
+                setCellChanges(new Map());
+                setAddedRows([]);
+                setDeletedRowIndices(new Set());
+                setColumnOperations([]);
                 setHasChanges(false);
+                
                 showNotification('Changes saved successfully!', 'success');
+                
+                // Reload data to reflect server state
+                await loadFileData();
             } catch (apiError) {
-                setHasChanges(false);
+                console.error('API Error:', apiError);
                 showNotification('Changes saved locally (demo mode)!', 'info');
+                setHasChanges(false);
             }
         } catch (err) {
+            console.error('Save error:', err);
             showNotification('Failed to save changes', 'error');
         } finally {
             setSaving(false);
@@ -263,6 +301,18 @@ const DataViewer = ({fileId, onClose}) => {
             newData[editingCell.row][columns[editingCell.col]] = editValue;
             setData(newData);
             addToHistory(newData, columns);
+            
+            // Track the change for patch-based saving
+            const absoluteRowIndex = (currentPage - 1) * pageSize + editingCell.row;
+            const columnName = columns[editingCell.col];
+            const changeKey = `${absoluteRowIndex}:${columnName}`;
+            
+            setCellChanges(prev => {
+                const newChanges = new Map(prev);
+                newChanges.set(changeKey, editValue);
+                setHasChanges(true);
+                return newChanges;
+            });
         }
         setEditingCell(null);
         setEditValue('');
@@ -312,6 +362,15 @@ const DataViewer = ({fileId, onClose}) => {
         setData(newData);
         addToHistory(newData, newColumns);
         setHasChanges(true);
+        
+        // Track column rename operation for patch-based saving
+        if (oldColumnName !== newColumnName) {
+            setColumnOperations(prev => [...prev, {
+                type: 'rename',
+                old_name: oldColumnName,
+                new_name: newColumnName
+            }]);
+        }
 
         // Clear editing state
         cancelColumnEdit();
@@ -411,12 +470,22 @@ const DataViewer = ({fileId, onClose}) => {
         const newData = [...data, newRow];
         setData(newData);
         addToHistory(newData, columns);
+        
+        // Track the added row for patch-based saving
+        setAddedRows(prev => [...prev, newRow]);
+        setTotalRowsInDataset(prev => prev + 1);
+        setHasChanges(true);
     };
 
     const deleteRow = (rowIndex) => {
         const newData = data.filter((_, index) => index !== rowIndex);
         setData(newData);
         addToHistory(newData, columns);
+        
+        // Track the deleted row for patch-based saving (absolute index)
+        const absoluteRowIndex = (currentPage - 1) * pageSize + rowIndex;
+        setDeletedRowIndices(prev => new Set([...prev, absoluteRowIndex]));
+        setHasChanges(true);
     };
 
     // Column filter handlers
@@ -471,6 +540,14 @@ const DataViewer = ({fileId, onClose}) => {
             setColumns(newColumns);
             setData(newData);
             addToHistory(newData, newColumns);
+            
+            // Track column addition for patch-based saving
+            setColumnOperations(prev => [...prev, {
+                type: 'add',
+                column_name: newColumnName.trim()
+            }]);
+            setHasChanges(true);
+            
             setNewColumnName('');
             setShowAddColumn(false);
         }
@@ -487,6 +564,13 @@ const DataViewer = ({fileId, onClose}) => {
         setColumns(newColumns);
         setData(newData);
         addToHistory(newData, newColumns);
+        
+        // Track column deletion for patch-based saving
+        setColumnOperations(prev => [...prev, {
+            type: 'delete',
+            column_name: columnToDelete
+        }]);
+        setHasChanges(true);
     };
 
     // Sorting
@@ -584,6 +668,15 @@ const DataViewer = ({fileId, onClose}) => {
         setColumns(newColumns);
         setData(newData);
         addToHistory(newData, newColumns);
+        
+        // Track column deletions for patch-based saving
+        const deletedColumnNames = Array.from(selectedColumns).sort((a, b) => a - b).map(columnIndex => columns[columnIndex]);
+        setColumnOperations(prev => [...prev, ...deletedColumnNames.map(columnName => ({
+            type: 'delete',
+            column_name: columnName
+        }))]);
+        setHasChanges(true);
+        
         setSelectedColumns(new Set()); // Clear selection
         setShowDeleteColumnsModal(false);
     };
@@ -613,6 +706,12 @@ const DataViewer = ({fileId, onClose}) => {
         
         setData(newData);
         addToHistory(newData, columns);
+        
+        // Track deleted rows for patch-based saving (absolute indices)
+        const absoluteIndices = Array.from(selectedRows).map(rowIndex => (currentPage - 1) * pageSize + rowIndex);
+        setDeletedRowIndices(prev => new Set([...prev, ...absoluteIndices]));
+        setHasChanges(true);
+        
         setSelectedRows(new Set()); // Clear selection
         setShowDeleteRowsModal(false);
     };

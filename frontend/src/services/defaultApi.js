@@ -142,6 +142,12 @@ export const apiService = {
         return response.data;
     },
 
+    // Patch-based file data update - only sends specific changes
+    patchFileData: async (fileId, patchData) => {
+        const response = await defaultApi.patch(`/files/${fileId}/data`, patchData);
+        return response.data;
+    },
+
     getColumnUniqueValues: async (fileId, columnName, limit = 1000, filters = {}) => {
         const params = new URLSearchParams({ limit: limit.toString() });
         

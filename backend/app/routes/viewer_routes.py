@@ -38,6 +38,26 @@ class UpdateFileDataRequest(BaseModel):
     data: Dict[str, Any]
 
 
+class CellChange(BaseModel):
+    row_index: int
+    column_name: str
+    new_value: str
+
+
+class ColumnOperation(BaseModel):
+    type: str  # 'add', 'delete', 'rename'
+    column_name: str = None
+    old_name: str = None
+    new_name: str = None
+
+
+class PatchFileDataRequest(BaseModel):
+    cell_changes: List[CellChange] = []
+    added_rows: List[Dict[str, Any]] = []
+    deleted_row_indices: List[int] = []
+    column_operations: List[ColumnOperation] = []
+
+
 @router.get("/{file_id}/data")
 async def get_file_data(
         file_id: str,
@@ -208,6 +228,103 @@ async def update_file_data(file_id: str, request: UpdateFileDataRequest):
     except Exception as e:
         logger.error(f"Error updating file data: {e}")
         raise HTTPException(500, f"Failed to update file data: {str(e)}")
+
+
+@router.patch("/{file_id}/data")
+async def patch_file_data(file_id: str, request: PatchFileDataRequest):
+    """Apply incremental changes to file data - more efficient than full updates"""
+    try:
+        if file_id not in uploaded_files:
+            raise HTTPException(404, f"File {file_id} not found")
+
+        # Get the current DataFrame
+        df = uploaded_files[file_id]["data"].copy()
+        file_info = uploaded_files[file_id]["info"]
+        
+        changes_applied = {
+            "cell_changes": 0,
+            "added_rows": 0,
+            "deleted_rows": 0,
+            "column_operations": 0
+        }
+
+        # Apply column operations first (as they affect structure)
+        for operation in request.column_operations:
+            if operation.type == "add" and operation.column_name:
+                if operation.column_name not in df.columns:
+                    df[operation.column_name] = ""
+                    changes_applied["column_operations"] += 1
+                    logger.info(f"Added column '{operation.column_name}' to file {file_id}")
+            
+            elif operation.type == "delete" and operation.column_name:
+                if operation.column_name in df.columns:
+                    df = df.drop(columns=[operation.column_name])
+                    changes_applied["column_operations"] += 1
+                    logger.info(f"Deleted column '{operation.column_name}' from file {file_id}")
+            
+            elif operation.type == "rename" and operation.old_name and operation.new_name:
+                if operation.old_name in df.columns and operation.new_name not in df.columns:
+                    df = df.rename(columns={operation.old_name: operation.new_name})
+                    changes_applied["column_operations"] += 1
+                    logger.info(f"Renamed column '{operation.old_name}' to '{operation.new_name}' in file {file_id}")
+
+        # Apply cell changes
+        for change in request.cell_changes:
+            if 0 <= change.row_index < len(df) and change.column_name in df.columns:
+                df.iloc[change.row_index, df.columns.get_loc(change.column_name)] = change.new_value
+                changes_applied["cell_changes"] += 1
+
+        # Delete rows (do this before adding rows to maintain indices)
+        if request.deleted_row_indices:
+            # Sort in descending order to delete from end to beginning
+            sorted_indices = sorted(request.deleted_row_indices, reverse=True)
+            valid_indices = [i for i in sorted_indices if 0 <= i < len(df)]
+            if valid_indices:
+                df = df.drop(df.index[valid_indices]).reset_index(drop=True)
+                changes_applied["deleted_rows"] = len(valid_indices)
+                logger.info(f"Deleted {len(valid_indices)} rows from file {file_id}")
+
+        # Add new rows
+        if request.added_rows:
+            new_rows_df = pd.DataFrame(request.added_rows)
+            # Ensure all columns exist in the new rows
+            for col in df.columns:
+                if col not in new_rows_df.columns:
+                    new_rows_df[col] = ""
+            # Reorder columns to match existing DataFrame
+            new_rows_df = new_rows_df.reindex(columns=df.columns, fill_value="")
+            df = pd.concat([df, new_rows_df], ignore_index=True)
+            changes_applied["added_rows"] = len(request.added_rows)
+            logger.info(f"Added {len(request.added_rows)} rows to file {file_id}")
+
+        # Update the stored file data
+        uploaded_files[file_id]["data"] = df
+
+        # Update file info
+        file_info["total_rows"] = len(df)
+        file_info["columns"] = list(df.columns)
+        file_info["last_modified"] = datetime.utcnow().isoformat()
+
+        total_changes = sum(changes_applied.values())
+        logger.info(f"Applied {total_changes} changes to file {file_info.get('filename', file_id)}: {changes_applied}")
+
+        return {
+            "success": True,
+            "message": f"Applied {total_changes} changes successfully",
+            "data": {
+                "filename": file_info.get("filename", "Unknown File"),
+                "total_rows": len(df),
+                "columns": len(df.columns),
+                "last_modified": file_info["last_modified"],
+                "changes_applied": changes_applied
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error patching file data: {e}")
+        raise HTTPException(500, f"Failed to patch file data: {str(e)}")
 
 
 @router.get("/{file_id}/download")
