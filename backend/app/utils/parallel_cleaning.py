@@ -11,6 +11,7 @@ from multiprocessing import cpu_count
 import threading
 from typing import List, Dict, Tuple, Any
 import time
+import functools
 
 logger = logging.getLogger(__name__)
 
@@ -22,15 +23,38 @@ class ParallelDataCleaner:
     
     def __init__(self, max_workers: int = None):
         """
-        Initialize the parallel data cleaner
+        Initialize the parallel data cleaner with hardware-aware thread allocation
+        Optimized for high-end servers like Intel Xeon Platinum 8260
         
         Args:
-            max_workers: Maximum number of worker threads (defaults to CPU count)
+            max_workers: Maximum number of worker threads (defaults to hardware-optimized count)
         """
-        self.max_workers = max_workers or min(cpu_count(), 8)  # Cap at 8 threads for I/O bound tasks
+        if max_workers is None:
+            # Enhanced threading for high-performance servers
+            available_cores = cpu_count()
+            
+            # Intelligent core allocation based on available hardware
+            if available_cores >= 40:  # High-end server (e.g., Xeon Platinum 8260 with 48 threads)
+                max_workers = min(available_cores - 4, 32)  # Leave 4 cores free, max 32 processes
+            elif available_cores >= 20:  # Mid-range server 
+                max_workers = min(available_cores - 2, 20)  # Leave 2 cores free, max 20 processes  
+            elif available_cores >= 8:   # Standard workstation
+                max_workers = min(available_cores - 1, 12)  # Leave 1 core free, max 12 processes
+            else:  # Limited cores
+                max_workers = min(available_cores - 1, 4)   # Conservative for low-core systems
+                
+            logger.info(f"🔧 Hardware-aware threading: Using {max_workers} workers on {available_cores}-core system")
+        
+        self.max_workers = max_workers
+        self.available_cores = cpu_count()
         self.stats = {
             'timing': {},
-            'performance': {}
+            'performance': {},
+            'threading_config': {
+                'max_workers': self.max_workers,
+                'available_cores': self.available_cores,
+                'optimization_level': 'high_performance_server' if self.available_cores >= 40 else 'standard'
+            }
         }
         
     def clean_dataframe_parallel(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict]:
@@ -70,7 +94,7 @@ class ParallelDataCleaner:
         df = self._clean_column_names_parallel(df)
         self.stats['timing']['column_names'] = time.time() - step_start
         
-        # Step 4: Parallel data value cleaning (chunked processing)
+        # Step 4: Parallel data value cleaning with adaptive chunking
         step_start = time.time()
         cleaned_values_count = self._clean_data_values_parallel(df)
         self.stats['timing']['data_values'] = time.time() - step_start
@@ -269,8 +293,11 @@ class ParallelDataCleaner:
                 logger.warning(f"Error cleaning column '{col}' chunk {chunk_start}-{chunk_end}: {e}")
                 return 0
         
-        # Process columns in chunks for memory efficiency
-        chunk_size = max(10000, len(df) // (self.max_workers * 4))  # Adaptive chunk size
+        # Process columns in chunks with hardware-aware sizing
+        # Larger chunks for high-end servers to maximize throughput
+        base_chunk_factor = 8 if self.available_cores >= 40 else 4
+        chunk_size = max(5000 if self.available_cores >= 40 else 10000, 
+                        len(df) // (self.max_workers * base_chunk_factor))  # Adaptive chunk size
         
         for col in string_columns:
             tasks = []
@@ -370,11 +397,12 @@ class ParallelDataCleaner:
 
 def clean_dataframe_fast(df: pd.DataFrame, max_workers: int = None) -> Tuple[pd.DataFrame, Dict]:
     """
-    High-performance data cleaning function for large datasets
+    High-performance data cleaning function optimized for large datasets
+    Hardware-aware threading for Intel Xeon Platinum 8260 and similar high-end servers
     
     Args:
         df: Input DataFrame
-        max_workers: Maximum number of worker threads
+        max_workers: Maximum number of worker threads (auto-detected for optimal performance)
         
     Returns:
         Tuple of (cleaned_df, cleanup_stats)
@@ -385,9 +413,9 @@ def clean_dataframe_fast(df: pd.DataFrame, max_workers: int = None) -> Tuple[pd.
 
 # Backwards compatibility functions that use parallel processing
 def remove_empty_rows_and_columns_fast(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict]:
-    """Fast version of empty row/column removal using parallel processing"""
+    """Fast version of empty row/column removal using hardware-optimized parallel processing"""
     start_time = time.time()
-    cleaner = ParallelDataCleaner()
+    cleaner = ParallelDataCleaner()  # Uses hardware-aware threading
     
     # Step 1: Remove empty columns in parallel
     empty_columns = cleaner._detect_empty_columns_parallel(df)
@@ -417,13 +445,13 @@ def remove_empty_rows_and_columns_fast(df: pd.DataFrame) -> Tuple[pd.DataFrame, 
 
 
 def clean_column_names_fast(df: pd.DataFrame) -> pd.DataFrame:
-    """Fast version of column name cleaning"""
-    cleaner = ParallelDataCleaner()
+    """Fast version of column name cleaning with hardware-optimized threading"""
+    cleaner = ParallelDataCleaner()  # Uses hardware-aware threading
     return cleaner._clean_column_names_parallel(df)
 
 
 def clean_data_values_fast(df: pd.DataFrame) -> pd.DataFrame:
-    """Fast version of data value cleaning"""
-    cleaner = ParallelDataCleaner()
+    """Fast version of data value cleaning with hardware-optimized threading"""
+    cleaner = ParallelDataCleaner()  # Uses hardware-aware threading
     cleaner._clean_data_values_parallel(df)
     return df

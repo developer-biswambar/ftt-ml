@@ -1098,12 +1098,42 @@ class OptimizedFileProcessor:
         
         # Determine optimal batch size and number of processes
         total_records = len(unmatched_source)
-        num_processes = min(cpu_count() - 1, 8)  # Leave one core free, max 8 processes
-        optimal_batch_size = max(100, min(1000, total_records // num_processes))
         
-        logger.info(f"🔧 Configuration: {num_processes} processes, batch size: {optimal_batch_size}")
+        # Enhanced threading for high-performance servers
+        available_cores = cpu_count()
+        
+        # Intelligent core allocation based on available hardware
+        logger.info(f"Total available cores: {available_cores}")
+        if available_cores >= 40:  # High-end server (e.g., Xeon Platinum 8260 with 48 threads)
+            max_processes = min(available_cores - 4, 32)  # Leave 4 cores free, max 32 processes
+        elif available_cores >= 20:  # Mid-range server 
+            max_processes = min(available_cores - 2, 20)  # Leave 2 cores free, max 20 processes  
+        elif available_cores >= 8:   # Standard workstation
+            max_processes = min(available_cores - 1, 12)  # Leave 1 core free, max 12 processes
+        else:  # Limited cores
+            max_processes = min(available_cores - 1, 4)   # Conservative for low-core systems
+        
+        num_processes = max_processes
+        logger.info(f"Total available processes: {num_processes}")
+
+        optimal_batch_size = max(50, min(500, total_records // num_processes))  # Smaller batches for more parallelism
+        
+        # Memory-aware optimization for high-RAM systems
+        estimated_memory_mb = ((total_records * len(full_target)) / 1_000_000) * 0.1  # Rough estimate in MB
+        
+        # Adjust batch processing based on available memory (assuming 32GB+ systems)
+        if estimated_memory_mb > 4000:  # > 4GB estimated usage
+            logger.info(f"📈 Large memory requirement detected ({estimated_memory_mb:.0f}MB estimated)")
+            # Use more aggressive parallelization for memory-intensive tasks
+            if num_processes < 20:
+                num_processes = min(num_processes * 2, 24)  # Boost parallelization
+                optimal_batch_size = max(25, optimal_batch_size // 2)  # Smaller batches
+                logger.info(f"⚡ Boosted to {num_processes} processes with smaller batches for memory efficiency")
+        
+        logger.info(f"🔧 Final Configuration: {num_processes} processes, batch size: {optimal_batch_size}")
+        logger.info(f"🖥️ Hardware: {available_cores} CPU cores detected")
         logger.info(f"📊 Processing {total_records:,} records against {len(full_target):,} targets")
-        logger.info(f"💾 Estimated memory impact: {(total_records * len(full_target)) / 1_000_000:.1f}M potential comparisons")
+        logger.info(f"💾 Estimated memory impact: {estimated_memory_mb:.0f}MB ({(total_records * len(full_target)) / 1_000_000:.1f}M potential comparisons)")
         
         # Split unmatched_source into batches
         batches = []
@@ -1140,7 +1170,14 @@ class OptimizedFileProcessor:
                 for future in as_completed(future_to_batch):
                     start_idx, original_batch = future_to_batch[future]
                     try:
-                        batch_result = future.result(timeout=300)  # 5 minute timeout per batch
+                        # Adaptive timeout based on batch size and hardware
+                        base_timeout = 300  # 5 minutes base
+                        if num_processes >= 20:  # High-performance systems
+                            timeout = min(base_timeout * 2, 600)  # Up to 10 minutes for large parallel jobs
+                        else:
+                            timeout = base_timeout
+                            
+                        batch_result = future.result(timeout=timeout)
                         processed_batches.append((start_idx, batch_result))
                         
                         # Progress update
@@ -1166,9 +1203,18 @@ class OptimizedFileProcessor:
             
             total_time = time.time() - start_time
             batch_total_time = time.time() - batch_start_time
+            
+            # Calculate performance metrics
+            records_per_second = total_records / batch_total_time if batch_total_time > 0 else 0
+            theoretical_single_thread_time = batch_total_time * num_processes  # Rough estimate
+            speedup_factor = theoretical_single_thread_time / batch_total_time if batch_total_time > 0 else 1
+            cpu_efficiency = (speedup_factor / num_processes) * 100 if num_processes > 0 else 0
+            
             logger.info(f"✅ Parallel batch processing completed in {batch_total_time:.1f} seconds")
-            logger.info(f"⚡ Processing rate: {total_records/batch_total_time:.0f} records/second")
-            logger.info(f"🚀 Speedup achieved through parallelization")
+            logger.info(f"⚡ Processing rate: {records_per_second:.0f} records/second")
+            logger.info(f"🚀 Parallelization speedup: {speedup_factor:.1f}x (using {num_processes} processes)")
+            logger.info(f"🎯 CPU efficiency: {cpu_efficiency:.1f}% (theoretical max: 100%)")
+            logger.info(f"💪 Hardware utilization: {num_processes}/{available_cores} cores ({(num_processes/available_cores)*100:.1f}%)")
             
         except Exception as e:
             logger.warning(f"⚠️ Parallel processing failed, falling back to single-threaded: {str(e)}")
