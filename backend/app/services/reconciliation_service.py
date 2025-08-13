@@ -5,6 +5,9 @@ import time
 from datetime import datetime
 from functools import lru_cache
 from typing import Dict, List, Optional, Set, Tuple
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from multiprocessing import cpu_count
+import threading
 
 import pandas as pd
 from fastapi import UploadFile, HTTPException
@@ -12,6 +15,7 @@ from rapidfuzz import fuzz, process
 import numpy as np
 
 from app.models.recon_models import PatternCondition, FileRule, ExtractRule, FilterRule, ReconciliationRule
+from app.utils.threading_config import get_reconciliation_config, get_timeout_for_operation
 
 # Configure logging for reconciliation service
 logger = logging.getLogger(__name__)
@@ -35,7 +39,89 @@ class OptimizedFileProcessor:
         self.warnings = []
         self._pattern_cache = {}  # Cache compiled regex patterns
         self._date_cache = {}  # Cache parsed dates for performance
+        
+        # Use centralized hardware-aware threading configuration
+        self.threading_config = get_reconciliation_config()
+        self.max_workers = self.threading_config.max_workers
+        self.batch_size = self.threading_config.batch_size
 
+    def _process_batch_parallel(self, batch_data: Dict) -> Dict:
+        """
+        Process a single batch of records in parallel
+        Uses many-to-many matching by default (allows all possible matches)
+        Preserves all original features: rule types, column selection, closest matching
+        This method is designed to be called by parallel workers
+        """
+        batch_a = batch_data['batch_a']
+        grouped_b = batch_data['grouped_b']
+        recon_rules = batch_data['recon_rules']
+        df_a = batch_data['df_a']
+        df_b = batch_data['df_b']
+        selected_columns_a = batch_data['selected_columns_a']
+        selected_columns_b = batch_data['selected_columns_b']
+        
+        matches = []
+        matched_indices_a = set()
+        matched_indices_b = set()
+        
+        try:
+            for idx_a, row_a in batch_a.iterrows():
+                match_key = row_a['_match_key']
+                
+                # Get potential matches from grouped data
+                if match_key in grouped_b:
+                    potential_matches = grouped_b[match_key]
+                    
+                    for idx_b, row_b in potential_matches.iterrows():
+                        # Check all reconciliation rules
+                        all_rules_match = True
+                        
+                        for rule in recon_rules:
+                            val_a = row_a[rule.LeftFileColumn]
+                            val_b = row_b[rule.RightFileColumn]
+                            
+                            if rule.MatchType.lower() == "equals":
+                                if not self._check_equals_match(val_a, val_b):
+                                    all_rules_match = False
+                                    break
+                            elif rule.MatchType.lower() == "date_equals":
+                                if not self._check_date_equals_match(val_a, val_b):
+                                    all_rules_match = False
+                                    break
+                            elif rule.MatchType.lower() == "tolerance":
+                                if not self._check_tolerance_match(val_a, val_b, rule.ToleranceValue):
+                                    all_rules_match = False
+                                    break
+                            elif rule.MatchType.lower() == "fuzzy":
+                                if not self._check_fuzzy_match(val_a, val_b, rule.ToleranceValue):
+                                    all_rules_match = False
+                                    break
+                        
+                        if all_rules_match:
+                            # Create match record with selected columns (preserves original functionality)
+                            match_record = self._create_match_record(
+                                row_a, row_b, df_a, df_b,
+                                selected_columns_a, selected_columns_b,
+                                recon_rules
+                            )
+                            matches.append(match_record)
+                            
+                            # Track matched records for unmatched calculation
+                            # Note: Many-to-many allows the same record to be in both matched and unmatched
+                            matched_indices_a.add(row_a['_orig_index_a'])
+                            matched_indices_b.add(row_b['_orig_index_b'])
+                            # No break - allows many-to-many matching (same as original)
+                                
+        except Exception as e:
+            batch_idx = batch_data.get('batch_idx', 'unknown')
+            logger.warning(f"Error processing batch {batch_idx}: {e}")
+            
+        return {
+            'matches': matches,
+            'matched_indices_a': matched_indices_a,
+            'matched_indices_b': matched_indices_b
+        }
+    
     def read_file(self, file: UploadFile, sheet_name: Optional[str] = None) -> pd.DataFrame:
         """Read CSV or Excel file into DataFrame with leading zero preservation and optimized settings"""
         try:
@@ -669,74 +755,120 @@ class OptimizedFileProcessor:
         matched_indices_b = set()
         matches = []
 
-        # Process matches in batches for better memory management
-        batch_size = 1000
+        # Process matches in batches with hardware-optimized batch size
+        batch_size = self.batch_size  # Use centralized threading configuration
         total_batches = (len(df_a_work) + batch_size - 1) // batch_size
-        logger.info(f"⚙️ Processing {len(df_a_work):,} records in {total_batches} batches (size: {batch_size})")
+        logger.info(f"⚙️ Processing {len(df_a_work):,} records in {total_batches} batches (size: {batch_size}) using {self.max_workers} workers")
+        logger.info(f"🖥️ Hardware optimization: {self.threading_config.server_class} ({self.threading_config.available_cores} cores, {self.threading_config.optimization_level})")
         
-        processed_records = 0
-        for batch_idx, start_idx in enumerate(range(0, len(df_a_work), batch_size), 1):
-            end_idx = min(start_idx + batch_size, len(df_a_work))
-            batch_a = df_a_work.iloc[start_idx:end_idx]
+        # Use parallel processing for batch execution on high-end servers
+        if self.threading_config.server_class in ['high_end_server', 'mid_range_server'] and total_batches > 4:
+            logger.info(f"🚀 Using parallel batch processing with {self.max_workers} workers for optimal performance")
             
-            # Progress logging every 10 batches or for large datasets
-            if batch_idx % 10 == 0 or total_batches <= 10:
-                progress_pct = (batch_idx / total_batches) * 100
-                logger.info(f"📈 Processing batch {batch_idx}/{total_batches} ({progress_pct:.1f}%) - {len(matches):,} matches found so far")
-
-            for idx_a, row_a in batch_a.iterrows():
-                # Removed: Skip already matched records (allows many-to-many)
+            # Prepare batches for parallel processing
+            batch_tasks = []
+            grouped_b_dict = {key: group for key, group in grouped_b}
+            
+            for batch_idx, start_idx in enumerate(range(0, len(df_a_work), batch_size), 1):
+                end_idx = min(start_idx + batch_size, len(df_a_work))
+                batch_a = df_a_work.iloc[start_idx:end_idx]
                 
-                match_key = row_a['_match_key']
-
-                # Get potential matches from grouped data
-                if match_key in grouped_b.groups:
-                    potential_matches = grouped_b.get_group(match_key)
-
-                    for idx_b, row_b in potential_matches.iterrows():
-                        # Removed: Skip already matched records (allows many-to-many)
-
-                        # Check all reconciliation rules
-                        all_rules_match = True
-
-                        for rule in recon_rules:
-                            val_a = row_a[rule.LeftFileColumn]
-                            val_b = row_b[rule.RightFileColumn]
-
-                            if rule.MatchType.lower() == "equals":
-                                # Use strict string matching for equals
-                                if not self._check_equals_match(val_a, val_b):
-                                    all_rules_match = False
-                                    break
-                            elif rule.MatchType.lower() == "date_equals":
-                                # Explicit date matching
-                                if not self._check_date_equals_match(val_a, val_b):
-                                    all_rules_match = False
-                                    break
-                            elif rule.MatchType.lower() == "tolerance":
-                                # Tolerance matching
-                                if not self._check_tolerance_match(val_a, val_b, rule.ToleranceValue):
-                                    all_rules_match = False
-                                    break
-                            elif rule.MatchType.lower() == "fuzzy":
-                                # Fuzzy matching (case insensitive)
-                                if not self._check_fuzzy_match(val_a, val_b, rule.ToleranceValue):
-                                    all_rules_match = False
-                                    break
-
-                        if all_rules_match:
-                            # Create match record with selected columns
-                            match_record = self._create_match_record(
-                                row_a, row_b, df_a, df_b,
-                                selected_columns_a, selected_columns_b,
-                                recon_rules
-                            )
-                            matches.append(match_record)
+                batch_data = {
+                    'batch_a': batch_a,
+                    'grouped_b': grouped_b_dict,
+                    'recon_rules': recon_rules,
+                    'df_a': df_a,
+                    'df_b': df_b,
+                    'selected_columns_a': selected_columns_a,
+                    'selected_columns_b': selected_columns_b,
+                    # Note: Using many-to-many matching by default (no restrictions on matching)
+                    'batch_idx': batch_idx
+                }
+                batch_tasks.append(batch_data)
+            
+            # Process batches in parallel with optimal timeout
+            base_timeout = 300  # 5 minutes base timeout
+            timeout = get_timeout_for_operation(base_timeout, self.threading_config)
+            
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                future_to_batch = {executor.submit(self._process_batch_parallel, task): task['batch_idx'] 
+                                 for task in batch_tasks}
+                
+                completed_batches = 0
+                for future in as_completed(future_to_batch, timeout=timeout):
+                    try:
+                        batch_result = future.result()
+                        matches.extend(batch_result['matches'])
+                        matched_indices_a.update(batch_result['matched_indices_a'])
+                        matched_indices_b.update(batch_result['matched_indices_b'])
+                        
+                        completed_batches += 1
+                        if completed_batches % 10 == 0 or completed_batches == total_batches:
+                            progress_pct = (completed_batches / total_batches) * 100
+                            logger.info(f"📈 Completed {completed_batches}/{total_batches} batches ({progress_pct:.1f}%) - {len(matches):,} matches found")
                             
-                            # Track matched records for unmatched calculation
-                            matched_indices_a.add(row_a['_orig_index_a'])
-                            matched_indices_b.add(row_b['_orig_index_b'])
-                            # No break - allows many-to-many matching
+                    except Exception as e:
+                        batch_idx = future_to_batch[future]
+                        logger.error(f"❌ Error processing batch {batch_idx}: {e}")
+                        self.warnings.append(f"Batch {batch_idx} failed: {e}")
+        else:
+            # Fall back to sequential processing for smaller datasets or limited hardware
+            logger.info(f"📝 Using sequential processing for {total_batches} batches")
+            
+            processed_records = 0
+            for batch_idx, start_idx in enumerate(range(0, len(df_a_work), batch_size), 1):
+                end_idx = min(start_idx + batch_size, len(df_a_work))
+                batch_a = df_a_work.iloc[start_idx:end_idx]
+                
+                # Progress logging every 10 batches or for large datasets
+                if batch_idx % 10 == 0 or total_batches <= 10:
+                    progress_pct = (batch_idx / total_batches) * 100
+                    logger.info(f"📈 Processing batch {batch_idx}/{total_batches} ({progress_pct:.1f}%) - {len(matches):,} matches found so far")
+
+                for idx_a, row_a in batch_a.iterrows():
+                    match_key = row_a['_match_key']
+
+                    # Get potential matches from grouped data
+                    if match_key in grouped_b.groups:
+                        potential_matches = grouped_b.get_group(match_key)
+
+                        for idx_b, row_b in potential_matches.iterrows():
+                            # Check all reconciliation rules
+                            all_rules_match = True
+
+                            for rule in recon_rules:
+                                val_a = row_a[rule.LeftFileColumn]
+                                val_b = row_b[rule.RightFileColumn]
+
+                                if rule.MatchType.lower() == "equals":
+                                    if not self._check_equals_match(val_a, val_b):
+                                        all_rules_match = False
+                                        break
+                                elif rule.MatchType.lower() == "date_equals":
+                                    if not self._check_date_equals_match(val_a, val_b):
+                                        all_rules_match = False
+                                        break
+                                elif rule.MatchType.lower() == "tolerance":
+                                    if not self._check_tolerance_match(val_a, val_b, rule.ToleranceValue):
+                                        all_rules_match = False
+                                        break
+                                elif rule.MatchType.lower() == "fuzzy":
+                                    if not self._check_fuzzy_match(val_a, val_b, rule.ToleranceValue):
+                                        all_rules_match = False
+                                        break
+
+                            if all_rules_match:
+                                # Create match record with selected columns
+                                match_record = self._create_match_record(
+                                    row_a, row_b, df_a, df_b,
+                                    selected_columns_a, selected_columns_b,
+                                    recon_rules
+                                )
+                                matches.append(match_record)
+                                
+                                # Track matched records for unmatched calculation
+                                matched_indices_a.add(row_a['_orig_index_a'])
+                                matched_indices_b.add(row_b['_orig_index_b'])
 
         # Create result DataFrames with selected columns
         matched_df = pd.DataFrame(matches) if matches else pd.DataFrame()

@@ -13,6 +13,7 @@ from typing import List, Dict, Tuple, Optional
 import time
 from datetime import datetime
 import functools
+from app.utils.threading_config import get_date_processing_config
 
 logger = logging.getLogger(__name__)
 
@@ -24,30 +25,16 @@ class ParallelDateNormalizer:
     
     def __init__(self, max_workers: int = None):
         """
-        Initialize parallel date normalizer with hardware-aware thread allocation
-        Optimized for high-end servers like Intel Xeon Platinum 8260
+        Initialize parallel date normalizer with centralized hardware-aware thread allocation
         
         Args:
-            max_workers: Maximum number of worker threads (defaults to hardware-optimized count)
+            max_workers: Maximum number of worker threads (defaults to centralized config)
         """
-        if max_workers is None:
-            # Enhanced threading for high-performance servers
-            available_cores = cpu_count()
-            
-            # Intelligent core allocation for date processing workloads
-            if available_cores >= 40:  # High-end server (e.g., Xeon Platinum 8260 with 48 threads)
-                max_workers = min(available_cores - 4, 28)  # Leave 4 cores free, max 28 for date processing
-            elif available_cores >= 20:  # Mid-range server 
-                max_workers = min(available_cores - 2, 16)  # Leave 2 cores free, max 16 processes  
-            elif available_cores >= 8:   # Standard workstation
-                max_workers = min(available_cores - 1, 10)  # Leave 1 core free, max 10 processes
-            else:  # Limited cores
-                max_workers = min(available_cores - 1, 4)   # Conservative for low-core systems
-                
-            logger.info(f"🗺 Hardware-aware date processing: Using {max_workers} workers on {available_cores}-core system")
+        # Use centralized threading configuration
+        self.threading_config = get_date_processing_config(max_workers_override=max_workers)
+        self.max_workers = self.threading_config.max_workers
+        self.batch_size = self.threading_config.batch_size
         
-        self.max_workers = max_workers
-        self.available_cores = cpu_count()
         self._local_storage = threading.local()  # Thread-local storage for caches
         
     def _get_thread_cache(self) -> dict:
@@ -193,12 +180,11 @@ class ParallelDateNormalizer:
             
         logger.info(f"🚀 Normalizing {len(date_columns)} date columns using parallel processing...")
         
-        # Step 2: Process each date column with hardware-aware chunking
+        # Step 2: Process each date column with centralized chunking configuration
         converted_columns = []
-        # Larger chunks for high-end servers to maximize date processing throughput
-        base_chunk_factor = 4 if self.available_cores >= 40 else 2
-        chunk_size = max(5000 if self.available_cores >= 40 else 10000, 
-                        len(df) // (self.max_workers * base_chunk_factor))  # Adaptive chunk size
+        # Use centralized batch sizing for optimal performance
+        chunk_size = max(self.batch_size,
+                        len(df) // (self.max_workers * 2))  # Ensure reasonable distribution
         
         for col_name in date_columns:
             try:
