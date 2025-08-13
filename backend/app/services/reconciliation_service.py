@@ -761,8 +761,10 @@ class OptimizedFileProcessor:
         logger.info(f"⚙️ Processing {len(df_a_work):,} records in {total_batches} batches (size: {batch_size}) using {self.max_workers} workers")
         logger.info(f"🖥️ Hardware optimization: {self.threading_config.server_class} ({self.threading_config.available_cores} cores, {self.threading_config.optimization_level})")
         
-        # Use parallel processing for batch execution on high-end servers
-        if self.threading_config.server_class in ['high_end_server', 'mid_range_server'] and total_batches > 4:
+        # Use parallel processing for batch execution on capable systems (6+ cores)
+        # Enable parallel processing if we have multiple workers OR if system has 6+ cores
+        if (self.threading_config.server_class in ['high_end_server', 'mid_range_server', 'standard_workstation'] and 
+            (total_batches > 1 or self.threading_config.available_cores >= 6)) and self.max_workers >= 2:
             logger.info(f"🚀 Using parallel batch processing with {self.max_workers} workers for optimal performance")
             
             # Prepare batches for parallel processing

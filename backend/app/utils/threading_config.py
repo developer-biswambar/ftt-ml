@@ -62,7 +62,7 @@ def _detect_hardware_class() -> tuple:
         return available_cores, "high_end_server", "maximum_performance"
     elif available_cores >= 20:
         return available_cores, "mid_range_server", "high_performance"  
-    elif available_cores >= 8:
+    elif available_cores >= 6:   # Include 6-core systems for parallel processing
         return available_cores, "standard_workstation", "balanced"
     else:
         return available_cores, "limited_system", "conservative"
@@ -96,7 +96,7 @@ def _calculate_optimal_threading(available_cores: int, server_class: str, worklo
         },
         "standard_workstation": {
             "reserve_cores": 1,
-            "base_batch_size": 2000, 
+            "base_batch_size": 2000,  # Set to 2000 as requested
             "timeout_multiplier": 1.0,
             "memory_efficiency": True
         },
@@ -114,8 +114,8 @@ def _calculate_optimal_threading(available_cores: int, server_class: str, worklo
     # Workload-specific adjustments
     workload_adjustments = {
         WorkloadType.RECONCILIATION: {
-            "max_worker_multiplier": 0.7,  # CPU-intensive, moderate threading
-            "batch_size_multiplier": 1.5,   # Larger batches for efficiency
+            "max_worker_multiplier": 0.8,  # Increased for better parallelization on 6-core systems
+            "batch_size_multiplier": 1.0,  # Use base batch size directly (2000 for 6-core systems)
             "max_workers_cap": 32
         },
         WorkloadType.DATA_CLEANING: {
@@ -147,12 +147,16 @@ def _calculate_optimal_threading(available_cores: int, server_class: str, worklo
     
     adjustment = workload_adjustments.get(workload_type, workload_adjustments[WorkloadType.GENERAL])
     
-    # Calculate final values
+    # Calculate final values with minimum guarantees for parallel processing
     max_workers = min(
         int(usable_cores * adjustment["max_worker_multiplier"]),
         adjustment["max_workers_cap"]
     )
-    max_workers = max(max_workers, 1)  # Ensure at least 1 worker
+    # Ensure at least 2 workers for parallel processing on systems with 6+ cores
+    if available_cores >= 6:
+        max_workers = max(max_workers, 2)  # Force at least 2 workers for 6+ core systems
+    else:
+        max_workers = max(max_workers, 1)  # Single worker for limited systems
     
     batch_size = int(base_config["base_batch_size"] * adjustment["batch_size_multiplier"])
     batch_size = max(batch_size, 100)  # Minimum reasonable batch size
@@ -254,7 +258,14 @@ def log_threading_summary():
 # Convenience functions for common workload types
 def get_reconciliation_config(max_workers_override: Optional[int] = None) -> ThreadingConfig:
     """Get optimized configuration for reconciliation workloads"""
-    return get_threading_config(WorkloadType.RECONCILIATION, max_workers_override)
+    config = get_threading_config(WorkloadType.RECONCILIATION, max_workers_override)
+    
+    # Special handling for 6-core systems to ensure proper parallel processing
+    if config.available_cores == 6 and config.batch_size != 2000:
+        logger.info(f"🔧 Adjusting 6-core system: Setting batch size to 2000 (was {config.batch_size})")
+        config.batch_size = 2000
+        
+    return config
 
 def get_cleaning_config(max_workers_override: Optional[int] = None) -> ThreadingConfig:
     """Get optimized configuration for data cleaning workloads"""
@@ -276,3 +287,9 @@ def set_cores_override(cores: int):
     _detect_hardware_class.cache_clear()
     get_threading_config.cache_clear()
     logger.info(f"🔧 Cores override set to {cores} - configurations will be recalculated")
+
+def force_config_refresh():
+    """Force refresh of threading configuration (clears cache)"""
+    _detect_hardware_class.cache_clear()
+    get_threading_config.cache_clear()
+    logger.info("🔄 Threading configuration cache cleared - will recalculate on next use")
