@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Eye,
     Download,
@@ -17,7 +17,13 @@ import {
     Clock,
     Users,
     TrendingUp,
-    Upload
+    Upload,
+    Database,
+    Zap,
+    Filter,
+    GitMerge,
+    Search,
+    Cpu
 } from 'lucide-react';
 
 const ReconciliationPreviewStep = ({
@@ -40,6 +46,46 @@ const ReconciliationPreviewStep = ({
 }) => {
     // State for closest match advanced configuration
     const [showAdvancedConfig, setShowAdvancedConfig] = useState(true);
+    
+    // State for processing animation
+    const [currentStep, setCurrentStep] = useState(0);
+    const [processingText, setProcessingText] = useState('');
+    
+    // Processing steps animation
+    const processingSteps = [
+        { icon: Database, text: 'Loading and validating files...', color: 'text-blue-500', bgColor: 'bg-blue-50' },
+        { icon: Filter, text: 'Applying extraction and filter rules...', color: 'text-purple-500', bgColor: 'bg-purple-50' },
+        { icon: Zap, text: 'Creating optimized match keys...', color: 'text-yellow-500', bgColor: 'bg-yellow-50' },
+        { icon: Cpu, text: 'Processing batches in parallel...', color: 'text-green-500', bgColor: 'bg-green-50' },
+        { icon: GitMerge, text: 'Matching records across files...', color: 'text-indigo-500', bgColor: 'bg-indigo-50' },
+        { icon: Search, text: 'Calculating unmatched records...', color: 'text-orange-500', bgColor: 'bg-orange-50' },
+        { icon: Target, text: 'Analyzing closest matches...', color: 'text-pink-500', bgColor: 'bg-pink-50' },
+        { icon: CheckCircle, text: 'Finalizing reconciliation results...', color: 'text-emerald-500', bgColor: 'bg-emerald-50' }
+    ];
+    
+    useEffect(() => {
+        let interval;
+        if (isLoading) {
+            // Reset animation when loading starts
+            setCurrentStep(0);
+            
+            interval = setInterval(() => {
+                setCurrentStep(prev => {
+                    const nextStep = (prev + 1) % processingSteps.length;
+                    setProcessingText(processingSteps[nextStep].text);
+                    return nextStep;
+                });
+            }, 2000); // Change step every 2 seconds
+        } else {
+            // Reset when not loading
+            setCurrentStep(0);
+            setProcessingText('');
+        }
+        
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [isLoading]);
 
     const renderConfigSummary = () => {
         const sourceFileCount = config.files ? config.files.length : 2;
@@ -91,13 +137,86 @@ const ReconciliationPreviewStep = ({
 
     const renderResults = () => {
         if (isLoading) {
+            const currentStepData = processingSteps[currentStep];
+            const StepIcon = currentStepData.icon;
+            
             return (
                 <div className="flex flex-col items-center justify-center py-12">
-                    <RefreshCw size={48} className="text-blue-500 animate-spin mb-4" />
-                    <h3 className="text-lg font-medium text-gray-800 mb-2">Processing Reconciliation</h3>
-                    <p className="text-gray-600 text-center max-w-md">
-                        Analyzing files and applying reconciliation rules. This may take a few moments...
-                    </p>
+                    {/* Main processing animation */}
+                    <div className="relative mb-6">
+                        <div className={`p-4 rounded-full ${currentStepData.bgColor} transition-all duration-500 transform hover:scale-105`}>
+                            <StepIcon size={48} className={`${currentStepData.color} animate-pulse`} />
+                        </div>
+                        {/* Spinning ring around the icon */}
+                        <div className="absolute inset-0 rounded-full border-4 border-blue-200 border-t-blue-500 animate-spin opacity-30"></div>
+                    </div>
+                    
+                    <h3 className="text-xl font-semibold text-gray-800 mb-3">Processing Reconciliation</h3>
+                    
+                    {/* Current step text with typing animation */}
+                    <div className="text-center mb-6">
+                        <p className={`${currentStepData.color} font-medium text-lg transition-all duration-500`}>
+                            {currentStepData.text}
+                        </p>
+                    </div>
+                    
+                    {/* Progress indicator */}
+                    <div className="w-full max-w-md mb-6">
+                        <div className="flex justify-between text-xs text-gray-500 mb-2">
+                            <span>Step {currentStep + 1} of {processingSteps.length}</span>
+                            <span>{Math.round(((currentStep + 1) / processingSteps.length) * 100)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                                className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500 ease-out"
+                                style={{ width: `${((currentStep + 1) / processingSteps.length) * 100}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                    
+                    {/* Processing steps grid */}
+                    <div className="grid grid-cols-4 gap-3 max-w-2xl">
+                        {processingSteps.map((step, index) => {
+                            const StepIconSmall = step.icon;
+                            const isActive = index === currentStep;
+                            const isCompleted = index < currentStep;
+                            
+                            return (
+                                <div key={index} className="flex flex-col items-center">
+                                    <div className={`p-2 rounded-full transition-all duration-300 ${
+                                        isActive ? `${step.bgColor} scale-110 shadow-lg` :
+                                        isCompleted ? 'bg-green-100 scale-100' :
+                                        'bg-gray-100 scale-90 opacity-50'
+                                    }`}>
+                                        <StepIconSmall size={16} className={`${
+                                            isActive ? `${step.color} animate-pulse` :
+                                            isCompleted ? 'text-green-600' :
+                                            'text-gray-400'
+                                        }`} />
+                                    </div>
+                                    <span className={`text-xs mt-1 text-center transition-all duration-300 ${
+                                        isActive ? step.color + ' font-medium' :
+                                        isCompleted ? 'text-green-600' :
+                                        'text-gray-400'
+                                    }`}>
+                                        {step.text.split(' ')[0]}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    
+                    {/* Hardware optimization indicator */}
+                    <div className="mt-6 flex items-center space-x-2 text-sm text-gray-500">
+                        <Cpu size={16} className="animate-pulse" />
+                        <span>Multi-core parallel processing active</span>
+                        <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                            <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
+                        </div>
+                    </div>
                 </div>
             );
         }

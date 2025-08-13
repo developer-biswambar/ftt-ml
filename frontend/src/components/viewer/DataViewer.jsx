@@ -1179,6 +1179,7 @@ const DataViewer = ({fileId, onClose}) => {
                                                 selectedValues={columnFilters[column] || []}
                                                 onFilterSelect={(values) => handleColumnFilter(column, values)}
                                                 onClear={() => handleColumnFilterClear(column)}
+                                                cascadeFilters={columnFilters}  // Pass all current filters for cascading
                                             />
                                             
                                             {/* Text Filter */}

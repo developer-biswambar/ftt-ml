@@ -7,7 +7,7 @@ from typing import List, Optional
 
 import pandas as pd
 from dotenv import load_dotenv
-from fastapi import UploadFile, File, HTTPException, APIRouter, BackgroundTasks, Form
+from fastapi import UploadFile, File, HTTPException, APIRouter, BackgroundTasks, Form, Request
 from pydantic import BaseModel
 
 from app.routes.delta_routes import DeltaProcessor, get_file_by_id
@@ -1141,9 +1141,10 @@ async def preview_file_data(
 async def get_column_unique_values(
         file_id: str,
         column_name: str,
-        limit: Optional[int] = 1000
+        limit: Optional[int] = 1000,
+        request: Request = None
 ):
-    """Get unique values for a specific column in a file with date parsing"""
+    """Get unique values for a specific column in a file with cascading filter support"""
 
     try:
         # Get the file DataFrame
@@ -1155,8 +1156,33 @@ async def get_column_unique_values(
                 detail=f"Column '{column_name}' not found in file"
             )
 
-        # Get the column data
-        column_data = df[column_name].dropna()
+        # Apply cascading filters from query parameters
+        filtered_df = df.copy()
+        applied_filters = []
+        
+        if request:
+            # Parse filter parameters (format: filter_columnname=value1,value2)
+            for param_name, param_value in request.query_params.items():
+                if param_name.startswith('filter_') and param_name != f'filter_{column_name}':
+                    filter_column = param_name[7:]  # Remove 'filter_' prefix
+                    
+                    if filter_column in filtered_df.columns:
+                        # Parse comma-separated filter values
+                        filter_values = [v.strip() for v in param_value.split(',') if v.strip()]
+                        
+                        if filter_values:
+                            # Apply filter: keep only rows where the filter column has one of the specified values
+                            filtered_df = filtered_df[filtered_df[filter_column].astype(str).isin(filter_values)]
+                            applied_filters.append({
+                                'column': filter_column,
+                                'values': filter_values,
+                                'matched_rows': len(filtered_df)
+                            })
+                            
+                            logger.info(f"Applied cascading filter on {filter_column}: {filter_values} -> {len(filtered_df)} rows remaining")
+        
+        # Get the column data from filtered DataFrame
+        column_data = filtered_df[column_name].dropna()
 
         if len(column_data) == 0:
             return {
@@ -1245,7 +1271,10 @@ async def get_column_unique_values(
             "returned_count": len(unique_display_values),
             "is_date_column": is_date_column,
             "sample_values": sample_display_values,
-            "has_more": len(column_data.unique()) > limit
+            "has_more": len(column_data.unique()) > limit,
+            "applied_filters": applied_filters,
+            "filtered_from_rows": len(df) if applied_filters else None,
+            "filtered_to_rows": len(filtered_df) if applied_filters else None
         }
 
     except HTTPException:

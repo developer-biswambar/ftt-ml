@@ -142,8 +142,18 @@ export const apiService = {
         return response.data;
     },
 
-    getColumnUniqueValues: async (fileId, columnName, limit = 1000) => {
-        const response = await defaultApi.get(`/files/${fileId}/columns/${encodeURIComponent(columnName)}/unique-values?limit=${limit}`);
+    getColumnUniqueValues: async (fileId, columnName, limit = 1000, filters = {}) => {
+        const params = new URLSearchParams({ limit: limit.toString() });
+        
+        // Add filter parameters for cascading dropdowns
+        Object.entries(filters).forEach(([filterColumn, filterValues]) => {
+            if (filterValues && filterValues.length > 0) {
+                // Send multiple filter values as comma-separated
+                params.append(`filter_${filterColumn}`, filterValues.join(','));
+            }
+        });
+        
+        const response = await defaultApi.get(`/files/${fileId}/columns/${encodeURIComponent(columnName)}/unique-values?${params}`);
         return response.data;
     },
 

@@ -7,7 +7,8 @@ const ColumnFilterDropdown = ({
     columnName, 
     onFilterSelect, 
     selectedValues = [],
-    onClear
+    onClear,
+    cascadeFilters = {} // New prop for cascading dropdown filters
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [uniqueValues, setUniqueValues] = useState([]);
@@ -20,13 +21,33 @@ const ColumnFilterDropdown = ({
             loadUniqueValues();
         }
     }, [isOpen, fileId, columnName]);
+    
+    // Reload unique values when cascade filters change
+    useEffect(() => {
+        if (isOpen) {
+            // Clear current values and reload with new filters
+            setUniqueValues([]);
+            loadUniqueValues();
+        }
+    }, [cascadeFilters]);
 
     const loadUniqueValues = async () => {
         try {
             setLoading(true);
             setError(null);
             
-            const response = await apiService.getColumnUniqueValues(fileId, columnName, 1000);
+            // Prepare filters for cascading dropdowns
+            // Only include filters from other columns (not the current column)
+            const relevantFilters = {};
+            Object.entries(cascadeFilters).forEach(([filterColumn, filterValues]) => {
+                if (filterColumn !== columnName && filterValues && filterValues.length > 0) {
+                    relevantFilters[filterColumn] = filterValues;
+                }
+            });
+            
+            console.log(`Loading unique values for ${columnName} with filters:`, relevantFilters);
+            
+            const response = await apiService.getColumnUniqueValues(fileId, columnName, 1000, relevantFilters);
             
             // Handle direct response format (not wrapped in success/data structure)
             if (response.unique_values) {
