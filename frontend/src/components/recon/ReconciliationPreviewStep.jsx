@@ -33,9 +33,12 @@ const ReconciliationPreviewStep = ({
     hasUnsavedChanges,
     onShowRuleModal,
     findClosestMatches = false,
-    onToggleClosestMatches
+    onToggleClosestMatches,
+    closestMatchConfig,
+    onClosestMatchConfigChange
 }) => {
-    // Remove viewMode state since we're combining into single view
+    // State for closest match advanced configuration
+    const [showAdvancedConfig, setShowAdvancedConfig] = useState(true);
 
     const renderConfigSummary = () => {
         const sourceFileCount = config.files ? config.files.length : 2;
@@ -46,88 +49,41 @@ const ReconciliationPreviewStep = ({
             config.Files.reduce((total, file) => total + (file.Filter ? file.Filter.length : 0), 0) : 0;
 
         return (
-            <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                        <div className="flex items-center space-x-2 mb-2">
-                            <FileText size={20} className="text-blue-600" />
-                            <span className="text-sm font-medium text-blue-800">Source Files</span>
+            <div className="space-y-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                        <div className="flex items-center space-x-1 mb-1">
+                            <FileText size={16} className="text-blue-600" />
+                            <span className="text-xs font-medium text-blue-800">Source Files</span>
                         </div>
-                        <p className="text-2xl font-semibold text-blue-900">{sourceFileCount}</p>
+                        <p className="text-xl font-semibold text-blue-900">{sourceFileCount}</p>
                     </div>
 
-                    <div className="bg-green-50 p-4 rounded-lg">
-                        <div className="flex items-center space-x-2 mb-2">
-                            <Target size={20} className="text-green-600" />
-                            <span className="text-sm font-medium text-green-800">Match Rules</span>
+                    <div className="bg-green-50 p-3 rounded-lg">
+                        <div className="flex items-center space-x-1 mb-1">
+                            <Target size={16} className="text-green-600" />
+                            <span className="text-xs font-medium text-green-800">Match Rules</span>
                         </div>
-                        <p className="text-2xl font-semibold text-green-900">{ruleCount}</p>
+                        <p className="text-xl font-semibold text-green-900">{ruleCount}</p>
                     </div>
 
-                    <div className="bg-purple-50 p-4 rounded-lg">
-                        <div className="flex items-center space-x-2 mb-2">
-                            <Layers size={20} className="text-purple-600" />
-                            <span className="text-sm font-medium text-purple-800">Extract Rules</span>
+                    <div className="bg-purple-50 p-3 rounded-lg">
+                        <div className="flex items-center space-x-1 mb-1">
+                            <Layers size={16} className="text-purple-600" />
+                            <span className="text-xs font-medium text-purple-800">Extract Rules</span>
                         </div>
-                        <p className="text-2xl font-semibold text-purple-900">{extractionRulesCount}</p>
+                        <p className="text-xl font-semibold text-purple-900">{extractionRulesCount}</p>
                     </div>
 
-                    <div className="bg-orange-50 p-4 rounded-lg">
-                        <div className="flex items-center space-x-2 mb-2">
-                            <CheckCircle size={20} className="text-orange-600" />
-                            <span className="text-sm font-medium text-orange-800">Filter Rules</span>
+                    <div className="bg-orange-50 p-3 rounded-lg">
+                        <div className="flex items-center space-x-1 mb-1">
+                            <CheckCircle size={16} className="text-orange-600" />
+                            <span className="text-xs font-medium text-orange-800">Filter Rules</span>
                         </div>
-                        <p className="text-2xl font-semibold text-orange-900">{filterRulesCount}</p>
-                    </div>
-                </div>
-
-                <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-800 mb-3">Reconciliation Configuration</h4>
-
-                    <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                            <span className="text-gray-600">Configuration:</span>
-                            <span className="font-medium">Custom Reconciliation</span>
-                        </div>
-
-                        <div className="flex justify-between">
-                            <span className="text-gray-600">Files to Process:</span>
-                            <span className="font-medium">{sourceFileCount} files</span>
-                        </div>
-
-                        <div className="flex justify-between">
-                            <span className="text-gray-600">Match Rules:</span>
-                            <span className="font-medium">{ruleCount} rule{ruleCount !== 1 ? 's' : ''}</span>
-                        </div>
-
-                        {config.user_requirements && (
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                                <span className="text-gray-600">Requirements:</span>
-                                <p className="mt-1 text-gray-800">{config.user_requirements}</p>
-                            </div>
-                        )}
+                        <p className="text-xl font-semibold text-orange-900">{filterRulesCount}</p>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {config.Files && config.Files.map((file, index) => (
-                        <div key={index} className="border border-gray-200 rounded-lg p-4">
-                            <h5 className="font-medium text-gray-800 mb-2">
-                                File {String.fromCharCode(65 + index)} Configuration
-                            </h5>
-                            <div className="space-y-1 text-sm text-gray-600">
-                                <div>Extract Rules: {file.Extract ? file.Extract.length : 0}</div>
-                                <div>Filter Rules: {file.Filter ? file.Filter.length : 0}</div>
-                                {config.selected_columns_file_a && index === 0 && (
-                                    <div>Selected Columns: {config.selected_columns_file_a.length}</div>
-                                )}
-                                {config.selected_columns_file_b && index === 1 && (
-                                    <div>Selected Columns: {config.selected_columns_file_b.length}</div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
             </div>
         );
     };
@@ -166,8 +122,8 @@ const ReconciliationPreviewStep = ({
 
         if (generatedResults.errors && generatedResults.errors.length > 0) {
             return (
-                <div className="space-y-4">
-                    <div className="flex items-center space-x-2 text-red-600 mb-4">
+                <div className="space-y-2">
+                    <div className="flex items-center space-x-2 text-red-600 mb-2">
                         <AlertCircle size={20} />
                         <h3 className="text-lg font-medium">Reconciliation Failed</h3>
                     </div>
@@ -215,12 +171,7 @@ const ReconciliationPreviewStep = ({
 
         if (hasNoMatches) {
             return (
-                <div className="space-y-6">
-                    <div className="flex items-center space-x-2 text-blue-600 mb-4">
-                        <AlertCircle size={20} />
-                        <h3 className="text-lg font-medium">Reconciliation Complete - No Matches Found</h3>
-                    </div>
-
+                <div className="space-y-3">
                     {/* No Matches Info Panel */}
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                         <div className="flex items-start space-x-3">
@@ -244,40 +195,40 @@ const ReconciliationPreviewStep = ({
                     </div>
 
                     {/* Processing Summary */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                            <div className="flex items-center space-x-2 mb-2">
-                                <FileText size={20} className="text-gray-600" />
-                                <span className="text-sm font-medium text-gray-800">File A Records</span>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                            <div className="flex items-center space-x-1 mb-1">
+                                <FileText size={16} className="text-gray-600" />
+                                <span className="text-xs font-medium text-gray-800">File A Records</span>
                             </div>
-                            <p className="text-2xl font-semibold text-gray-900">{totalFileA}</p>
+                            <p className="text-xl font-semibold text-gray-900">{totalFileA}</p>
                             <p className="text-xs text-gray-600">all unmatched</p>
                         </div>
 
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                            <div className="flex items-center space-x-2 mb-2">
-                                <FileText size={20} className="text-gray-600" />
-                                <span className="text-sm font-medium text-gray-800">File B Records</span>
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                            <div className="flex items-center space-x-1 mb-1">
+                                <FileText size={16} className="text-gray-600" />
+                                <span className="text-xs font-medium text-gray-800">File B Records</span>
                             </div>
-                            <p className="text-2xl font-semibold text-gray-900">{totalFileB}</p>
+                            <p className="text-xl font-semibold text-gray-900">{totalFileB}</p>
                             <p className="text-xs text-gray-600">all unmatched</p>
                         </div>
 
-                        <div className="bg-red-50 p-4 rounded-lg">
-                            <div className="flex items-center space-x-2 mb-2">
-                                <AlertCircle size={20} className="text-red-600" />
-                                <span className="text-sm font-medium text-red-800">Matches Found</span>
+                        <div className="bg-red-50 p-3 rounded-lg">
+                            <div className="flex items-center space-x-1 mb-1">
+                                <AlertCircle size={16} className="text-red-600" />
+                                <span className="text-xs font-medium text-red-800">Matches Found</span>
                             </div>
-                            <p className="text-2xl font-semibold text-red-900">0</p>
+                            <p className="text-xl font-semibold text-red-900">0</p>
                             <p className="text-xs text-red-600">0% match rate</p>
                         </div>
 
-                        <div className="bg-blue-50 p-4 rounded-lg">
-                            <div className="flex items-center space-x-2 mb-2">
-                                <Clock size={20} className="text-blue-600" />
-                                <span className="text-sm font-medium text-blue-800">Processing</span>
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                            <div className="flex items-center space-x-1 mb-1">
+                                <Clock size={16} className="text-blue-600" />
+                                <span className="text-xs font-medium text-blue-800">Processing</span>
                             </div>
-                            <p className="text-2xl font-semibold text-blue-900">{processingTime.toFixed(2)}s</p>
+                            <p className="text-xl font-semibold text-blue-900">{processingTime.toFixed(2)}s</p>
                             <p className="text-xs text-blue-600">processing time</p>
                         </div>
                     </div>
@@ -329,88 +280,56 @@ const ReconciliationPreviewStep = ({
         }
 
         return (
-            <div className="space-y-6">
-                <div className="flex items-center space-x-2 text-green-600 mb-4">
-                    <CheckCircle size={20} />
-                    <h3 className="text-lg font-medium">Reconciliation Complete</h3>
-                </div>
-
+            <div className="space-y-3">
                 {/* Results Summary */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-green-50 p-4 rounded-lg">
-                        <div className="flex items-center space-x-2 mb-2">
-                            <CheckCircle size={20} className="text-green-600" />
-                            <span className="text-sm font-medium text-green-800">Matched</span>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-green-50 p-3 rounded-lg">
+                        <div className="flex items-center space-x-1 mb-1">
+                            <CheckCircle size={16} className="text-green-600" />
+                            <span className="text-xs font-medium text-green-800">Matched</span>
                         </div>
-                        <p className="text-2xl font-semibold text-green-900">{matchedCount}</p>
+                        <p className="text-xl font-semibold text-green-900">{matchedCount}</p>
                         <p className="text-xs text-green-600">{matchPercentage.toFixed(1)}% match rate</p>
                     </div>
 
-                    <div className="bg-yellow-50 p-4 rounded-lg">
-                        <div className="flex items-center space-x-2 mb-2">
-                            <AlertCircle size={20} className="text-yellow-600" />
-                            <span className="text-sm font-medium text-yellow-800">Unmatched A</span>
+                    <div className="bg-yellow-50 p-3 rounded-lg">
+                        <div className="flex items-center space-x-1 mb-1">
+                            <AlertCircle size={16} className="text-yellow-600" />
+                            <span className="text-xs font-medium text-yellow-800">Unmatched A</span>
                         </div>
-                        <p className="text-2xl font-semibold text-yellow-900">{unmatchedACount}</p>
+                        <p className="text-xl font-semibold text-yellow-900">{unmatchedACount}</p>
                         <p className="text-xs text-yellow-600">of {totalFileA} total</p>
                     </div>
 
-                    <div className="bg-orange-50 p-4 rounded-lg">
-                        <div className="flex items-center space-x-2 mb-2">
-                            <AlertCircle size={20} className="text-orange-600" />
-                            <span className="text-sm font-medium text-orange-800">Unmatched B</span>
+                    <div className="bg-orange-50 p-3 rounded-lg">
+                        <div className="flex items-center space-x-1 mb-1">
+                            <AlertCircle size={16} className="text-orange-600" />
+                            <span className="text-xs font-medium text-orange-800">Unmatched B</span>
                         </div>
-                        <p className="text-2xl font-semibold text-orange-900">{unmatchedBCount}</p>
+                        <p className="text-xl font-semibold text-orange-900">{unmatchedBCount}</p>
                         <p className="text-xs text-orange-600">of {totalFileB} total</p>
                     </div>
 
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                        <div className="flex items-center space-x-2 mb-2">
-                            <Clock size={20} className="text-blue-600" />
-                            <span className="text-sm font-medium text-blue-800">Processing</span>
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                        <div className="flex items-center space-x-1 mb-1">
+                            <Clock size={16} className="text-blue-600" />
+                            <span className="text-xs font-medium text-blue-800">Processing</span>
                         </div>
-                        <p className="text-2xl font-semibold text-blue-900">{processingTime.toFixed(2)}s</p>
+                        <p className="text-xl font-semibold text-blue-900">{processingTime.toFixed(2)}s</p>
                         <p className="text-xs text-blue-600">processing time</p>
                     </div>
                 </div>
 
                 {/* Processing Information */}
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-800 mb-3">Processing Details</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div className="space-y-2">
-                            <div className="flex items-center space-x-2">
-                                <Clock size={16} className="text-gray-500" />
-                                <span className="text-gray-600">Processing Time:</span>
-                                <span className="font-medium">{processingTime.toFixed(3)}s</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <Target size={16} className="text-gray-500" />
-                                <span className="text-gray-600">Match Percentage:</span>
-                                <span className="font-medium">{matchPercentage.toFixed(1)}%</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <TrendingUp size={16} className="text-gray-500" />
-                                <span className="text-gray-600">Total Records:</span>
-                                <span className="font-medium">File A: {totalFileA}, File B: {totalFileB}</span>
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            {generatedResults.reconciliation_id && (
-                                <div className="flex items-center space-x-2">
-                                    <FileText size={16} className="text-gray-500" />
-                                    <span className="text-gray-600">ID:</span>
-                                    <span className="font-medium text-xs bg-gray-200 px-2 py-1 rounded">{generatedResults.reconciliation_id}</span>
-                                </div>
-                            )}
-                            {generatedResults.processing_info && (
-                                <div className="text-xs text-gray-600 mt-2">
-                                    <div>✓ Hash-based matching: {generatedResults.processing_info.hash_based_matching ? 'Enabled' : 'Disabled'}</div>
-                                    <div>✓ Optimization: {generatedResults.processing_info.optimization_used ? 'Enabled' : 'Disabled'}</div>
-                                    <div>✓ Vectorized extraction: {generatedResults.processing_info.vectorized_extraction ? 'Enabled' : 'Disabled'}</div>
-                                </div>
-                            )}
-                        </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <h4 className="text-sm font-medium text-gray-800 mb-2">Processing Details</h4>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                        <span className="text-gray-600">Time: <span className="font-medium text-gray-800">{processingTime.toFixed(2)}s</span></span>
+                        <span className="text-gray-600">Match Rate: <span className="font-medium text-gray-800">{matchPercentage.toFixed(1)}%</span></span>
+                        <span className="text-gray-600">Records: <span className="font-medium text-gray-800">A:{totalFileA}, B:{totalFileB}</span></span>
+                        {generatedResults.reconciliation_id && (
+                            <span className="text-gray-600">ID: <span className="font-medium text-xs bg-gray-200 px-1 py-0.5 rounded">{generatedResults.reconciliation_id}</span></span>
+                        )}
                     </div>
                 </div>
 
@@ -434,25 +353,114 @@ const ReconciliationPreviewStep = ({
                                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                             </label>
                         </div>
-                        <div className="text-sm text-purple-700">
-                            {findClosestMatches ? (
-                                <div className="space-y-1">
-                                    <div className="flex items-center space-x-2">
-                                        <CheckCircle size={16} className="text-purple-600" />
-                                        <span>✓ Will analyze similarity between unmatched records</span>
+                        
+                        {findClosestMatches && (
+                            <div className="space-y-3 mt-4">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium text-purple-800">Advanced Configuration</span>
+                                    <button
+                                        onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
+                                        className="text-xs text-purple-600 hover:text-purple-800 underline"
+                                    >
+                                        {showAdvancedConfig ? 'Hide Advanced' : 'Show Advanced'}
+                                    </button>
+                                </div>
+                                
+                                {showAdvancedConfig && onClosestMatchConfigChange && closestMatchConfig && (
+                                    <div className="bg-white border border-purple-200 rounded p-3 space-y-4">
+                                        {/* Column Selection Section */}
+                                        <div>
+                                            <label className="block text-xs font-medium text-purple-700 mb-2">
+                                                Specific Columns for Comparison (Optional)
+                                            </label>
+                                            <p className="text-xs text-purple-600 mb-2">
+                                                Select specific column pairs for closest match analysis. If not specified, all reconciliation rule columns will be used.
+                                            </p>
+                                            
+                                            {/* Get available column pairs from reconciliation rules */}
+                                            {(() => {
+                                                const availableColumnPairs = config.ReconciliationRules ? 
+                                                    config.ReconciliationRules.map(rule => ({
+                                                        fileA: rule.LeftFileColumn,
+                                                        fileB: rule.RightFileColumn
+                                                    })) : [];
+                                                
+                                                const currentSpecificColumns = closestMatchConfig.specific_columns || {};
+                                                
+                                                return availableColumnPairs.length > 0 ? (
+                                                    <div className="space-y-2">
+                                                        {availableColumnPairs.map((pair, index) => (
+                                                            <div key={index} className="flex items-center space-x-2 bg-gray-50 p-2 rounded text-xs">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    id={`column-pair-${index}`}
+                                                                    checked={currentSpecificColumns[pair.fileA] === pair.fileB}
+                                                                    onChange={(e) => {
+                                                                        const newSpecificColumns = { ...currentSpecificColumns };
+                                                                        if (e.target.checked) {
+                                                                            newSpecificColumns[pair.fileA] = pair.fileB;
+                                                                        } else {
+                                                                            delete newSpecificColumns[pair.fileA];
+                                                                        }
+                                                                        onClosestMatchConfigChange({ 
+                                                                            specific_columns: Object.keys(newSpecificColumns).length > 0 ? newSpecificColumns : null
+                                                                        });
+                                                                    }}
+                                                                    className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+                                                                />
+                                                                <label htmlFor={`column-pair-${index}`} className="text-purple-700">
+                                                                    <span className="font-medium">{pair.fileA}</span> ↔ <span className="font-medium">{pair.fileB}</span>
+                                                                </label>
+                                                            </div>
+                                                        ))}
+                                                        
+                                                        {Object.keys(currentSpecificColumns).length > 0 && (
+                                                            <div className="mt-2 p-2 bg-purple-50 rounded text-xs">
+                                                                <span className="font-medium text-purple-800">Selected pairs: </span>
+                                                                <span className="text-purple-700">
+                                                                    {Object.entries(currentSpecificColumns).map(([fileA, fileB]) => 
+                                                                        `${fileA}↔${fileB}`
+                                                                    ).join(', ')}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-xs text-gray-500 italic">No reconciliation rules configured</p>
+                                                );
+                                            })()}
+                                        </div>
+                                        
                                     </div>
-                                    <div className="flex items-center space-x-2">
-                                        <CheckCircle size={16} className="text-purple-600" />
-                                        <span>✓ Adds 3 new columns: closest_match_record, closest_match_score, closest_match_details</span>
-                                    </div>
-                                    <div className="text-xs text-purple-600 mt-2">
-                                        Example: transaction_id: 'TXN002' → 'REF002'
+                                )}
+                                
+                                <div className="text-sm text-purple-700">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center space-x-2">
+                                            <CheckCircle size={16} className="text-purple-600" />
+                                            <span>✓ Will analyze similarity between unmatched records</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <CheckCircle size={16} className="text-purple-600" />
+                                            <span>✓ Adds 3 new columns: closest_match_record, closest_match_score, closest_match_details</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <CheckCircle size={16} className="text-purple-600" />
+                                            <span>✓ Use specific column pairs or all reconciliation rule columns</span>
+                                        </div>
+                                        <div className="text-xs text-purple-600 mt-2">
+                                            Example: transaction_id: 'TXN002' → 'REF002' (score: 85.2%)
+                                        </div>
                                     </div>
                                 </div>
-                            ) : (
+                            </div>
+                        )}
+                        
+                        {!findClosestMatches && (
+                            <div className="text-sm text-purple-700">
                                 <span>Toggle on to add closest match analysis to the next reconciliation run</span>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -541,7 +549,7 @@ const ReconciliationPreviewStep = ({
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-3">
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-800">Generate & View Results</h3>
                 {!isLoading && !generatedResults && (
@@ -555,24 +563,24 @@ const ReconciliationPreviewStep = ({
                 )}
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-2">
                 {/* Configuration Summary */}
-                <div className="border border-gray-200 rounded-lg p-6">
-                    <h4 className="text-md font-semibold text-gray-800 mb-4">Configuration Summary</h4>
+                <div className="border border-gray-200 rounded-lg p-3">
+                    <h4 className="text-sm font-semibold text-gray-800 mb-2">Configuration Summary</h4>
                     {renderConfigSummary()}
                 </div>
 
                 {/* Results Section */}
-                <div className="border border-gray-200 rounded-lg p-6">
-                    <h4 className="text-md font-semibold text-gray-800 mb-4">Reconciliation Results</h4>
+                <div className="border border-gray-200 rounded-lg p-3">
+                    <h4 className="text-sm font-semibold text-gray-800 mb-2">Reconciliation Results</h4>
                     {renderResults()}
                 </div>
 
                 {/* Rule Management Section */}
                 {generatedResults && generatedResults.success && (
-                    <div className="border border-gray-200 rounded-lg p-6">
-                        <h4 className="text-md font-semibold text-gray-800 mb-4 flex items-center space-x-2">
-                            <Save size={18} className="text-blue-600" />
+                    <div className="border border-gray-200 rounded-lg p-3">
+                        <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center space-x-2">
+                            <Save size={16} className="text-blue-600" />
                             <span>Rule Management</span>
                         </h4>
                         

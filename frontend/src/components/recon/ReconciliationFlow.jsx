@@ -68,6 +68,25 @@ const ReconciliationFlow = ({
     
     // Closest match functionality state
     const [findClosestMatches, setFindClosestMatches] = useState(false);
+    const [closestMatchConfig, setClosestMatchConfig] = useState({
+        enabled: false,
+        specific_columns: null,
+        min_score_threshold: 30.0,
+        perfect_match_threshold: 99.5,
+        max_comparisons: null,
+        use_sampling: null
+    });
+
+    // Handler to sync both closest match states
+    const handleClosestMatchToggle = (enabled) => {
+        setFindClosestMatches(enabled);
+        setClosestMatchConfig(prev => ({ ...prev, enabled }));
+    };
+
+    // Handler to update closest match config
+    const handleClosestMatchConfigChange = (updates) => {
+        setClosestMatchConfig(prev => ({ ...prev, ...updates }));
+    };
 
     // Step definitions
     const steps = [
@@ -77,7 +96,6 @@ const ReconciliationFlow = ({
         {id: 'filter_rules', title: 'Data Filtering', icon: Filter},
         {id: 'reconciliation_rules', title: 'Matching Rules', icon: Settings},
         {id: 'result_columns', title: 'Result Columns', icon: Columns},
-        {id: 'review', title: 'Review & Confirm', icon: Check},
         {id: 'generate_view', title: 'Generate & View', icon: Upload}
     ];
 
@@ -253,10 +271,7 @@ const ReconciliationFlow = ({
             const nextStepId = steps[currentIndex + 1].id;
             setCurrentStep(nextStepId);
             
-            // Generate results when reaching generate_view step
-            if (nextStepId === 'generate_view') {
-                await generateReconciliationResults();
-            }
+            // Don't auto-generate results - let user click Generate Results button in preview step
         }
     };
 
@@ -276,7 +291,6 @@ const ReconciliationFlow = ({
                 process_type: 'reconciliation',
                 process_name: 'Custom Reconciliation Process',
                 user_requirements: 'Reconcile files using the configured rules',
-                find_closest_matches: findClosestMatches,
                 files: filesArray.map((file, index) => ({
                     file_id: file.file_id,
                     role: `file_${index}`,
@@ -293,7 +307,8 @@ const ReconciliationFlow = ({
                         role: `file_${index}`,
                         label: selectedTemplate?.fileLabels[index] || `File ${index + 1}`
                     }))
-                }
+                },
+                closest_match_config: closestMatchConfig.enabled ? closestMatchConfig : null
             };
 
             onSendMessage('system', '🎉 Starting reconciliation process...');
@@ -1107,100 +1122,6 @@ const ReconciliationFlow = ({
                     </div>
                 );
 
-            case 'review':
-                return (
-                    <div className="space-y-6">
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-800">Review Configuration</h3>
-                            <p className="text-sm text-gray-600">Review your reconciliation configuration before
-                                proceeding.</p>
-                        </div>
-
-                        {/* Files Summary */}
-                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                            <h4 className="font-medium text-blue-800 mb-2">Files Selected</h4>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                {filesArray.slice(0, 2).map((file, index) => (
-                                    <div key={index}>
-                                        <span
-                                            className="font-medium">File {String.fromCharCode(65 + index)}:</span> {file?.filename}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Configuration Status */}
-                        <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                            <h4 className="font-medium text-gray-800 mb-2">Configuration Status</h4>
-                            <div className="space-y-1 text-sm">
-                                <div className="flex items-center space-x-2">
-                                    <Check size={16} className="text-green-500"/>
-                                    <span>Files selected</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    {reconciliationRules.length > 0 ? (
-                                        <Check size={16} className="text-green-500"/>
-                                    ) : (
-                                        <AlertCircle size={16} className="text-yellow-500"/>
-                                    )}
-                                    <span>Reconciliation rules {reconciliationRules.length > 0 ? 'configured' : 'needed'}</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <Check size={16} className="text-green-500"/>
-                                    <span>Result column selection configured</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Save Rule Option */}
-                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
-                                <h4 className="font-medium text-blue-800">Save This Configuration</h4>
-                                <button
-                                    onClick={() => openRuleModalForSaving()}
-                                    disabled={reconciliationRules.length === 0}
-                                    className="flex items-center space-x-1 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
-                                >
-                                    <Save size={14}/>
-                                    <span>{loadedRuleId && hasUnsavedChanges ? 'Update Rule' : 'Save as New Rule'}</span>
-                                </button>
-                            </div>
-                            <p className="text-sm text-blue-700">
-                                Save this configuration as a reusable rule template for future reconciliations.
-                                {loadedRuleId && hasUnsavedChanges && ' You have unsaved changes to the loaded rule.'}
-                            </p>
-                        </div>
-                        
-                        {/* Closest Match Options */}
-                        <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                            <div className="flex items-center justify-between mb-3">
-                                <div>
-                                    <h4 className="font-medium text-purple-800">Closest Match Analysis</h4>
-                                    <p className="text-sm text-purple-700">Find potential matches for unmatched records</p>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        className="sr-only peer"
-                                        checked={findClosestMatches}
-                                        onChange={(e) => setFindClosestMatches(e.target.checked)}
-                                    />
-                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                                </label>
-                            </div>
-                            <div className="text-sm text-purple-700">
-                                {findClosestMatches ? (
-                                    <div className="flex items-center space-x-2">
-                                        <Check size={16} className="text-purple-600" />
-                                        <span>✓ Will analyze unmatched records and suggest closest matches</span>
-                                    </div>
-                                ) : (
-                                    <span>Enable to add closest match suggestions to unmatched records</span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                );
 
             case 'generate_view':
                 return (
@@ -1222,14 +1143,16 @@ const ReconciliationFlow = ({
                         onRefresh={generateReconciliationResults}
                         onViewResults={openFileViewer}
                         onSaveResults={handleSaveResults}
-                        onRetry={() => setCurrentStep('review')}
-                        onUpdateConfig={() => setCurrentStep('review')}
+                        onRetry={() => setCurrentStep('result_columns')}
+                        onUpdateConfig={() => setCurrentStep('result_columns')}
                         onClose={onCancel}
                         loadedRuleId={loadedRuleId}
                         hasUnsavedChanges={hasUnsavedChanges}
                         onShowRuleModal={() => openRuleModalForSaving()}
                         findClosestMatches={findClosestMatches}
-                        onToggleClosestMatches={setFindClosestMatches}
+                        onToggleClosestMatches={handleClosestMatchToggle}
+                        closestMatchConfig={closestMatchConfig}
+                        onClosestMatchConfigChange={handleClosestMatchConfigChange}
                     />
                 );
 
@@ -1304,10 +1227,10 @@ const ReconciliationFlow = ({
                         {getCurrentStepIndex() < steps.length - 1 ? (
                             <button
                                 onClick={nextStep}
-                                disabled={currentStep === 'review' && reconciliationRules.length === 0}
+                                disabled={currentStep === 'result_columns' && reconciliationRules.length === 0}
                                 className="flex items-center space-x-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
-                                <span>{currentStep === 'review' ? 'Generate Results' : 'Next'}</span>
+                                <span>Next</span>
                                 <ChevronRight size={16}/>
                             </button>
                         ) : (

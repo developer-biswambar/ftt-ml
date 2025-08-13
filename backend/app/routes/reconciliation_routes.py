@@ -12,6 +12,16 @@ from app.models.recon_models import ReconciliationResponse, ReconciliationSummar
 from app.services.reconciliation_service import OptimizedFileProcessor, optimized_reconciliation_storage
 from app.utils.uuid_generator import generate_uuid
 
+# Closest Match Configuration Model
+class ClosestMatchConfig(BaseModel):
+    """Configuration for closest match functionality"""
+    enabled: bool = False
+    specific_columns: Optional[Dict[str, str]] = None  # {"file_a_column": "file_b_column"} for specific column comparison
+    min_score_threshold: Optional[float] = 30.0  # Minimum similarity score to consider
+    perfect_match_threshold: Optional[float] = 99.5  # Early termination threshold
+    max_comparisons: Optional[int] = None  # Limit number of comparisons for performance
+    use_sampling: Optional[bool] = None  # Force enable/disable sampling for large datasets
+
 # Setup logging
 logger = logging.getLogger(__name__)
 
@@ -50,7 +60,7 @@ class JSONReconciliationRequest(BaseModel):
     user_requirements: str
     files: List[FileReference]
     reconciliation_config: ReconciliationConfig
-    find_closest_matches: Optional[bool] = False  # Optional parameter for closest match functionality
+    closest_match_config: Optional[ClosestMatchConfig] = None  # Comprehensive closest match configuration
 
 
 async def get_file_by_id(file_id: str) -> UploadFile:
@@ -163,7 +173,7 @@ async def process_reconciliation_json(
 
         return await _process_reconciliation_core(
             processor, rules_config, fileA, fileB, columns_a, columns_b, "standard", start_time,
-            find_closest_matches=request.find_closest_matches
+            closest_match_config=request.closest_match_config
         )
 
     except HTTPException:
@@ -182,7 +192,7 @@ async def _process_reconciliation_core(
         columns_b: Optional[List[str]],
         output_format: str,
         start_time: datetime,
-        find_closest_matches: bool = False
+        closest_match_config: Optional[ClosestMatchConfig] = None
 ) -> ReconciliationResponse:
     """Core reconciliation processing logic shared between endpoints"""
 
@@ -253,7 +263,7 @@ async def _process_reconciliation_core(
     print("Starting optimized reconciliation...")
     reconciliation_results = processor.reconcile_files_optimized(
         df_a, df_b, rules_config.ReconciliationRules,
-        columns_a, columns_b, find_closest_matches=find_closest_matches
+        columns_a, columns_b, closest_match_config=closest_match_config
     )
 
     # Generate reconciliation ID

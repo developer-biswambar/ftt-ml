@@ -619,7 +619,7 @@ class OptimizedFileProcessor:
                                   selected_columns_a: Optional[List[str]] = None,
                                   selected_columns_b: Optional[List[str]] = None,
                                   match_mode: str = "one_to_one",
-                                  find_closest_matches: bool = False) -> Dict[str, pd.DataFrame]:
+                                  closest_match_config: Optional[Dict] = None) -> Dict[str, pd.DataFrame]:
         """
         Optimized reconciliation using hash-based matching for large datasets with date support
         
@@ -632,9 +632,14 @@ class OptimizedFileProcessor:
         """
         start_time = time.time()
         
+        # Parse closest match configuration
+        find_closest_matches = closest_match_config and closest_match_config.enabled
+        
         logger.info("🚀 Starting optimized reconciliation process")
         logger.info(f"📊 Dataset sizes: File A ({len(df_a):,} records) vs File B ({len(df_b):,} records)")
         logger.info(f"🔧 Configuration: Match mode = {match_mode}, Closest matches = {find_closest_matches}")
+        if find_closest_matches and closest_match_config:
+            logger.info(f"🎯 Closest match config: {closest_match_config}")
         logger.info(f"📋 Reconciliation rules: {len(recon_rules)} rules defined")
         
         # Log rule details for debugging
@@ -767,11 +772,11 @@ class OptimizedFileProcessor:
             
             if len(unmatched_a) > 0 and len(full_df_b) > 0:
                 logger.info(f"🔍 Analyzing {len(unmatched_a):,} unmatched A records against entire File B ({len(full_df_b):,} records)")
-                unmatched_a = self._add_closest_matches(unmatched_a, full_df_b, recon_rules, 'A')
+                unmatched_a = self._add_closest_matches(unmatched_a, full_df_b, recon_rules, 'A', closest_match_config)
                 
             if len(unmatched_b) > 0 and len(full_df_a) > 0:
                 logger.info(f"🔍 Analyzing {len(unmatched_b):,} unmatched B records against entire File A ({len(full_df_a):,} records)")
-                unmatched_b = self._add_closest_matches(unmatched_b, full_df_a, recon_rules, 'B')
+                unmatched_b = self._add_closest_matches(unmatched_b, full_df_a, recon_rules, 'B', closest_match_config)
             
             closest_match_time = time.time() - closest_match_start
             logger.info(f"✅ Closest match analysis completed in {closest_match_time:.2f}s")
@@ -796,7 +801,8 @@ class OptimizedFileProcessor:
         }
 
     def _add_closest_matches(self, unmatched_source: pd.DataFrame, full_target: pd.DataFrame, 
-                            recon_rules: List[ReconciliationRule], source_file: str) -> pd.DataFrame:
+                            recon_rules: List[ReconciliationRule], source_file: str, 
+                            closest_match_config: Optional[Dict] = None) -> pd.DataFrame:
         """
         Add closest match columns to unmatched records using optimized composite similarity scoring
         
@@ -825,15 +831,19 @@ class OptimizedFileProcessor:
         total_comparisons = len(unmatched_source) * len(full_target)
         logger.info(f"📊 Total potential comparisons: {total_comparisons:,}")
         
-        if total_comparisons > 10_000_000:  # 10M+ comparisons
+        # Use config to override comparison limits if specified
+        max_comparisons = closest_match_config.max_comparisons if closest_match_config and closest_match_config.max_comparisons else 10_000_000
+        
+        if total_comparisons > max_comparisons:
             logger.info(f"⚡ Large dataset detected ({total_comparisons:,} comparisons). Using batch processing...")
-            return self._add_closest_matches_optimized_batch(unmatched_source, full_target, recon_rules, source_file)
+            return self._add_closest_matches_optimized_batch(unmatched_source, full_target, recon_rules, source_file, closest_match_config)
         else:
             logger.info("⚙️ Using single-threaded optimization for moderate dataset size")
-            return self._add_closest_matches_optimized_single(unmatched_source, full_target, recon_rules, source_file)
+            return self._add_closest_matches_optimized_single(unmatched_source, full_target, recon_rules, source_file, closest_match_config)
 
     def _add_closest_matches_optimized_single(self, unmatched_source: pd.DataFrame, full_target: pd.DataFrame,
-                                            recon_rules: List[ReconciliationRule], source_file: str) -> pd.DataFrame:
+                                            recon_rules: List[ReconciliationRule], source_file: str, 
+                                            closest_match_config: Optional[Dict] = None) -> pd.DataFrame:
         """Optimized single-batch processing for smaller datasets"""
         
         # Make a copy to avoid modifying the original
@@ -844,21 +854,40 @@ class OptimizedFileProcessor:
         result_df['closest_match_score'] = 0.0
         result_df['closest_match_details'] = None
         
-        # Get columns to compare based on reconciliation rules
+        # Get columns to compare - use specific columns from config if provided, otherwise use reconciliation rules
         compare_columns = []
-        for rule in recon_rules:
+        
+        if closest_match_config and closest_match_config.specific_columns:
+            # Use user-specified columns for comparison
+            specific_cols = closest_match_config.specific_columns
+            logger.info(f"🎯 Using specific columns for comparison: {specific_cols}")
+            
             if source_file == 'A':
-                source_col = rule.LeftFileColumn
-                target_col = rule.RightFileColumn
+                # For file A: specific_columns = {"file_a_col": "file_b_col"}
+                for source_col, target_col in specific_cols.items():
+                    if source_col in unmatched_source.columns and target_col in full_target.columns:
+                        compare_columns.append((source_col, target_col))
             else:
-                source_col = rule.RightFileColumn  
-                target_col = rule.LeftFileColumn
-                
-            if source_col in unmatched_source.columns and target_col in full_target.columns:
-                compare_columns.append((source_col, target_col))
+                # For file B: reverse the mapping
+                for file_a_col, file_b_col in specific_cols.items():
+                    if file_b_col in unmatched_source.columns and file_a_col in full_target.columns:
+                        compare_columns.append((file_b_col, file_a_col))
+        else:
+            # Use all reconciliation rule columns (default behavior)
+            logger.info("🔍 Using all reconciliation rule columns for comparison")
+            for rule in recon_rules:
+                if source_file == 'A':
+                    source_col = rule.LeftFileColumn
+                    target_col = rule.RightFileColumn
+                else:
+                    source_col = rule.RightFileColumn  
+                    target_col = rule.LeftFileColumn
+                    
+                if source_col in unmatched_source.columns and target_col in full_target.columns:
+                    compare_columns.append((source_col, target_col))
         
         if not compare_columns:
-            print(f"Warning: No comparable columns found for closest match analysis")
+            logger.warning(f"⚠️ No comparable columns found for closest match analysis")
             return result_df
         
         # Pre-compute column types for caching
@@ -871,11 +900,12 @@ class OptimizedFileProcessor:
                 )
         
         logger.info(f"🔍 Comparing {len(compare_columns)} column pairs with optimizations...")
-        logger.info(f"⚙️ Performance thresholds: Min score = 30%, Perfect match = 99.5%")
         
-        # Performance settings
-        MIN_SCORE_THRESHOLD = 30.0  # Skip very low similarity matches
-        PERFECT_MATCH_THRESHOLD = 99.5  # Early termination threshold
+        # Performance settings - use config values if provided
+        MIN_SCORE_THRESHOLD = closest_match_config.min_score_threshold if closest_match_config else 30.0
+        PERFECT_MATCH_THRESHOLD = closest_match_config.perfect_match_threshold if closest_match_config else 99.5
+        
+        logger.info(f"⚙️ Performance thresholds: Min score = {MIN_SCORE_THRESHOLD}%, Perfect match = {PERFECT_MATCH_THRESHOLD}%")
         
         processed_count = 0
         matches_found = 0
@@ -995,7 +1025,8 @@ class OptimizedFileProcessor:
         return result_df
 
     def _add_closest_matches_optimized_batch(self, unmatched_source: pd.DataFrame, full_target: pd.DataFrame,
-                                           recon_rules: List[ReconciliationRule], source_file: str) -> pd.DataFrame:
+                                           recon_rules: List[ReconciliationRule], source_file: str, 
+                                           closest_match_config: Optional[Dict] = None) -> pd.DataFrame:
         """
         Batch processing for very large datasets with parallel processing
         
@@ -1020,21 +1051,40 @@ class OptimizedFileProcessor:
         result_df['closest_match_score'] = 0.0
         result_df['closest_match_details'] = None
         
-        # Get columns to compare based on reconciliation rules
+        # Get columns to compare - use specific columns from config if provided, otherwise use reconciliation rules
         compare_columns = []
-        for rule in recon_rules:
+        
+        if closest_match_config and closest_match_config.specific_columns:
+            # Use user-specified columns for comparison
+            specific_cols = closest_match_config.specific_columns
+            logger.info(f"🎯 Using specific columns for batch comparison: {specific_cols}")
+            
             if source_file == 'A':
-                source_col = rule.LeftFileColumn
-                target_col = rule.RightFileColumn
+                # For file A: specific_columns = {"file_a_col": "file_b_col"}
+                for source_col, target_col in specific_cols.items():
+                    if source_col in unmatched_source.columns and target_col in full_target.columns:
+                        compare_columns.append((source_col, target_col))
             else:
-                source_col = rule.RightFileColumn  
-                target_col = rule.LeftFileColumn
-                
-            if source_col in unmatched_source.columns and target_col in full_target.columns:
-                compare_columns.append((source_col, target_col))
+                # For file B: reverse the mapping
+                for file_a_col, file_b_col in specific_cols.items():
+                    if file_b_col in unmatched_source.columns and file_a_col in full_target.columns:
+                        compare_columns.append((file_b_col, file_a_col))
+        else:
+            # Use all reconciliation rule columns (default behavior)
+            logger.info("🔍 Using all reconciliation rule columns for batch comparison")
+            for rule in recon_rules:
+                if source_file == 'A':
+                    source_col = rule.LeftFileColumn
+                    target_col = rule.RightFileColumn
+                else:
+                    source_col = rule.RightFileColumn  
+                    target_col = rule.LeftFileColumn
+                    
+                if source_col in unmatched_source.columns and target_col in full_target.columns:
+                    compare_columns.append((source_col, target_col))
         
         if not compare_columns:
-            print(f"Warning: No comparable columns found for closest match analysis")
+            logger.warning(f"⚠️ No comparable columns found for batch closest match analysis")
             return result_df
         
         # Pre-compute column types for caching
@@ -1082,7 +1132,7 @@ class OptimizedFileProcessor:
                     future = executor.submit(
                         self._process_batch_closest_matches,
                         batch_df, full_target, compare_columns, column_type_cache,
-                        batch_idx, len(batches)
+                        batch_idx, len(batches), closest_match_config
                     )
                     future_to_batch[future] = (start_idx, batch_df)
                 
@@ -1131,7 +1181,8 @@ class OptimizedFileProcessor:
     
     def _process_batch_closest_matches(self, batch_df: pd.DataFrame, full_target: pd.DataFrame, 
                                      compare_columns: list, column_type_cache: dict, 
-                                     batch_idx: int, total_batches: int) -> pd.DataFrame:
+                                     batch_idx: int, total_batches: int, 
+                                     closest_match_config: Optional[Dict] = None) -> pd.DataFrame:
         """
         Process a single batch of records for closest matches
         This method is designed to be called by multiprocessing
@@ -1143,13 +1194,17 @@ class OptimizedFileProcessor:
         batch_df['closest_match_score'] = 0.0
         batch_df['closest_match_details'] = None
         
-        # Performance settings
-        MIN_SCORE_THRESHOLD = 30.0
-        PERFECT_MATCH_THRESHOLD = 99.5
+        # Performance settings - use config values if provided
+        MIN_SCORE_THRESHOLD = closest_match_config.min_score_threshold if closest_match_config else 30.0
+        PERFECT_MATCH_THRESHOLD = closest_match_config.perfect_match_threshold if closest_match_config else 99.5
         
         # Create target index for faster lookup (if beneficial)
         target_size = len(full_target)
-        use_sampling = target_size > 50_000  # Use sampling for very large targets
+        # Use config to override sampling behavior if specified
+        if closest_match_config and closest_match_config.use_sampling is not None:
+            use_sampling = closest_match_config.use_sampling
+        else:
+            use_sampling = target_size > 50_000  # Use sampling for very large targets
         
         if use_sampling:
             # For extremely large targets, sample a representative subset
