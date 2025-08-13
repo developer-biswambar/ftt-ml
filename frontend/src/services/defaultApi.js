@@ -121,13 +121,17 @@ export const apiService = {
     // ===========================================
     // VIEWER OPERATIONS
     // ===========================================
-    getFileData: async (fileId, page = 1, pageSize = 1000, searchTerm = '', filterColumn = '', filterValues = []) => {
+    getFileData: async (fileId, page = 1, pageSize = 1000, searchTerm = '', columnFilters = {}) => {
         let url = `/files/${fileId}/data?page=${page}&page_size=${pageSize}`;
         
-        if (filterColumn && filterValues.length > 0) {
-            // Column-specific filtering (from dropdown)
-            url += `&filter_column=${encodeURIComponent(filterColumn)}`;
-            url += `&filter_values=${encodeURIComponent(filterValues.join(','))}`;
+        // Handle multiple column filters
+        const activeFilters = Object.entries(columnFilters).filter(([column, values]) => values && values.length > 0);
+        
+        if (activeFilters.length > 0) {
+            // Multiple column filters
+            activeFilters.forEach(([column, values]) => {
+                url += `&filter_${encodeURIComponent(column)}=${encodeURIComponent(values.join(','))}`;
+            });
         } else if (searchTerm.trim()) {
             // Wildcard search (from search box)
             url += `&search=${encodeURIComponent(searchTerm.trim())}`;

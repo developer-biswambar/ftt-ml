@@ -44,7 +44,6 @@ const DataViewer = ({fileId, onClose}) => {
     const [sortConfig, setSortConfig] = useState({column: null, direction: 'asc'});
     const [filterConfig, setFilterConfig] = useState({});
     const [columnFilters, setColumnFilters] = useState({});
-    const [activeColumnFilter, setActiveColumnFilter] = useState({ column: '', values: [] });
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(50);
@@ -78,7 +77,7 @@ const DataViewer = ({fileId, onClose}) => {
             setCurrentPage(1); // Reset to first page when searching
             // Clear column filters when user types in search box
             if (searchTerm.trim()) {
-                setActiveColumnFilter({ column: '', values: [] });
+                setColumnFilters({});
             }
             loadFileData();
         }, 500); // 500ms debounce
@@ -89,7 +88,12 @@ const DataViewer = ({fileId, onClose}) => {
     useEffect(() => {
         loadFileData();
         loadFileName();
-    }, [fileId, currentPage, pageSize, activeColumnFilter]);
+    }, [fileId, currentPage, pageSize, columnFilters]);
+
+    // Debug: Log error state changes
+    useEffect(() => {
+        console.log('Error state changed:', error);
+    }, [error]);
 
     // Cleanup effect - no longer needed as we handle cleanup in mouse up
 
@@ -110,6 +114,15 @@ const DataViewer = ({fileId, onClose}) => {
             }
         } catch (err) {
             console.error('Failed to load file name:', err);
+            
+            // If it's a 404 error, the file doesn't exist
+            if (err.response?.status === 404) {
+                setError(`File not found. The file with ID "${fileId}" does not exist or may have been deleted.`);
+                setLoading(false);
+                return;
+            }
+            
+            // For other errors, just use a fallback filename
             setFileName(`File ${fileId}`);
         }
     };
@@ -125,8 +138,7 @@ const DataViewer = ({fileId, onClose}) => {
                     currentPage, 
                     pageSize, 
                     searchTerm, 
-                    activeColumnFilter.column, 
-                    activeColumnFilter.values
+                    columnFilters
                 );
                 if (response.success) {
                     setData(response.data.rows);
@@ -141,6 +153,46 @@ const DataViewer = ({fileId, onClose}) => {
                     return;
                 }
             } catch (apiError) {
+                console.error('API Error:', apiError);
+                console.log('Error properties:', {
+                    status: apiError.status,
+                    responseStatus: apiError.response?.status,
+                    code: apiError.code,
+                    message: apiError.message,
+                    keys: Object.keys(apiError)
+                });
+                
+                // Check if it's a specific error that should be shown to user
+                const errorStatus = apiError.response?.status || apiError.status;
+                const message = apiError.message || '';
+                const is404 = errorStatus === 404 || 
+                              message.includes('404') || 
+                              message.includes('status code 404') ||
+                              message.includes('Requested resource not found') ||
+                              message.includes('not found');
+                const is403 = errorStatus === 403 || 
+                              message.includes('403') || 
+                              message.includes('status code 403') ||
+                              message.includes('Access denied') ||
+                              message.includes('Forbidden');
+                const is5xx = (errorStatus >= 500 && errorStatus < 600) || /status code 5\d\d/.test(message);
+                
+                console.log('Checking error status:', errorStatus);
+                console.log('Error message:', message);
+                console.log('Error classification:', { is404, is403, is5xx });
+                
+                if (is404) {
+                    console.log('Re-throwing 404 error');
+                    throw apiError; // Re-throw to be handled by outer catch
+                } else if (is403) {
+                    console.log('Re-throwing 403 error');
+                    throw apiError; // Re-throw to be handled by outer catch
+                } else if (is5xx) {
+                    console.log('Re-throwing 5xx error');
+                    throw apiError; // Re-throw to be handled by outer catch
+                }
+                
+                // Only fallback to sample data for non-critical errors (network issues, etc.)
                 console.log('API endpoint not available, using sample data');
             }
 
@@ -152,8 +204,54 @@ const DataViewer = ({fileId, onClose}) => {
             }
 
         } catch (err) {
-            setError('Failed to load file data');
-            console.error(err);
+            console.error('Error loading file data:', err);
+            console.error('Error details:', {
+                response: err.response,
+                status: err.response?.status,
+                data: err.response?.data,
+                message: err.message
+            });
+            
+            // Provide specific error messages based on error type
+            const errorStatus = err.response?.status || err.status;
+            const message = err.message || '';
+            const is404 = errorStatus === 404 || 
+                          message.includes('404') || 
+                          message.includes('status code 404') ||
+                          message.includes('Requested resource not found') ||
+                          message.includes('not found');
+            const is403 = errorStatus === 403 || 
+                          message.includes('403') || 
+                          message.includes('status code 403') ||
+                          message.includes('Access denied') ||
+                          message.includes('Forbidden');
+            const is5xx = (errorStatus >= 500 && errorStatus < 600) || /status code 5\d\d/.test(message);
+            
+            console.log('Outer catch - error status:', errorStatus);
+            console.log('Outer catch - error message:', message);
+            console.log('Outer catch - error classification:', { is404, is403, is5xx });
+            
+            if (is404) {
+                console.log('Setting 404 error');
+                const errorMsg = `File not found. The file with ID "${fileId}" does not exist or may have been deleted.`;
+                setError(errorMsg);
+                console.log('Error state set to:', errorMsg);
+            } else if (is403) {
+                console.log('Setting 403 error');
+                setError('Access denied. You do not have permission to view this file.');
+            } else if (is5xx) {
+                console.log('Setting 5xx error');
+                setError('Server error occurred while loading the file. Please try again later.');
+            } else if (errorStatus) {
+                console.log('Setting generic HTTP error');
+                setError(`Failed to load file data (Error ${errorStatus}): ${err.response?.data?.message || err.message || 'Unknown error'}`);
+            } else if (err.code === 'NETWORK_ERROR' || err.message.includes('Network Error')) {
+                console.log('Setting network error');
+                setError('Network error. Please check your connection and try again.');
+            } else {
+                console.log('Setting generic error');
+                setError(`Failed to load file data: ${err.message || 'Unknown error occurred'}`);
+            }
         } finally {
             setLoading(false);
         }
@@ -493,14 +591,11 @@ const DataViewer = ({fileId, onClose}) => {
         const newColumnFilters = { ...columnFilters, [columnName]: selectedValues };
         setColumnFilters(newColumnFilters);
         
-        // Set active column filter for API call
+        // Clear search term when using column filter
         if (selectedValues.length > 0) {
-            setActiveColumnFilter({ column: columnName, values: selectedValues });
-            // Clear search term when using column filter
             setSearchTerm('');
-        } else {
-            setActiveColumnFilter({ column: '', values: [] });
         }
+        
         setCurrentPage(1); // Reset to first page
     };
 
@@ -509,15 +604,12 @@ const DataViewer = ({fileId, onClose}) => {
         delete newColumnFilters[columnName];
         setColumnFilters(newColumnFilters);
         
-        // Clear active column filter
-        setActiveColumnFilter({ column: '', values: [] });
         setCurrentPage(1); // Reset to first page
     };
 
     // Clear all filters function
     const clearAllFilters = () => {
         setColumnFilters({});
-        setActiveColumnFilter({ column: '', values: [] });
         setSearchTerm('');
         setFilterConfig({});
         setCurrentPage(1);
@@ -527,7 +619,8 @@ const DataViewer = ({fileId, onClose}) => {
     const getActiveFilterCount = () => {
         let count = 0;
         if (searchTerm) count++;
-        if (activeColumnFilter.column) count++;
+        // Count active column filters
+        count += Object.keys(columnFilters).filter(key => columnFilters[key] && columnFilters[key].length > 0).length;
         count += Object.keys(filterConfig).filter(key => filterConfig[key]).length;
         return count;
     };
@@ -771,17 +864,60 @@ const DataViewer = ({fileId, onClose}) => {
     }
 
     if (error) {
+        const isFileNotFound = error.includes('File not found');
+        
         return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="text-center">
-                    <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4"/>
-                    <p className="text-red-600">{error}</p>
-                    <button
-                        onClick={() => window.close()}
-                        className="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-                    >
-                        Close
-                    </button>
+            <div className="flex items-center justify-center h-screen bg-gray-50">
+                <div className="max-w-md text-center p-8 bg-white rounded-lg shadow-lg">
+                    <div className="mb-6">
+                        {isFileNotFound ? (
+                            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <FileText className="h-8 w-8 text-orange-500" />
+                            </div>
+                        ) : (
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <AlertCircle className="h-8 w-8 text-red-500" />
+                            </div>
+                        )}
+                        
+                        <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                            {isFileNotFound ? 'File Not Found' : 'Unable to Load File'}
+                        </h2>
+                        
+                        <p className="text-gray-600 text-sm leading-relaxed mb-6">
+                            {error}
+                        </p>
+                        
+                        {isFileNotFound && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
+                                <h3 className="text-sm font-medium text-blue-800 mb-2">What you can do:</h3>
+                                <ul className="text-sm text-blue-700 space-y-1">
+                                    <li>• Check if the file ID is correct</li>
+                                    <li>• Verify the file hasn't been deleted</li>
+                                    <li>• Contact support if you need assistance</li>
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="flex space-x-3 justify-center">
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm font-medium"
+                        >
+                            Retry
+                        </button>
+                        <button
+                            onClick={() => window.close()}
+                            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors text-sm font-medium"
+                        >
+                            Close
+                        </button>
+                    </div>
+                    
+                    <p className="text-xs text-gray-400 mt-4">
+                        File ID: {fileId}
+                    </p>
                 </div>
             </div>
         );
@@ -1435,8 +1571,11 @@ const DataViewer = ({fileId, onClose}) => {
                     <span>
                         Showing {displayedData.length} of {data.length} rows on this page
                         {searchTerm && ` (search: "${searchTerm}")`}
-                        {activeColumnFilter.column && activeColumnFilter.values.length > 0 && 
-                            ` (filtered by ${activeColumnFilter.column}: ${activeColumnFilter.values.join(', ')})`}
+                        {Object.keys(columnFilters).some(key => columnFilters[key] && columnFilters[key].length > 0) && 
+                            ` (filtered by: ${Object.entries(columnFilters)
+                                .filter(([column, values]) => values && values.length > 0)
+                                .map(([column, values]) => `${column}: ${values.join(', ')}`)
+                                .join('; ')})`}
                     </span>
                     <span>
                         Click cells to edit • Hover over headers/rows to delete • Undo/Redo available

@@ -7,7 +7,7 @@ from typing import Dict, Any, List
 
 import pandas as pd
 from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response, Request
 from pydantic import BaseModel
 
 # Load environment variables
@@ -64,8 +64,9 @@ async def get_file_data(
         page: int = Query(1, ge=1, description="Page number"),
         page_size: int = Query(1000, ge=1, le=5000, description="Items per page"),
         search: str = Query("", description="Search term to filter data across all columns"),
-        filter_column: str = Query("", description="Column name for column-specific filtering"),
-        filter_values: str = Query("", description="Comma-separated values for column-specific filtering")
+        filter_column: str = Query("", description="Column name for column-specific filtering (deprecated - use filter_<column>=values)"),
+        filter_values: str = Query("", description="Comma-separated values for column-specific filtering (deprecated)"),
+        request: Request = None
 ):
     """Get paginated file data for the viewer with filename"""
     try:
@@ -77,8 +78,24 @@ async def get_file_data(
         file_info = file_data["info"]
 
         # Apply filtering based on type of search
-        if filter_column.strip() and filter_values.strip():
-            # Column-specific filtering (from dropdown selection)
+        # Handle multiple column filters from query parameters (filter_<column>=values)
+        column_filters_applied = False
+        if request:
+            for param_name, param_value in request.query_params.items():
+                if param_name.startswith('filter_') and param_value.strip():
+                    column_name = param_name[7:]  # Remove 'filter_' prefix
+                    if column_name in df.columns:
+                        values = [v.strip() for v in param_value.split(',') if v.strip()]
+                        if values:
+                            # Create mask for rows where the specific column contains any of the filter values
+                            mask = df[column_name].astype(str).str.lower().isin([v.lower() for v in values])
+                            df = df[mask]
+                            column_filters_applied = True
+                            logger.info(f"Applied filter on column '{column_name}' with values: {values}")
+        
+        # Fallback to old single filter format for backwards compatibility
+        if not column_filters_applied and filter_column.strip() and filter_values.strip():
+            # Column-specific filtering (from dropdown selection) - deprecated
             column_name = filter_column.strip()
             values = [v.strip() for v in filter_values.split(',') if v.strip()]
             
@@ -86,8 +103,10 @@ async def get_file_data(
                 # Create mask for rows where the specific column contains any of the filter values
                 mask = df[column_name].astype(str).str.lower().isin([v.lower() for v in values])
                 df = df[mask]
+                column_filters_applied = True
             
-        elif search.strip():
+        # Search across all columns if no column filters are applied
+        if not column_filters_applied and search.strip():
             # Wildcard search across all columns (from search box)
             search_term = search.strip().lower()
             
