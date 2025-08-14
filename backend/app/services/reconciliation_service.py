@@ -206,7 +206,9 @@ class OptimizedFileProcessor:
         """
         # Handle null values
         if pd.isna(val_a) and pd.isna(val_b):
-            return 100.0
+            # Both are NaN - for closest match, this is often not a meaningful comparison
+            # Return lower score to deprioritize NaN-to-NaN matches
+            return 50.0  # Reduced from 100.0
         if pd.isna(val_a) or pd.isna(val_b):
             return 0.0
             
@@ -972,8 +974,12 @@ class OptimizedFileProcessor:
         has_exact_filters = (closest_match_config and closest_match_config.specific_columns and 
                            any(rule for rule in recon_rules))
         is_large_dataset = total_comparisons > 1_000_000  # 1M+ comparisons benefit from ultra-optimization
+        is_very_large_dataset = total_comparisons > 50_000_000  # 50M+ comparisons should use batch processing
         
-        if has_exact_filters or is_large_dataset:
+        if is_very_large_dataset:
+            logger.info(f"⚡ Very large dataset detected ({total_comparisons:,} comparisons). Using batch processing for stability...")
+            return self._add_closest_matches_optimized_batch(unmatched_source, full_target, recon_rules, source_file, closest_match_config)
+        elif has_exact_filters or is_large_dataset:
             logger.info(f"🚀 Using ultra-optimized processing with exact match pre-filtering...")
             return self._add_closest_matches_ultra_optimized(unmatched_source, full_target, recon_rules, source_file, closest_match_config)
         elif total_comparisons > max_comparisons:
@@ -1417,11 +1423,32 @@ class OptimizedFileProcessor:
             
             source_val = details.get('source_value', 'N/A')
             target_val = details.get('target_value', 'N/A')
+            score = details.get('score', 0)
             
-            # Format the comparison (matching the style used in other functions)
-            formatted_details.append(f"{source_col}: {source_val}->{target_val}")
+            # Handle NaN/None values properly
+            import pandas as pd
+            if pd.isna(source_val) and pd.isna(target_val):
+                # Both are NaN - skip this comparison as it's not meaningful
+                continue
+            elif pd.isna(source_val):
+                source_val = "(empty)"
+            elif pd.isna(target_val):
+                target_val = "(empty)"
+            
+            # Convert to string and handle 'nan' strings
+            source_str = str(source_val)
+            target_str = str(target_val)
+            
+            if source_str.lower() == 'nan':
+                source_str = "(empty)"
+            if target_str.lower() == 'nan':
+                target_str = "(empty)"
+            
+            # Only include meaningful comparisons (not both empty)
+            if source_str != "(empty)" or target_str != "(empty)":
+                formatted_details.append(f"{source_col}: {source_str}->{target_str}")
         
-        return "; ".join(formatted_details)
+        return "; ".join(formatted_details) if formatted_details else "No meaningful comparisons found"
     
     def _add_closest_matches_ultra_optimized(self, unmatched_source: pd.DataFrame, full_target: pd.DataFrame,
                                           recon_rules: List[ReconciliationRule], source_file: str, 
@@ -1512,19 +1539,25 @@ class OptimizedFileProcessor:
         PERFECT_MATCH_THRESHOLD = closest_match_config.perfect_match_threshold if closest_match_config else 99.5
         
         # OPTIMIZATION 1: Pre-normalize string columns for exact matching
-        logger.info("🔧 Pre-normalizing columns for exact matching...")
-        target_normalized = full_target.copy()
-        source_normalized = unmatched_source.copy()
-        
-        for source_col, target_col in exact_match_columns:
-            # Normalize target column
-            target_normalized[f"{target_col}_normalized"] = target_normalized[target_col].astype(str).str.strip().str.lower()
-            # Normalize source column
-            source_normalized[f"{source_col}_normalized"] = source_normalized[source_col].astype(str).str.strip().str.lower()
+        if exact_match_columns:
+            logger.info(f"🔧 Pre-normalizing {len(exact_match_columns)} columns for exact matching...")
+            target_normalized = full_target.copy()
+            source_normalized = unmatched_source.copy()
+            
+            for i, (source_col, target_col) in enumerate(exact_match_columns, 1):
+                logger.info(f"  → Normalizing column {i}/{len(exact_match_columns)}: {source_col} ↔ {target_col}")
+                # Normalize target column with progress feedback
+                target_normalized[f"{target_col}_normalized"] = target_normalized[target_col].astype(str).str.strip().str.lower()
+                # Normalize source column
+                source_normalized[f"{source_col}_normalized"] = source_normalized[source_col].astype(str).str.strip().str.lower()
+        else:
+            # No exact match columns, skip normalization
+            target_normalized = full_target
+            source_normalized = unmatched_source
         
         # OPTIMIZATION 2: Create exact match index for fast filtering
         if exact_match_columns:
-            logger.info("🗂️ Building exact match index for fast filtering...")
+            logger.info(f"🗂️ Building exact match index for {len(full_target):,} target records...")
             
             # Create composite key for exact matching
             def create_composite_key(row, columns, suffix="_normalized"):
@@ -1534,13 +1567,23 @@ class OptimizedFileProcessor:
                     key_parts.append(str(row.get(col_name, "")))
                 return "|".join(key_parts)
             
-            # Build target index
+            # Build target index with progress tracking
             target_index = defaultdict(list)
-            for idx, row in target_normalized.iterrows():
-                composite_key = create_composite_key(row, exact_match_columns)
-                target_index[composite_key].append(idx)
+            batch_size = 10000
+            total_rows = len(target_normalized)
             
-            logger.info(f"📈 Built index with {len(target_index)} unique key combinations")
+            for batch_start in range(0, total_rows, batch_size):
+                batch_end = min(batch_start + batch_size, total_rows)
+                logger.info(f"  → Processing batch {batch_start:,}-{batch_end:,} of {total_rows:,} records...")
+                
+                batch_df = target_normalized.iloc[batch_start:batch_end]
+                for idx, row in batch_df.iterrows():
+                    composite_key = create_composite_key(row, exact_match_columns)
+                    target_index[composite_key].append(idx)
+            
+            logger.info(f"📈 Built index with {len(target_index):,} unique key combinations")
+        else:
+            target_index = None
         
         # Pre-compute column types for caching
         column_type_cache = {}
@@ -1562,18 +1605,30 @@ class OptimizedFileProcessor:
         filtered_comparisons = 0
         total_comparisons = 0
         
-        # Process each unmatched record
+        # Process each unmatched record with timeout protection
+        import time
+        loop_start_time = time.time()
+        timeout_seconds = 300  # 5 minute timeout for ultra-optimization
+        
         for idx, source_row in unmatched_source.iterrows():
+            # Check for timeout
+            if time.time() - loop_start_time > timeout_seconds:
+                logger.warning(f"⚠️ Ultra-optimization timeout after {timeout_seconds}s, falling back to batch processing...")
+                return self._add_closest_matches_optimized_batch(unmatched_source, full_target, recon_rules, source_file, closest_match_config)
+            
             best_match_score = 0.0
             best_match_record = None
             best_match_details = {}
             
             processed_count += 1
-            if processed_count % 1000 == 0:
-                logger.info(f"📊 Processed {processed_count:,} / {len(unmatched_source):,} records | Matches: {matches_found:,}")
+            if processed_count % 100 == 0:  # More frequent progress for large datasets
+                elapsed = time.time() - loop_start_time
+                rate = processed_count / elapsed if elapsed > 0 else 0
+                eta = (len(unmatched_source) - processed_count) / rate if rate > 0 else 0
+                logger.info(f"📊 Processed {processed_count:,} / {len(unmatched_source):,} records | Matches: {matches_found:,} | Rate: {rate:.1f}/s | ETA: {eta:.0f}s")
             
             # OPTIMIZATION 3: Use exact match index for pre-filtering
-            if exact_match_columns:
+            if exact_match_columns and target_index:
                 source_composite_key = create_composite_key(source_normalized.loc[idx], exact_match_columns)
                 candidate_indices = target_index.get(source_composite_key, [])
                 
