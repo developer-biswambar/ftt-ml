@@ -948,6 +948,7 @@ class OptimizedFileProcessor:
         - Minimum score thresholds
         - Batch processing for large datasets
         - Memory-efficient processing
+        - Hardware-aware thread allocation
         
         Args:
             unmatched_source: Unmatched records from source file
@@ -970,24 +971,18 @@ class OptimizedFileProcessor:
         # Use config to override comparison limits if specified
         max_comparisons = closest_match_config.max_comparisons if closest_match_config and closest_match_config.max_comparisons else 10_000_000
         
-        # Check if ultra-optimization is beneficial (exact filters or large dataset)
-        has_exact_filters = (closest_match_config and closest_match_config.specific_columns and 
-                           any(rule for rule in recon_rules))
-        is_large_dataset = total_comparisons > 1_000_000  # 1M+ comparisons benefit from ultra-optimization
-        is_very_large_dataset = total_comparisons > 50_000_000  # 50M+ comparisons should use batch processing
+        # UNIFIED APPROACH: Always use batch processing with intelligent thread allocation
+        from app.utils.threading_config import get_reconciliation_config
         
-        if is_very_large_dataset:
-            logger.info(f"⚡ Very large dataset detected ({total_comparisons:,} comparisons). Using batch processing for stability...")
-            return self._add_closest_matches_optimized_batch(unmatched_source, full_target, recon_rules, source_file, closest_match_config)
-        elif has_exact_filters or is_large_dataset:
-            logger.info(f"🚀 Using ultra-optimized processing with exact match pre-filtering...")
-            return self._add_closest_matches_ultra_optimized(unmatched_source, full_target, recon_rules, source_file, closest_match_config)
-        elif total_comparisons > max_comparisons:
-            logger.info(f"⚡ Large dataset detected ({total_comparisons:,} comparisons). Using batch processing...")
-            return self._add_closest_matches_optimized_batch(unmatched_source, full_target, recon_rules, source_file, closest_match_config)
-        else:
-            logger.info("⚙️ Using single-threaded optimization for moderate dataset size")
-            return self._add_closest_matches_optimized_single(unmatched_source, full_target, recon_rules, source_file, closest_match_config)
+        # Get optimal threading configuration for reconciliation workload
+        threading_config = get_reconciliation_config()
+        num_threads = threading_config.max_workers
+        
+        logger.info(f"🚀 Using hardware-aware threading: {num_threads} threads on {threading_config.server_class} ({threading_config.available_cores} cores)")
+        logger.info(f"📊 Dataset size: {total_comparisons:,} comparisons")
+        
+        # Always use the batch processing function with intelligent threading
+        return self._add_closest_matches_optimized_batch(unmatched_source, full_target, recon_rules, source_file, closest_match_config, num_threads)
 
     def _add_closest_matches_optimized_single(self, unmatched_source: pd.DataFrame, full_target: pd.DataFrame,
                                             recon_rules: List[ReconciliationRule], source_file: str, 
@@ -1132,7 +1127,15 @@ class OptimizedFileProcessor:
                     column_type = column_type_cache[source_col]
                     
                     # Calculate similarity
-                    similarity = self._calculate_composite_similarity(source_val, target_val, column_type)
+                    # Check cache first to avoid recalculation
+                    cache_key = f"{source_val}|{target_val}|{column_type}"
+                    if cache_key in similarity_cache:
+                        similarity = similarity_cache[cache_key]
+                    else:
+                        similarity = self._calculate_composite_similarity(source_val, target_val, column_type)
+                        similarity_cache[cache_key] = similarity
+                        if len(similarity_cache) > 10000:
+                            similarity_cache.clear()
                     column_scores[f"{source_col}_vs_{target_col}"] = {
                         'score': similarity,
                         'source_value': source_val,
@@ -1203,7 +1206,7 @@ class OptimizedFileProcessor:
 
     def _add_closest_matches_optimized_batch(self, unmatched_source: pd.DataFrame, full_target: pd.DataFrame,
                                            recon_rules: List[ReconciliationRule], source_file: str, 
-                                           closest_match_config: Optional[Dict] = None) -> pd.DataFrame:
+                                           closest_match_config: Optional[Dict] = None, num_threads: int = None) -> pd.DataFrame:
         """
         Batch processing for very large datasets with parallel processing
         
@@ -1217,6 +1220,11 @@ class OptimizedFileProcessor:
         import multiprocessing as mp
         import gc
         import time
+        
+        # Get available cores for logging (from threading config or system)
+        from app.utils.threading_config import get_reconciliation_config
+        threading_config = get_reconciliation_config()
+        available_cores = threading_config.available_cores
         
         logger.info(f"🚀 Starting advanced batch processing for large dataset...")
         batch_start_time = time.time()
@@ -1274,42 +1282,27 @@ class OptimizedFileProcessor:
                     unmatched_source[source_col].head(10).tolist()
                 )
         
-        # Determine optimal batch size and number of processes
+        # Determine optimal batch size and number of processes using threading config
         total_records = len(unmatched_source)
         
-        # Enhanced threading for high-performance servers
-        available_cores = cpu_count()
+        # Use the passed num_threads parameter (from threading config)
+        num_processes = num_threads or 1
+        logger.info(f"🔧 Using {num_processes} processes (from threading configuration)")
         
-        # Intelligent core allocation based on available hardware
-        logger.info(f"Total available cores: {available_cores}")
-        if available_cores >= 40:  # High-end server (e.g., Xeon Platinum 8260 with 48 threads)
-            max_processes = min(available_cores - 4, 32)  # Leave 4 cores free, max 32 processes
-        elif available_cores >= 20:  # Mid-range server 
-            max_processes = min(available_cores - 2, 20)  # Leave 2 cores free, max 20 processes  
-        elif available_cores >= 8:   # Standard workstation
-            max_processes = min(available_cores - 1, 12)  # Leave 1 core free, max 12 processes
-        else:  # Limited cores
-            max_processes = min(available_cores - 1, 4)   # Conservative for low-core systems
+        # Calculate optimal batch size based on dataset size and thread count
+        optimal_batch_size = max(50, min(500, total_records // num_processes)) if num_processes > 1 else total_records
         
-        num_processes = max_processes
-        logger.info(f"Total available processes: {num_processes}")
-
-        optimal_batch_size = max(50, min(500, total_records // num_processes))  # Smaller batches for more parallelism
-        
-        # Memory-aware optimization for high-RAM systems
+        # Memory-aware optimization
         estimated_memory_mb = ((total_records * len(full_target)) / 1_000_000) * 0.1  # Rough estimate in MB
         
-        # Adjust batch processing based on available memory (assuming 32GB+ systems)
+        # Adjust batch processing based on available memory
         if estimated_memory_mb > 4000:  # > 4GB estimated usage
             logger.info(f"📈 Large memory requirement detected ({estimated_memory_mb:.0f}MB estimated)")
-            # Use more aggressive parallelization for memory-intensive tasks
-            if num_processes < 20:
-                num_processes = min(num_processes * 2, 24)  # Boost parallelization
-                optimal_batch_size = max(25, optimal_batch_size // 2)  # Smaller batches
-                logger.info(f"⚡ Boosted to {num_processes} processes with smaller batches for memory efficiency")
+            # Use smaller batches for memory efficiency
+            optimal_batch_size = max(25, optimal_batch_size // 2)
+            logger.info(f"⚡ Reduced batch size to {optimal_batch_size} for memory efficiency")
         
         logger.info(f"🔧 Final Configuration: {num_processes} processes, batch size: {optimal_batch_size}")
-        logger.info(f"🖥️ Hardware: {available_cores} CPU cores detected")
         logger.info(f"📊 Processing {total_records:,} records against {len(full_target):,} targets")
         logger.info(f"💾 Estimated memory impact: {estimated_memory_mb:.0f}MB ({(total_records * len(full_target)) / 1_000_000:.1f}M potential comparisons)")
         
@@ -1340,7 +1333,7 @@ class OptimizedFileProcessor:
                     future = executor.submit(
                         self._process_batch_closest_matches,
                         batch_df, full_target, compare_columns, column_type_cache,
-                        batch_idx, len(batches), closest_match_config
+                        batch_idx, len(batches), closest_match_config, recon_rules, source_file, unmatched_source
                     )
                     future_to_batch[future] = (start_idx, batch_df)
                 
@@ -1395,8 +1388,8 @@ class OptimizedFileProcessor:
             logger.info(f"💪 Hardware utilization: {num_processes}/{available_cores} cores ({(num_processes/available_cores)*100:.1f}%)")
             
         except Exception as e:
-            logger.warning(f"⚠️ Parallel processing failed, falling back to single-threaded: {str(e)}")
-            return self._add_closest_matches_optimized_single(unmatched_source, full_target, recon_rules, source_file)
+            logger.error(f"❌ Parallel processing failed: {str(e)}")
+            raise  # Re-raise the exception instead of fallback
         
         # Force garbage collection after intensive processing
         gc.collect()
@@ -1613,8 +1606,8 @@ class OptimizedFileProcessor:
         for idx, source_row in unmatched_source.iterrows():
             # Check for timeout
             if time.time() - loop_start_time > timeout_seconds:
-                logger.warning(f"⚠️ Ultra-optimization timeout after {timeout_seconds}s, falling back to batch processing...")
-                return self._add_closest_matches_optimized_batch(unmatched_source, full_target, recon_rules, source_file, closest_match_config)
+                logger.error(f"❌ Ultra-optimization timeout after {timeout_seconds}s - dataset too large for this method")
+                raise TimeoutError(f"Ultra-optimization timed out after {timeout_seconds} seconds. Consider using smaller dataset or batch processing.")
             
             best_match_score = 0.0
             best_match_record = None
@@ -1674,7 +1667,7 @@ class OptimizedFileProcessor:
                         similarity = self._calculate_composite_similarity(source_val, target_val, column_type)
                         similarity_cache[cache_key] = similarity
                         # Limit cache size to prevent memory issues
-                        if len(similarity_cache) > 50000:
+                        if len(similarity_cache) > 10000:
                             similarity_cache.clear()
                     column_scores[f"{source_col}_vs_{target_col}"] = {
                         'score': similarity,
@@ -1739,7 +1732,10 @@ class OptimizedFileProcessor:
     def _process_batch_closest_matches(self, batch_df: pd.DataFrame, full_target: pd.DataFrame, 
                                      compare_columns: list, column_type_cache: dict, 
                                      batch_idx: int, total_batches: int, 
-                                     closest_match_config: Optional[Dict] = None) -> pd.DataFrame:
+                                     closest_match_config: Optional[Dict] = None,
+                                     recon_rules: Optional[List] = None,
+                                     source_file: Optional[str] = None,
+                                     unmatched_source: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """
         Process a single batch of records for closest matches
         This method is designed to be called by multiprocessing
@@ -1772,8 +1768,21 @@ class OptimizedFileProcessor:
             target_sample = full_target
             logger.debug(f"🔍 Batch {batch_idx}: Processing against full target ({target_size:,} records)")
         
+        # SAFE OPTIMIZATION: Add similarity caching for this batch (no logic changes)
+        similarity_cache = {}
+        processed_in_batch = 0
+        batch_start_time = time.time()
+        
         # Process each record in the batch
         for idx, source_row in batch_df.iterrows():
+            processed_in_batch += 1
+            
+            # Progress feedback for long-running batches
+            if processed_in_batch % 50 == 0:
+                elapsed = time.time() - batch_start_time
+                rate = processed_in_batch / elapsed if elapsed > 0 else 0
+                logger.debug(f"Batch {batch_idx}: Processed {processed_in_batch}/{len(batch_df)} records at {rate:.1f}/s")
+            
             best_match_score = 0.0
             best_match_record = None
             best_match_details = {}
@@ -1838,7 +1847,15 @@ class OptimizedFileProcessor:
                     column_type = column_type_cache[source_col]
                     
                     # Calculate similarity
-                    similarity = self._calculate_composite_similarity(source_val, target_val, column_type)
+                    # Check cache first to avoid recalculation
+                    cache_key = f"{source_val}|{target_val}|{column_type}"
+                    if cache_key in similarity_cache:
+                        similarity = similarity_cache[cache_key]
+                    else:
+                        similarity = self._calculate_composite_similarity(source_val, target_val, column_type)
+                        similarity_cache[cache_key] = similarity
+                        if len(similarity_cache) > 10000:
+                            similarity_cache.clear()
                     column_scores[f"{source_col}_vs_{target_col}"] = {
                         'score': similarity,
                         'source_value': source_val,
