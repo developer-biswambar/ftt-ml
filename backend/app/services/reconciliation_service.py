@@ -1397,6 +1397,32 @@ class OptimizedFileProcessor:
         
         return result_df
     
+    def _format_closest_match_details(self, column_scores: dict) -> str:
+        """
+        Format closest match details in a readable format
+        
+        Input: {'amount_vs_total_amount': {'score': 99.99, 'source_value': 899.95, 'target_value': 899.99, 'type': 'numeric'}}
+        Output: 'amount: 899.95->899.99'
+        """
+        if not column_scores:
+            return "No comparison details available"
+        
+        formatted_details = []
+        for column_key, details in column_scores.items():
+            # Extract column name (remove _vs_ part)
+            if '_vs_' in column_key:
+                source_col = column_key.split('_vs_')[0]
+            else:
+                source_col = column_key
+            
+            source_val = details.get('source_value', 'N/A')
+            target_val = details.get('target_value', 'N/A')
+            
+            # Format the comparison (matching the style used in other functions)
+            formatted_details.append(f"{source_col}: {source_val}->{target_val}")
+        
+        return "; ".join(formatted_details)
+    
     def _add_closest_matches_ultra_optimized(self, unmatched_source: pd.DataFrame, full_target: pd.DataFrame,
                                           recon_rules: List[ReconciliationRule], source_file: str, 
                                           closest_match_config: Optional[Dict] = None) -> pd.DataFrame:
@@ -1551,12 +1577,15 @@ class OptimizedFileProcessor:
                 source_composite_key = create_composite_key(source_normalized.loc[idx], exact_match_columns)
                 candidate_indices = target_index.get(source_composite_key, [])
                 
-                if not candidate_indices:
-                    continue  # No exact matches found, skip this source record
-                
-                # Filter target to only exact match candidates
-                target_candidates = full_target.loc[candidate_indices]
-                filtered_comparisons += len(candidate_indices)
+                if candidate_indices:
+                    # Found exact matches, use only those candidates
+                    target_candidates = full_target.loc[candidate_indices]
+                    filtered_comparisons += len(candidate_indices)
+                else:
+                    # No exact matches found, but still do similarity analysis on all records
+                    # This is important for closest match - we want to find the most similar even without exact matches
+                    target_candidates = full_target
+                    filtered_comparisons += len(full_target)
             else:
                 # No exact match filtering, use all target records
                 target_candidates = full_target
@@ -1624,7 +1653,7 @@ class OptimizedFileProcessor:
                         record_summary.append(f"{key}: {value}")
                     result_df.at[idx, 'closest_match_record'] = "; ".join(record_summary)
                     result_df.at[idx, 'closest_match_score'] = round(best_match_score, 2)
-                    result_df.at[idx, 'closest_match_details'] = str(best_match_details)
+                    result_df.at[idx, 'closest_match_details'] = self._format_closest_match_details(best_match_details)
         
         end_time = time.time()
         processing_time = end_time - start_time
