@@ -1,8 +1,0 @@
-employee_id,name,salary,department,hire_date,bonus,status
-1001,John Smith,52000.0,IT,2020-01-15,5200,Active
-1002,Jane Doe,60000,Marketing,2019-03-22,7500.00,Active
-1003,Bob Johnson,55000.00,Finance,2021-06-10,5500,Active
-1004,Alice Brown,67000,Marketing,2018-11-05,8500.0,Active
-1005,Charlie Wilson,45000.0,Support,2022-02-28,4500,Inactive
-1008,Sarah Miller,58000,IT,2023-01-10,6000.00,Active
-1009,Tom Anderson,48000.0,Sales,2023-03-15,4800,Active

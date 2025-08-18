@@ -11,18 +11,27 @@ from fastapi.responses import JSONResponse
 from app.services.storage_service import uploaded_files, extractions, comparisons, reconciliations
 
 # Load .env file
-try:
-    from dotenv import load_dotenv
+from dotenv import load_dotenv
 
-    load_dotenv()
-    print("✅ .env file loaded successfully")
-except ImportError:
-    print("⚠️ python-dotenv not installed. Install with: pip install python-dotenv")
+load_dotenv()
+print("✅ .env file loaded successfully")
 
 # Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4-turbo")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "20"))
+
+# Server Configuration
+HOST = os.getenv("HOST", "0.0.0.0")
+PORT = int(os.getenv("PORT", "8000"))
+SERVER_URL = os.getenv("SERVER_URL", f"http://{HOST}:{PORT}")
+API_DOCS_URL = f"{SERVER_URL}/docs"
+
+# CORS Configuration
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+if ALLOWED_ORIGINS == ["*"]:
+    # Development fallback
+    ALLOWED_ORIGINS = ["*"]
 
 # Validate configuration
 if not OPENAI_API_KEY or OPENAI_API_KEY == "sk-placeholder":
@@ -94,12 +103,8 @@ Configured for high-throughput financial data processing. Adjust based on your i
     },
     servers=[
         {
-            "url": "http://localhost:8000",
-            "description": "Development server"
-        },
-        {
-            "url": "https://api.example.com",
-            "description": "Production server"
+            "url": SERVER_URL,
+            "description": f"API Server ({os.getenv('ENVIRONMENT', 'development')})"
         }
     ],
     tags_metadata=[
@@ -144,7 +149,7 @@ Configured for high-throughput financial data processing. Adjust based on your i
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -292,40 +297,37 @@ sys.modules['app_storage'].extractions = extractions
 sys.modules['app_storage'].reconciliations = reconciliations
 
 # Import and include routers
-try:
-    from app.routes.health_routes import router as health_routes
-    from app.routes.reconciliation_routes import router as reconciliation_router
-    from app.routes.viewer_routes import router as viewer_router
-    from app.routes.file_routes import router as file_router
-    from app.routes.regex_routes import router as regex_router
-    from app.routes.delta_routes import router as delta_router
-    from app.routes.save_results_routes import router as save_results_router
-    from app.routes.recent_results_routes import router as recent_results_router
-    from app.routes.rule_management_routes import router as rule_management_router
-    from app.routes.delta_rules_router import delta_rules_router
-    from app.routes.transformation_routes import router as transformation_router
-    from app.routes.ai_assistance import router as ai_assistance_router
+from app.routes.health_routes import router as health_routes
+from app.routes.reconciliation_routes import router as reconciliation_router
+from app.routes.viewer_routes import router as viewer_router
+from app.routes.file_routes import router as file_router
+from app.routes.regex_routes import router as regex_router
+from app.routes.delta_routes import router as delta_router
+from app.routes.save_results_routes import router as save_results_router
+from app.routes.recent_results_routes import router as recent_results_router
+from app.routes.rule_management_routes import router as rule_management_router
+from app.routes.delta_rules_router import delta_rules_router
+from app.routes.transformation_routes import router as transformation_router
+from app.routes.ai_assistance import router as ai_assistance_router
 
-    app.include_router(health_routes)
-    app.include_router(reconciliation_router)
-    app.include_router(viewer_router)
-    app.include_router(file_router)
-    app.include_router(regex_router)  # NEW: Include regex routes
+app.include_router(health_routes)
+app.include_router(reconciliation_router)
+app.include_router(viewer_router)
+app.include_router(file_router)
+app.include_router(regex_router)  # NEW: Include regex routes
 
-    app.include_router(delta_router)
+app.include_router(delta_router)
 
-    app.include_router(save_results_router)
+app.include_router(save_results_router)
 
-    app.include_router(recent_results_router)
-    app.include_router(rule_management_router)
+app.include_router(recent_results_router)
+app.include_router(rule_management_router)
 
-    app.include_router(delta_rules_router)
+app.include_router(delta_rules_router)
 
-    app.include_router(transformation_router)
-    app.include_router(ai_assistance_router)
-    print("✅ All routes loaded successfully (optimized reconciliation + AI regex generation enabled)")
-except ImportError as e:
-    print(f"❌ Failed to load routes: {e}")
+app.include_router(transformation_router)
+app.include_router(ai_assistance_router)
+print("✅ All routes loaded successfully (optimized reconciliation + AI regex generation enabled)")
 
 
 @app.get("/performance/metrics")
@@ -374,7 +376,7 @@ async def startup_event():
     print("   • Paginated result retrieval")
     print("   • AI-powered regex generation")  # NEW feature
     print("🔧 Optimized for: 50k-100k record datasets")
-    print("📋 API Docs: http://localhost:8000/docs")
+    print(f"📋 API Docs: {API_DOCS_URL}")
 
 
 if __name__ == "__main__":
@@ -388,4 +390,4 @@ if __name__ == "__main__":
     print("🔗 Column Selection: ✅ Enabled")
     print("📊 Large Dataset Support: ✅ 50k-100k records")
     print("🧙 AI Regex Generation: ✅ Enabled")  # NEW feature
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run(app, host=HOST, port=PORT, log_level=os.getenv("LOG_LEVEL", "info").lower())

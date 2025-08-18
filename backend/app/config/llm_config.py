@@ -59,7 +59,7 @@ class LLMConfig:
             })
         elif provider == "jpmcllm":
             config.update({
-                "api_url": os.getenv('JPMC_LLM_URL', 'http://localhost:8080'),
+                "api_url": os.getenv('JPMC_LLM_URL'),
                 "temperature": float(os.getenv('JPMC_LLM_TEMPERATURE', '0.3')),
                 "max_tokens": int(os.getenv('JPMC_LLM_MAX_TOKENS', '2000')),
                 "timeout": int(os.getenv('JPMC_LLM_TIMEOUT', '30')),
@@ -87,28 +87,3 @@ class LLMConfig:
             if cls.is_provider_configured(provider):
                 available.append(provider)
         return available
-
-
-# Environment variable configurations:
-"""
-# To use OpenAI (default):
-LLM_PROVIDER=openai
-OPENAI_API_KEY=your_openai_key
-OPENAI_MODEL=gpt-4  # Optional, defaults to gpt-4
-OPENAI_TEMPERATURE=0.3  # Optional
-OPENAI_MAX_TOKENS=2000  # Optional
-
-# To use JPMC LLM (internal service, no API key needed):
-LLM_PROVIDER=jpmcllm
-JPMC_LLM_URL=http://localhost:8080  # Internal JPMC LLM service endpoint
-# JPMC LLM uses simplified JSON format:
-# Request: {"Message": "combined_message_string"}
-# Response: {"Message": "ai_response", ...other_details}
-JPMC_LLM_MODEL=jpmc-llm-v1  # Optional, defaults to jpmc-llm-v1
-JPMC_LLM_TEMPERATURE=0.3  # Optional
-JPMC_LLM_MAX_TOKENS=2000  # Optional
-JPMC_LLM_TIMEOUT=30  # Optional, request timeout in seconds
-
-# General settings (applies to current provider):
-LLM_MODEL=custom-model  # Override model for any provider
-"""

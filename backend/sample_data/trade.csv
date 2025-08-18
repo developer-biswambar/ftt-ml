@@ -1,4 +1,0 @@
-Trade ID,Description,Amount,Date,Comments
-TRD001,"ISIN: US0378331005 Apple Inc. Amount: $1,500,000 Currency: USD",1500000,2024-01-10,"Settlement: T+2"
-TRD002,"Security: MSFT CUSIP: 594918104 Amount: €750,000 Currency: EUR",750000,2024-01-11,"Account: MAIN-001"
-TRD003,"Trade Ref: TX123456 Amount: £2,000,000 ISIN: GB0002634946",2000000,2024-01-12,"Portfolio: EQUITY-UK"

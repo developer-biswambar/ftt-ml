@@ -181,7 +181,7 @@ class JPMCLLMService(LLMServiceInterface):
     """JPMC Custom LLM implementation - Internal service without API key"""
     
     def __init__(self, api_url: Optional[str] = None, model: str = "jpmc-llm-v1"):
-        self.api_url = api_url or os.getenv('JPMC_LLM_URL', 'http://localhost:8080')
+        self.api_url = api_url or os.getenv('JPMC_LLM_URL')
         self.model = model
         self.timeout = int(os.getenv('JPMC_LLM_TIMEOUT', '30'))
         
