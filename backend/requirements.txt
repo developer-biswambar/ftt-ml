@@ -1,11 +1,11 @@
-# backend/requirements.txt
+# backend/requirements.txt - Updated with missing dependencies
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
-pydantic-settings==2.1.0  # ADDED: Required for BaseSettings
+pydantic-settings==2.1.0
 python-multipart==0.0.6
 aiofiles==23.2.1
-openai==1.35.12            # CHANGED: Updated to latest version
+openai==1.35.12
 pandas==2.1.3
 openpyxl==3.1.2
 xlrd==2.0.1
@@ -19,22 +19,25 @@ isort==5.12.0
 flake8==6.1.0
 structlog==23.2.0
 
-# File handling
-aiofiles==23.2.0
+# String similarity and fuzzy matching
+rapidfuzz==3.5.2
 
-# AWS S3 integration (optional but recommended)
+# File handling
 boto3==1.34.0
 botocore==1.34.0
-
-# Excel/CSV processing for viewer
 xlsxwriter==3.1.9
 python-dotenv==1.0.0
 
-# New Vector DB dependencies for reconciliation
+# Vector DB dependencies for reconciliation
 chromadb==0.4.18
 sentence-transformers==2.2.2
 numpy==1.24.3
 
-# Optional: For production deployments
-# pinecone-client==2.2.4  # If using Pinecone instead of ChromaDB
-# weaviate-client==3.25.3  # If using Weaviate instead of ChromaDB
+# Development dependencies
+mypy==1.7.0
+pre-commit==3.5.0
+bandit==1.7.5
+safety==2.3.0
+pytest-xdist==3.5.0
+pytest-mock==3.12.0
+faker==20.1.0

@@ -1,0 +1,226 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_REGISTRY = 'your-ecr-registry.amazonaws.com'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        APP_NAME = 'ftt-ml'
+        AWS_DEFAULT_REGION = 'us-east-1'
+        ECS_CLUSTER = 'ftt-ml-cluster'
+    }
+    
+    stages {
+        stage('Checkout & Change Detection') {
+            steps {
+                checkout scm
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                    env.FULL_IMAGE_TAG = "${IMAGE_TAG}-${GIT_COMMIT_SHORT}"
+                    
+                    // Detect changes in each component
+                    env.BACKEND_CHANGED = sh(
+                        script: "git diff --name-only HEAD~1 HEAD | grep -q '^backend/' && echo 'true' || echo 'false'",
+                        returnStdout: true
+                    ).trim()
+                    
+                    env.FRONTEND_CHANGED = sh(
+                        script: "git diff --name-only HEAD~1 HEAD | grep -q '^frontend/' && echo 'true' || echo 'false'",
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "🔍 Change Detection:"
+                    echo "Backend Changed: ${env.BACKEND_CHANGED}"
+                    echo "Frontend Changed: ${env.FRONTEND_CHANGED}"
+                }
+            }
+        }
+        
+        stage('Build & Test') {
+            parallel {
+                stage('Backend Pipeline') {
+                    when {
+                        anyOf {
+                            environment name: 'BACKEND_CHANGED', value: 'true'
+                            branch 'main'  // Always build main branch
+                        }
+                    }
+                    stages {
+                        stage('Build Backend') {
+                            steps {
+                                script {
+                                    echo "🏗️ Building Backend (changes detected)..."
+                                    sh """
+                                        cd backend
+                                        docker build \
+                                            -t ${DOCKER_REGISTRY}/${APP_NAME}-backend:${FULL_IMAGE_TAG} \
+                                            -t ${DOCKER_REGISTRY}/${APP_NAME}-backend:latest \
+                                            .
+                                    """
+                                }
+                            }
+                        }
+                        
+                        stage('Test Backend') {
+                            steps {
+                                script {
+                                    echo "🧪 Testing Backend..."
+                                    sh """
+                                        docker run -d --name test-backend-${BUILD_NUMBER} \
+                                            -p 8001:8000 \
+                                            -e ENVIRONMENT=test \
+                                            -e OPENAI_API_KEY=test-key \
+                                            ${DOCKER_REGISTRY}/${APP_NAME}-backend:${FULL_IMAGE_TAG}
+                                        
+                                        sleep 30
+                                        curl -f http://localhost:8001/health || exit 1
+                                        
+                                        docker stop test-backend-${BUILD_NUMBER}
+                                        docker rm test-backend-${BUILD_NUMBER}
+                                    """
+                                }
+                            }
+                        }
+                        
+                        stage('Push Backend') {
+                            when {
+                                branch 'main'
+                            }
+                            steps {
+                                script {
+                                    echo "📤 Pushing Backend Image..."
+                                    sh """
+                                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
+                                        docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
+                                        
+                                        docker push ${DOCKER_REGISTRY}/${APP_NAME}-backend:${FULL_IMAGE_TAG}
+                                        docker push ${DOCKER_REGISTRY}/${APP_NAME}-backend:latest
+                                    """
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                stage('Frontend Pipeline') {
+                    when {
+                        anyOf {
+                            environment name: 'FRONTEND_CHANGED', value: 'true'
+                            branch 'main'  // Always build main branch
+                        }
+                    }
+                    stages {
+                        stage('Build Frontend') {
+                            steps {
+                                script {
+                                    echo "🏗️ Building Frontend (changes detected)..."
+                                    sh """
+                                        cd frontend
+                                        docker build \
+                                            -t ${DOCKER_REGISTRY}/${APP_NAME}-frontend:${FULL_IMAGE_TAG} \
+                                            -t ${DOCKER_REGISTRY}/${APP_NAME}-frontend:latest \
+                                            .
+                                    """
+                                }
+                            }
+                        }
+                        
+                        stage('Test Frontend') {
+                            steps {
+                                script {
+                                    echo "🧪 Testing Frontend..."
+                                    sh """
+                                        docker run -d --name test-frontend-${BUILD_NUMBER} \
+                                            -p 3001:3000 \
+                                            ${DOCKER_REGISTRY}/${APP_NAME}-frontend:${FULL_IMAGE_TAG}
+                                        
+                                        sleep 15
+                                        curl -f http://localhost:3001/health || exit 1
+                                        
+                                        docker stop test-frontend-${BUILD_NUMBER}
+                                        docker rm test-frontend-${BUILD_NUMBER}
+                                    """
+                                }
+                            }
+                        }
+                        
+                        stage('Push Frontend') {
+                            when {
+                                branch 'main'
+                            }
+                            steps {
+                                script {
+                                    echo "📤 Pushing Frontend Image..."
+                                    sh """
+                                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
+                                        docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
+                                        
+                                        docker push ${DOCKER_REGISTRY}/${APP_NAME}-frontend:${FULL_IMAGE_TAG}
+                                        docker push ${DOCKER_REGISTRY}/${APP_NAME}-frontend:latest
+                                    """
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy') {
+            when {
+                branch 'main'
+            }
+            parallel {
+                stage('Deploy Backend') {
+                    when {
+                        environment name: 'BACKEND_CHANGED', value: 'true'
+                    }
+                    steps {
+                        script {
+                            echo "🚀 Deploying Backend..."
+                            sh """
+                                aws ecs update-service \
+                                    --cluster ${ECS_CLUSTER} \
+                                    --service ftt-ml-backend-service \
+                                    --force-new-deployment \
+                                    --region ${AWS_DEFAULT_REGION}
+                            """
+                        }
+                    }
+                }
+                
+                stage('Deploy Frontend') {
+                    when {
+                        environment name: 'FRONTEND_CHANGED', value: 'true'
+                    }
+                    steps {
+                        script {
+                            echo "🚀 Deploying Frontend..."
+                            sh """
+                                aws ecs update-service \
+                                    --cluster ${ECS_CLUSTER} \
+                                    --service ftt-ml-frontend-service \
+                                    --force-new-deployment \
+                                    --region ${AWS_DEFAULT_REGION}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            sh '''
+                docker stop test-backend-${BUILD_NUMBER} || true
+                docker stop test-frontend-${BUILD_NUMBER} || true
+                docker rm test-backend-${BUILD_NUMBER} || true
+                docker rm test-frontend-${BUILD_NUMBER} || true
+                docker image prune -f
+            '''
+        }
+    }
+}

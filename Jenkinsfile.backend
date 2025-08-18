@@ -1,0 +1,122 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_REGISTRY = 'your-ecr-registry.amazonaws.com'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        APP_NAME = 'ftt-ml'
+        SERVICE_NAME = 'backend'
+        AWS_DEFAULT_REGION = 'us-east-1'
+        ECS_CLUSTER = 'ftt-ml-cluster'
+        ECS_SERVICE = 'ftt-ml-backend-service'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                    env.FULL_IMAGE_TAG = "${IMAGE_TAG}-${GIT_COMMIT_SHORT}"
+                }
+            }
+        }
+        
+        stage('Build Backend') {
+            steps {
+                script {
+                    echo "🏗️ Building Backend Docker Image..."
+                    sh """
+                        cd backend
+                        docker build \
+                            -t ${DOCKER_REGISTRY}/${APP_NAME}-${SERVICE_NAME}:${FULL_IMAGE_TAG} \
+                            -t ${DOCKER_REGISTRY}/${APP_NAME}-${SERVICE_NAME}:latest \
+                            .
+                    """
+                }
+            }
+        }
+        
+        stage('Test Backend') {
+            steps {
+                script {
+                    echo "🧪 Testing Backend Container..."
+                    sh """
+                        # Run backend tests
+                        docker run --rm \
+                            -e ENVIRONMENT=test \
+                            -e PYTHONPATH=/app \
+                            ${DOCKER_REGISTRY}/${APP_NAME}-${SERVICE_NAME}:${FULL_IMAGE_TAG} \
+                            python -m pytest test/ --maxfail=1 --disable-warnings -v
+                        
+                        # Health check test
+                        docker run -d --name test-backend-${BUILD_NUMBER} \
+                            -p 8001:8000 \
+                            -e ENVIRONMENT=test \
+                            -e OPENAI_API_KEY=test-key \
+                            ${DOCKER_REGISTRY}/${APP_NAME}-${SERVICE_NAME}:${FULL_IMAGE_TAG}
+                        
+                        sleep 30
+                        curl -f http://localhost:8001/health || exit 1
+                        
+                        docker stop test-backend-${BUILD_NUMBER}
+                        docker rm test-backend-${BUILD_NUMBER}
+                    """
+                }
+            }
+        }
+        
+        stage('Push Backend') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            steps {
+                script {
+                    echo "📤 Pushing Backend Image..."
+                    sh """
+                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
+                        docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
+                        
+                        docker push ${DOCKER_REGISTRY}/${APP_NAME}-${SERVICE_NAME}:${FULL_IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/${APP_NAME}-${SERVICE_NAME}:latest
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy Backend') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo "🚀 Deploying Backend to ECS..."
+                    sh """
+                        aws ecs update-service \
+                            --cluster ${ECS_CLUSTER} \
+                            --service ${ECS_SERVICE} \
+                            --force-new-deployment \
+                            --region ${AWS_DEFAULT_REGION}
+                        
+                        aws ecs wait services-stable \
+                            --cluster ${ECS_CLUSTER} \
+                            --services ${ECS_SERVICE} \
+                            --region ${AWS_DEFAULT_REGION}
+                    """
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            sh 'docker image prune -f'
+        }
+    }
+}

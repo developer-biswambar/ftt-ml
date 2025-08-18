@@ -1,0 +1,117 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_REGISTRY = 'your-ecr-registry.amazonaws.com'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        APP_NAME = 'ftt-ml'
+        SERVICE_NAME = 'frontend'
+        AWS_DEFAULT_REGION = 'us-east-1'
+        ECS_CLUSTER = 'ftt-ml-cluster'
+        ECS_SERVICE = 'ftt-ml-frontend-service'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                    env.FULL_IMAGE_TAG = "${IMAGE_TAG}-${GIT_COMMIT_SHORT}"
+                }
+            }
+        }
+        
+        stage('Build Frontend') {
+            steps {
+                script {
+                    echo "🏗️ Building Frontend Docker Image..."
+                    sh """
+                        cd frontend
+                        docker build \
+                            --build-arg REACT_APP_API_URL=https://your-api-domain.com \
+                            -t ${DOCKER_REGISTRY}/${APP_NAME}-${SERVICE_NAME}:${FULL_IMAGE_TAG} \
+                            -t ${DOCKER_REGISTRY}/${APP_NAME}-${SERVICE_NAME}:latest \
+                            .
+                    """
+                }
+            }
+        }
+        
+        stage('Test Frontend') {
+            steps {
+                script {
+                    echo "🧪 Testing Frontend Container..."
+                    sh """
+                        # Start container for testing
+                        docker run -d --name test-frontend-${BUILD_NUMBER} \
+                            -p 3001:3000 \
+                            ${DOCKER_REGISTRY}/${APP_NAME}-${SERVICE_NAME}:${FULL_IMAGE_TAG}
+                        
+                        sleep 15
+                        curl -f http://localhost:3001/health || exit 1
+                        
+                        # Test main page loads
+                        curl -f http://localhost:3001/ || exit 1
+                        
+                        docker stop test-frontend-${BUILD_NUMBER}
+                        docker rm test-frontend-${BUILD_NUMBER}
+                    """
+                }
+            }
+        }
+        
+        stage('Push Frontend') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            steps {
+                script {
+                    echo "📤 Pushing Frontend Image..."
+                    sh """
+                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
+                        docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
+                        
+                        docker push ${DOCKER_REGISTRY}/${APP_NAME}-${SERVICE_NAME}:${FULL_IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/${APP_NAME}-${SERVICE_NAME}:latest
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy Frontend') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo "🚀 Deploying Frontend to ECS..."
+                    sh """
+                        aws ecs update-service \
+                            --cluster ${ECS_CLUSTER} \
+                            --service ${ECS_SERVICE} \
+                            --force-new-deployment \
+                            --region ${AWS_DEFAULT_REGION}
+                        
+                        aws ecs wait services-stable \
+                            --cluster ${ECS_CLUSTER} \
+                            --services ${ECS_SERVICE} \
+                            --region ${AWS_DEFAULT_REGION}
+                    """
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            sh 'docker image prune -f'
+        }
+    }
+}
