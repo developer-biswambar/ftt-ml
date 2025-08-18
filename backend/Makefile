@@ -70,6 +70,18 @@ production-start: ## Start production server with optimized settings
 	@echo "$(BLUE)Starting production server...$(NC)"
 	$(POETRY) run uvicorn app.main:app --host $(HOST) --port $(PORT) --workers 4 --log-level info
 
+waitress-start: ## Start application using Waitress WSGI server
+	@echo "$(BLUE)Starting application with Waitress...$(NC)"
+	$(POETRY) run python app/server.py
+
+waitress-dev: ## Start Waitress in development mode
+	@echo "$(BLUE)Starting Waitress in development mode...$(NC)"
+	ENVIRONMENT=development DEBUG=true $(POETRY) run python app/server.py
+
+waitress-prod: ## Start Waitress in production mode
+	@echo "$(BLUE)Starting Waitress in production mode...$(NC)"
+	ENVIRONMENT=production DEBUG=false WAITRESS_THREADS=8 $(POETRY) run python app/server.py
+
 # ==================== TESTING ====================
 
 test: ## Run all tests
